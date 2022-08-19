@@ -1,0 +1,17 @@
+html, body {
+    margin: 0;
+    padding: 0;
+}
+
+#longStrip {
+    height: 100vh;
+    overflow: hidden;
+}
+#longStrip > img {
+    /*height: 100vh;*/
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+    width: 50vh;
+    margin-top: -12vh;
+}

@@ -1,0 +1,35 @@
+name: release
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  release_x86_64_linux:
+    runs-on: [self-hosted, release]
+    timeout-minutes: 5
+
+    steps:
+      - name: checkout
+        uses: actions/checkout@v2
+        with:
+          submodules: 'recursive'
+
+      - name: test
+        run: ~/zig-stable/zig build -Drelease-fast=true -Dtarget=x86_64-linux test
+
+      - name: build
+        run: ~/zig-stable/zig build -Drelease-fast=true -Dtarget=x86_64-linux
+
+      - name: rename
+        run: mv zig-out yorstory
+
+      - name: zip
+        run: tar -czf yorstory.tar.gz yorstory
+
+      - name: copy
+        run: cp yorstory.tar.gz ~/ci/builds/yorstory/yorstory.`date '+%s'`.tar.gz

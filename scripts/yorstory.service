@@ -1,0 +1,10 @@
+After=network.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=1
+User=root
+WorkingDirectory=/usr/bin/yorstory
+ExecStart=/usr/bin/yorstory/yorstory 80

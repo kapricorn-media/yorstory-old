@@ -1,0 +1,15 @@
+name: verify
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  schedule:
+    - cron: "6 5 * * *"
+
+jobs:
+  verify:
+    uses: kapricorn-media/github/.github/workflows/verify.yaml@main
