@@ -1,3 +1,5 @@
+[Unit]
+Description=yorstory
 After=network.target
 StartLimitIntervalSec=0
 
@@ -8,3 +10,6 @@ RestartSec=1
 User=root
 WorkingDirectory=/usr/bin/yorstory
 ExecStart=/usr/bin/yorstory/yorstory 80
+
+[Install]
+WantedBy=multi-user.target
