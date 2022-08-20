@@ -47,7 +47,7 @@ const linkShaderProgram = function(vertexShaderId, fragmentShaderId) {
     return glPrograms.length - 1;
 };
 
-const createTexture = function(imgUrlPtr, imgUrlLen) {
+const createTexture = function(imgUrlPtr, imgUrlLen, wrap) {
     const imgUrl = readCharStr(imgUrlPtr, imgUrlLen);
 
     const texture = gl.createTexture();
@@ -61,7 +61,7 @@ const createTexture = function(imgUrlPtr, imgUrlLen) {
     const border = 0;
     const srcFormat = gl.RGBA;
     const srcType = gl.UNSIGNED_BYTE;
-    const pixel = new Uint8Array([0, 0, 255, 255]);  // opaque blue
+    const pixel = new Uint8Array([255, 255, 255, 255]);
     gl.texImage2D(gl.TEXTURE_2D, level, internalFormat, width, height, border, srcFormat, srcType, pixel);
 
     const image = new Image();
@@ -69,18 +69,13 @@ const createTexture = function(imgUrlPtr, imgUrlLen) {
         gl.bindTexture(gl.TEXTURE_2D, texture);
         gl.texImage2D(gl.TEXTURE_2D, level, internalFormat, srcFormat, srcType, image);
 
-        // WebGL1 has different requirements for power of 2 images
-        // vs non power of 2 images so check if the image is a
-        // power of 2 in both dimensions.
         if (isPowerOfTwo(image.width) && isPowerOfTwo(image.height)) {
-            // Yes, it's a power of 2. Generate mips.
             gl.generateMipmap(gl.TEXTURE_2D);
         } else {
-            // No, it's not a power of 2. Turn off mips and set
-            // wrapping to clamp to edge
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrap);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, wrap);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
         }
     };
     image.src = imgUrl;
@@ -89,17 +84,22 @@ const createTexture = function(imgUrlPtr, imgUrlLen) {
     return glTextures.length - 1;
 };
 
+const glClear = function(x) {
+    gl.clear(x);
+};
 const glClearColor = function(r, g, b, a) {
     gl.clearColor(r, g, b, a);
 };
+
 const glEnable = function(x) {
     gl.enable(x);
 };
+
+const glBlendFunc = function(x, y) {
+    gl.blendFunc(x, y);
+};
 const glDepthFunc = function(x) {
     gl.depthFunc(x);
-};
-const glClear = function(x) {
-    gl.clear(x);
 };
 
 const glGetAttribLocation = function(programId, namePtr, nameLen) {
@@ -164,10 +164,13 @@ const env = {
     linkShaderProgram,
     createTexture,
 
-    glClearColor,
-    glEnable,
-    glDepthFunc,
     glClear,
+    glClearColor,
+
+    glEnable,
+
+    glBlendFunc,
+    glDepthFunc,
 
     glGetAttribLocation,
     glGetUniformLocation,
@@ -202,16 +205,26 @@ function fetchAndInstantiate(url, importObject) {
     });
 }
 
+function updateCanvasSize()
+{
+    _canvas.width = window.innerWidth;
+    _canvas.height = window.innerHeight;
+
+    gl.viewport(0, 0, _canvas.width, _canvas.height);
+
+    console.log(`canvas resize: ${_canvas.width} x ${_canvas.height}`);
+}
+
 window.onload = function() {
     console.log("window.onload");
 
     _canvas = document.getElementById("canvas");
-    _canvas.width = window.innerWidth;
-    _canvas.height = window.innerHeight;
-    console.log(`canvas: ${_canvas.width} x ${_canvas.height}`);
+    gl = _canvas.getContext("webgl") || _canvas.getContext("experimental-webgl");
+    updateCanvasSize();
 
-    gl = _canvas.getContext('webgl') || _canvas.getContext('experimental-webgl');
-    gl.viewport(0, 0, _canvas.width, _canvas.height);
+    addEventListener("resize", function() {
+        updateCanvasSize();
+    });
 
     fetchAndInstantiate("yorstory.wasm", {env}).then(function(instance) {
         _memory = instance.exports.memory;
