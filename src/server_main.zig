@@ -4,8 +4,9 @@ const std = @import("std");
 const http = @import("http-common");
 const server = @import("http-server");
 
-// const config = @import("config");
+const config = @import("config");
 
+const WASM_PATH = if (config.DEBUG) "zig-out/yorstory.wasm" else "yourstory.wasm";
 // const DOMAIN = if (config.DEBUG) "localhost" else "yorstory.com";
 const SERVER_IP = "0.0.0.0";
 
@@ -36,7 +37,11 @@ fn serverCallback(
 
     switch (request.method) {
         .Get => {
-            try server.serveStatic(writer, request.uri, "static", allocator);
+            if (std.mem.eql(u8, request.uri, "/yorstory.wasm")) {
+                try server.writeFileResponse(writer, WASM_PATH, allocator);
+            } else {
+                try server.serveStatic(writer, request.uri, "static", allocator);
+            }
         },
         .Post => {
             try server.writeCode(writer, ._404);

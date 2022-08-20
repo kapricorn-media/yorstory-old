@@ -10,23 +10,32 @@ pub fn build(b: *std.build.Builder) void
     const mode = b.standardReleaseOptions();
     const target = b.standardTargetOptions(.{});
     const isDebug = mode == .Debug;
-    _ = isDebug;
+
+    const installDirRoot = std.build.InstallDir {
+        .custom = "",
+    };
 
     const server = b.addExecutable(PROJECT_NAME, "src/server_main.zig");
     server.setBuildMode(mode);
     server.setTarget(target);
-    // const configSrc = if (isDebug) "src/config_debug.zig" else "src/config_release.zig";
-    // server.addPackagePath("config", configSrc);
+    const configSrc = if (isDebug) "src/config_debug.zig" else "src/config_release.zig";
+    server.addPackagePath("config", configSrc);
     zig_bearssl_build.addLib(server, target, "deps/zig-bearssl");
     zig_http_build.addLibClient(server, target, "deps/zig-http");
     zig_http_build.addLibCommon(server, target, "deps/zig-http");
     zig_http_build.addLibServer(server, target, "deps/zig-http");
     server.linkLibC();
-    const installDirRoot = std.build.InstallDir {
-        .custom = "",
-    };
     server.override_dest_dir = installDirRoot;
     server.install();
+
+    const wasm = b.addSharedLibrary(PROJECT_NAME, "src/main.zig", .unversioned);
+    wasm.setBuildMode(mode);
+    wasm.setTarget(.{
+        .cpu_arch = .wasm32,
+        .os_tag = .freestanding,
+    });
+    wasm.override_dest_dir = installDirRoot;
+    wasm.install();
 
     const installDirScripts = std.build.InstallDir {
         .custom = "scripts",
@@ -46,17 +55,7 @@ pub fn build(b: *std.build.Builder) void
         .install_subdir = "",
     });
 
-    const serverRun = server.run();
-    serverRun.step.dependOn(b.getInstallStep());
-    if (b.args) |args| {
-        serverRun.addArgs(args);
-    }
-
-    const runStep = b.step("run", "Run the app");
-    runStep.dependOn(&serverRun.step);
-
     const runTests = b.step("test", "Run tests");
-
     const testSrcs = [_][]const u8 {
         "src/server_main.zig",
     };
