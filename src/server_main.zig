@@ -6,7 +6,7 @@ const server = @import("http-server");
 
 const config = @import("config");
 
-const WASM_PATH = if (config.DEBUG) "zig-out/yorstory.wasm" else "yourstory.wasm";
+const WASM_PATH = if (config.DEBUG) "zig-out/yorstory.wasm" else "yorstory.wasm";
 // const DOMAIN = if (config.DEBUG) "localhost" else "yorstory.com";
 const SERVER_IP = "0.0.0.0";
 
