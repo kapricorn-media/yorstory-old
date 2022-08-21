@@ -3,7 +3,7 @@ const std = @import("std");
 const m = @import("math.zig");
 
 // Shaders
-extern fn consoleLog(messagePtr: *const u8, messageLen: c_uint) void;
+extern fn consoleMessage(isError: bool, messagePtr: *const u8, messageLen: c_uint) void;
 extern fn compileShader(source: *const u8 , len:  c_uint, type: c_uint) c_uint;
 extern fn linkShaderProgram(vertexShaderId: c_uint, fragmentShaderId: c_uint) c_uint;
 extern fn createTexture(imgUrlPtr: *const u8, imgUrlLen: c_uint, wrapMode: c_uint) c_uint;
@@ -69,23 +69,23 @@ pub fn log(
     comptime format: []const u8,
     args: anytype) void
 {
-    _ = message_level; _ = scope;
+    _ = scope;
 
     var buf: [2048]u8 = undefined;
     const message = std.fmt.bufPrint(&buf, format, args) catch {
         const errMsg = "bufPrint failed for format: " ++ format;
-        consoleLog(&errMsg[0], errMsg.len);
+        consoleMessage(true, &errMsg[0], errMsg.len);
         return;
     };
-    consoleLog(&message[0], message.len);
+
+    const isError = switch (message_level) {
+        .err, .warn => true, 
+        .info, .debug => false,
+    };
+    consoleMessage(isError, &message[0], message.len);
 }
 
 var _state: State = undefined;
-
-fn createTextureNice(url: []const u8, wrapMode: c_uint) c_uint
-{
-    return createTexture(&url[0], url.len, wrapMode);
-}
 
 fn floatPosToNdc(pos: f32, canvas: f32) f32
 {
@@ -143,33 +143,83 @@ fn sizeToNdc(comptime T: type, size: T, canvas: T) T
     }
 }
 
+const Texture = enum(usize) {
+    Logo,
+    ScrollingText,
+    Icons,
+    Categories,
+};
+
+const TextureData = struct {
+    id: c_uint,
+    size: m.Vec2i,
+
+    const Self = @This();
+
+    fn init(url: []const u8, wrapMode: c_uint) !Self
+    {
+        const texture = createTexture(&url[0], url.len, wrapMode);
+        if (texture == -1) {
+            return error.createTextureFailed;
+        }
+
+        return Self {
+            .id = texture,
+            .size = m.Vec2i.zero, // set later when the image is loaded from URL
+        };
+    }
+
+    fn loaded(self: Self) bool
+    {
+        return !m.Vec2i.eql(self.size, m.Vec2i.zero);
+    }
+};
+
+const Assets = struct {
+    const numTextures = @typeInfo(Texture).Enum.fields.len;
+
+    textures: [numTextures]TextureData,
+
+    const Self = @This();
+
+    fn init() !Self
+    {
+        var self: Self = undefined;
+        self.textures[@enumToInt(Texture.Logo)] = try TextureData.init(
+            "images/logo.png", GL_CLAMP_TO_EDGE
+        );
+        self.textures[@enumToInt(Texture.ScrollingText)] = try TextureData.init(
+            "images/scrolling-text.png",GL_REPEAT
+        );
+        self.textures[@enumToInt(Texture.Icons)] = try TextureData.init(
+            "images/icons.png", GL_CLAMP_TO_EDGE
+        );
+        self.textures[@enumToInt(Texture.Categories)] = try TextureData.init(
+            "images/categories.png", GL_CLAMP_TO_EDGE
+        );
+        return self;
+    }
+
+    fn getTextureData(self: Self, texture: Texture) TextureData
+    {
+        return self.textures[@enumToInt(texture)];
+    }
+};
+
 const State = struct {
     timestampMsPrev: c_int,
-
     quad: QuadState,
-
-    textureLogo: c_uint,
-    textureScrollingText: c_uint,
-    textureIcons: c_uint,
-
+    assets: Assets,
     scrollingTextY: f32,
 
     const Self = @This();
 
-    const logoSize = m.Vec2i.init(4096, 1024);
-    const scrollingTextSize = m.Vec2i.init(512, 2048);
-
-    pub fn init() Self
+    pub fn init() !Self
     {
         return Self {
             .timestampMsPrev = 0,
-
-            .quad = QuadState.init(),
-
-            .textureLogo = createTextureNice("images/logo.png", GL_CLAMP_TO_EDGE),
-            .textureScrollingText = createTextureNice("images/scrolling-text.png", GL_REPEAT),
-            .textureIcons = createTextureNice("images/icons.png", GL_CLAMP_TO_EDGE),
-
+            .quad = try QuadState.init(),
+            .assets = try Assets.init(),
             .scrollingTextY = 0.0,
         };
     }
@@ -209,10 +259,9 @@ const QuadState = struct {
 
     const Self = @This();
 
-    pub fn init() Self
+    pub fn init() !Self
     {
-        std.log.info("init", .{});
-
+        // TODO error check all these
         const vertQuadId = compileShader(&vertQuad[0], vertQuad.len, GL_VERTEX_SHADER);
         const fragQuadId = compileShader(&fragQuad[0], fragQuad.len, GL_FRAGMENT_SHADER);
 
@@ -229,19 +278,40 @@ const QuadState = struct {
 
         const a_position = "a_position";
         const positionAttrLoc = glGetAttribLocation(programId, &a_position[0], a_position.len);
+        if (positionAttrLoc == -1) {
+            return error.MissingAttrLoc;
+        }
         const a_uv = "a_uv";
         const uvAttrLoc = glGetAttribLocation(programId, &a_uv[0], a_uv.len);
+        if (uvAttrLoc == -1) {
+            return error.MissingAttrLoc;
+        }
 
         const u_offsetPos = "u_offsetPos";
         const offsetPosUniLoc = glGetUniformLocation(programId, &u_offsetPos[0], u_offsetPos.len);
+        if (offsetPosUniLoc == -1) {
+            return error.MissingUniformLoc;
+        }
         const u_scalePos = "u_scalePos";
         const scalePosUniLoc = glGetUniformLocation(programId, &u_scalePos[0], u_scalePos.len);
+        if (scalePosUniLoc == -1) {
+            return error.MissingUniformLoc;
+        }
         const u_offsetUv = "u_offsetUv";
         const offsetUvUniLoc = glGetUniformLocation(programId, &u_offsetUv[0], u_offsetUv.len);
+        if (offsetUvUniLoc == -1) {
+            return error.MissingUniformLoc;
+        }
         const u_scaleUv = "u_scaleUv";
         const scaleUvUniLoc = glGetUniformLocation(programId, &u_scaleUv[0], u_scaleUv.len);
+        if (scaleUvUniLoc == -1) {
+            return error.MissingUniformLoc;
+        }
         const u_sampler = "u_sampler";
         const samplerUniLoc = glGetUniformLocation(programId, &u_sampler[0], u_sampler.len);
+        if (samplerUniLoc == -1) {
+            return error.MissingUniformLoc;
+        }
 
         return Self {
             .positionBuffer = positionBuffer,
@@ -316,7 +386,10 @@ const QuadState = struct {
 
 export fn onInit() void
 {
-    _state = State.init();
+    _state = State.init() catch |err| {
+        std.log.err("State init failed, err {}", .{err});
+        return;
+    };
     std.log.info("{}", .{_state});
 
     glClearColor(1.0, 1.0, 1.0, 1.0);
@@ -332,6 +405,7 @@ export fn onAnimationFrame(width: c_int, height: c_int, timestampMs: c_int) void
     const screenSizeI = m.Vec2i.init(@intCast(i32, width), @intCast(i32, height));
     const screenSizeF = m.Vec2.initFromVec2i(screenSizeI);
     const halfScreenSizeF = m.Vec2.divScalar(screenSizeF, 2.0);
+    _ = halfScreenSizeF;
 
     const deltaMs = if (_state.timestampMsPrev > 0) (timestampMs - _state.timestampMsPrev) else 0;
     const deltaS = @intToFloat(f32, deltaMs) / 1000.0;
@@ -344,13 +418,23 @@ export fn onAnimationFrame(width: c_int, height: c_int, timestampMs: c_int) void
 
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    const logoSizeF = m.Vec2.initFromVec2i(State.logoSize); // original pixel size
+    const textureLogo = _state.assets.getTextureData(Texture.Logo);
+    const textureText = _state.assets.getTextureData(Texture.ScrollingText);
+    const textureIcons = _state.assets.getTextureData(Texture.Icons);
+    const textureCategories = _state.assets.getTextureData(Texture.Categories);
+
+    if (!textureLogo.loaded() or !textureText.loaded() or !textureIcons.loaded() or !textureCategories.loaded()) {
+        std.log.info("skipping, not loaded", .{});
+        return;
+    }
+
+    const logoSizeF = m.Vec2.initFromVec2i(textureLogo.size); // original pixel size
     const logoWidthPixels = screenSizeF.x * 0.34;
     const logoAspect = logoSizeF.x / logoSizeF.y;
     const logoSizePixels = m.Vec2.init(logoWidthPixels, logoWidthPixels / logoAspect);
     const logoPosPixels = m.Vec2.sub(halfScreenSizeF, m.Vec2.divScalar(logoSizePixels, 2.0));
 
-    const textSizeF = m.Vec2.initFromVec2i(State.scrollingTextSize); // original pixel size
+    const textSizeF = m.Vec2.initFromVec2i(textureText.size); // original pixel size
     const textWidthPixels = logoWidthPixels * textSizeF.x / logoSizeF.x;
     const textAspect = textSizeF.x / textSizeF.y;
     const textSizePixels = m.Vec2.init(textWidthPixels, textWidthPixels / textAspect);
@@ -368,13 +452,49 @@ export fn onAnimationFrame(width: c_int, height: c_int, timestampMs: c_int) void
         const uvOffset = m.Vec2.init(0.0, _state.scrollingTextY);
         const uvScale = m.Vec2.one;
         _state.quad.drawQuadUvOffset(
-            pos, textSizePixels, uvOffset, uvScale, _state.textureScrollingText, screenSizeF
+            pos, textSizePixels, uvOffset, uvScale, textureText.id, screenSizeF
         );
     }
 
-    // _state.quad.drawQuad(logoPosPixels, logoSizePixels, _state.textureLogo, screenSizeF);
+    const iconsSizeF = m.Vec2.initFromVec2i(textureIcons.size); // original pixel size
+    const iconsWidthPixels = 0.75 * logoWidthPixels * iconsSizeF.x / logoSizeF.x;
+    const iconsAspect = iconsSizeF.x / iconsSizeF.y;
+    const iconsSizePixels = m.Vec2.init(iconsWidthPixels, iconsWidthPixels / iconsAspect);
+    const iconsPosPixels = m.Vec2.init(
+        halfScreenSizeF.x + logoSizePixels.x * 0.07,
+        textPosPixels.y - iconsSizePixels.y,
+    );
+    _state.quad.drawQuad(iconsPosPixels, iconsSizePixels, textureIcons.id, screenSizeF);
 
-    _state.quad.drawQuad(logoPosPixels, logoSizePixels, _state.textureLogo, screenSizeF);
+    _state.quad.drawQuad(logoPosPixels, logoSizePixels, textureLogo.id, screenSizeF);
+
+    const categoriesSizeF = m.Vec2.initFromVec2i(textureCategories.size); // original pixel size
+    const categoriesWidthPixels = logoWidthPixels * categoriesSizeF.x / logoSizeF.x;
+    const categoriesAspect = categoriesSizeF.x / categoriesSizeF.y;
+    const categoriesSizePixels = m.Vec2.init(categoriesWidthPixels, categoriesWidthPixels / categoriesAspect);
+    const categoriesPosPixels = m.Vec2.init(
+        halfScreenSizeF.x - categoriesSizePixels.x / 2.0,
+        halfScreenSizeF.y - logoSizePixels.y * 1.5,
+    );
+    _state.quad.drawQuad(categoriesPosPixels, categoriesSizePixels, textureCategories.id, screenSizeF);
 
     _state.timestampMsPrev = timestampMs;
+}
+
+export fn onTextureLoaded(textureId: c_uint, width: c_int, height: c_int) void
+{
+    std.log.info("onTextureLoaded {}: {} x {}", .{textureId, width, height});
+
+    var found = false;
+    for (_state.assets.textures) |*texture| {
+        if (texture.id == textureId) {
+            texture.size = m.Vec2i.init(width, height);
+            found = true;
+            break;
+        }
+    }
+
+    if (!found) {
+        std.log.err("onTextureLoaded not found!", .{});
+    }
 }

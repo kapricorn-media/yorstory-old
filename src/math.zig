@@ -14,6 +14,11 @@ pub const Vec2i = packed struct {
         return Self { .x = x, .y = y };
     }
 
+    pub fn eql(v1: Self, v2: Self) bool
+    {
+        return v1.x == v2.x and v1.y == v2.y;
+    }
+
     pub fn add(v1: Self, v2: Self) Self
     {
         return Self {
@@ -65,6 +70,11 @@ pub const Vec2 = packed struct {
         return Self.init(@intToFloat(f32, v.x), @intToFloat(f32, v.y));
     }
 
+    pub fn eql(v1: Self, v2: Self) bool
+    {
+        return v1.x == v2.x and v1.y == v2.y;
+    }
+
     pub fn add(v1: Self, v2: Self) Self
     {
         return Self {
@@ -111,6 +121,11 @@ pub const Vec3 = packed struct {
     pub fn init(x: f32, y: f32, z: f32) Self
     {
         return Self { .x = x, .y = y, .z = z };
+    }
+
+    pub fn eql(v1: Self, v2: Self) bool
+    {
+        return v1.x == v2.x and v1.y == v2.y and v1.z == v2.z;
     }
 
     pub fn add(v1: Self, v2: Self) Self

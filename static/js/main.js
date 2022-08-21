@@ -1,10 +1,14 @@
-let _memory;
+let _wasmInstance = null;
 let _canvas = null;
 let gl = null;
 
-function consoleLog(messagePtr, messageLen) {
+function consoleMessage(isError, messagePtr, messageLen) {
     const message = readCharStr(messagePtr, messageLen);
-    console.log(message);
+    if (isError) {
+        console.error(message);
+    } else {
+        console.log(message);
+    }
 }
 
 function isPowerOfTwo(x) {
@@ -12,7 +16,7 @@ function isPowerOfTwo(x) {
 }
 
 const readCharStr = function(ptr, len) {
-    const bytes = new Uint8Array(_memory.buffer, ptr, len);
+    const bytes = new Uint8Array(_wasmInstance.exports.memory.buffer, ptr, len);
     return new TextDecoder("utf-8").decode(bytes);
 };
 
@@ -64,6 +68,9 @@ const createTexture = function(imgUrlPtr, imgUrlLen, wrap) {
     const pixel = new Uint8Array([255, 255, 255, 255]);
     gl.texImage2D(gl.TEXTURE_2D, level, internalFormat, width, height, border, srcFormat, srcType, pixel);
 
+    glTextures.push(texture);
+    const index = glTextures.length - 1;
+
     const image = new Image();
     image.onload = function() {
         gl.bindTexture(gl.TEXTURE_2D, texture);
@@ -77,11 +84,12 @@ const createTexture = function(imgUrlPtr, imgUrlLen, wrap) {
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
         }
+
+        _wasmInstance.exports.onTextureLoaded(index, image.width, image.height);
     };
     image.src = imgUrl;
 
-    glTextures.push(texture);
-    return glTextures.length - 1;
+    return index;
 };
 
 const glClear = function(x) {
@@ -132,7 +140,7 @@ const glBindBuffer = function(type, bufferId) {
     gl.bindBuffer(type, glBuffers[bufferId]);
 };
 const glBufferData = function(type, dataPtr, count, drawType) {
-    const floats = new Float32Array(_memory.buffer, dataPtr, count);
+    const floats = new Float32Array(_wasmInstance.exports.memory.buffer, dataPtr, count);
     gl.bufferData(type, floats, drawType);
 };
 
@@ -159,7 +167,7 @@ const glDrawArrays = function(type, offset, count) {
 };
 
 const env = {
-    consoleLog,
+    consoleMessage,
     compileShader,
     linkShaderProgram,
     createTexture,
@@ -227,7 +235,7 @@ window.onload = function() {
     });
 
     fetchAndInstantiate("yorstory.wasm", {env}).then(function(instance) {
-        _memory = instance.exports.memory;
+        _wasmInstance = instance;
         instance.exports.onInit();
 
         const onAnimationFrame = instance.exports.onAnimationFrame;
