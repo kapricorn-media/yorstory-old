@@ -3,12 +3,12 @@ html, body {
     padding: 0;
 }
 
+/*
 #longStrip {
     height: 100vh;
     overflow: hidden;
 }
 #longStrip > img {
-    /*height: 100vh;*/
     display: block;
     margin-left: auto;
     margin-right: auto;
@@ -20,4 +20,36 @@ html, body {
     position: absolute;
     width: 100%;
     height: 100%;
+}
+*/
+
+#landing {
+    position: relative;
+    width: 100%;
+}
+
+#landingBackground {
+    position: relative;
+    background-color: #101010;
+    overflow: hidden;
+}
+
+.landingFixedImage {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+    background-size: contain;
+    background-position: bottom center;
+    background-repeat: no-repeat;
+}
+
+#landingDecals {
+    background-image: url('../images/decals.png');
+}
+#landingSticker {
+    background-image: url('../images/sticker.png');
+}
+#landingText {
+    background-image: url('../images/text.png');
 }
