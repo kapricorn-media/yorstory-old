@@ -19,16 +19,16 @@ const parallaxImages = [
     parallaxImage("images/parallax5.png", 1.0),
 ];
 
-// offsetX is in the range [-1, 1]
-function updateParallax(offsetX)
+// offsetX, offsetY is in the range [-1, 1]
+function updateParallax(offsetX, offsetY)
 {
-    console.log(offsetX);
     for (let i = 0; i < parallaxImages.length; i++) {
         const img = parallaxImages[i];
 
-        const offsetPixels = offsetX * 100 * img.factor;
+        const offsetXPixels = offsetX * 100 * img.factor;
+        const offsetYPixels = offsetY * 100 * img.factor;
         const el = document.getElementById(parallaxImageId(i));
-        el.style.transform = "translateX(" + offsetPixels.toString() + "px)";
+        el.style.transform = "translate(" + offsetXPixels.toString() + "px, " + offsetYPixels.toString() + "px)";
     }
 }
 
@@ -83,6 +83,7 @@ window.onload = function() {
 
     addEventListener("mousemove", function(event) {
         const offsetX = event.clientX / window.innerWidth * 2.0 - 1.0;
-        updateParallax(offsetX);
+        const offsetY = (event.clientY / window.innerWidth * 2.0 - 0.25) * 0.75;
+        updateParallax(offsetX, offsetY);
     });
 };
