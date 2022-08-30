@@ -37,14 +37,12 @@ function updateCanvasSize()
     const width = window.innerWidth;
     const height = window.innerHeight;
     const margin = Math.round(height * 0.04);
-    const imageWidth = width - margin * 2;
     const imageHeight = height - margin * 2;
     const borderRadius = margin * 0.5;
 
     const landing = document.getElementById("landing");
 
     const landingBackground = document.getElementById("landingBackground");
-    landingBackground.style.width = imageWidth.toString() + "px";
     landingBackground.style.height = imageHeight.toString() + "px";
     landingBackground.style.margin = margin.toString() + "px";
     landingBackground.style.borderRadius = borderRadius.toString() + "px";
@@ -71,6 +69,15 @@ function updateCanvasSize()
             landingBackground.appendChild(el);
         }
     }
+
+    const content = document.getElementById("content");
+    content.style.marginLeft = margin.toString() + "px";
+    content.style.marginRight = margin.toString() + "px";
+
+    const sections = document.getElementsByClassName("section");
+    for (let i = 0; i < sections.length; i++) {
+        sections[i].style.borderRadius = borderRadius.toString() + "px";
+    }
 }
 
 window.onload = function() {
@@ -84,6 +91,6 @@ window.onload = function() {
     addEventListener("mousemove", function(event) {
         const offsetX = event.clientX / window.innerWidth * 2.0 - 1.0;
         const offsetY = (event.clientY / window.innerWidth * 2.0 - 0.25) * 0.75;
-        updateParallax(offsetX, offsetY);
+        updateParallax(offsetX, 0.0);
     });
 };

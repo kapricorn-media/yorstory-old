@@ -9,7 +9,7 @@ Restart=always
 RestartSec=1
 User=root
 WorkingDirectory=/usr/bin/yorstory
-ExecStart=/usr/bin/yorstory/yorstory 80
+ExecStart=/usr/bin/yorstory/yorstory 443 /etc/letsencrypt/live/yorstory.ca/fullchain.pem /etc/letsencrypt/live/yorstory.ca/privkey.pem
 
 [Install]
 WantedBy=multi-user.target
