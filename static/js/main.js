@@ -64,6 +64,8 @@ function updateCanvasSize()
         el.style.backgroundSize = "contain";
         el.style.backgroundRepeat = "no-repeat";
         el.style.backgroundPosition = "bottom center";
+        const blur = 2 * img.factor;
+        // el.style.filter = "blur(" + blur.toString() + "px)"
 
         if (create) {
             landingBackground.appendChild(el);
