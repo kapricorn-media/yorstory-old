@@ -13,8 +13,9 @@ const parallaxImageSets = [
             parallaxImage("images/parallax1-1.png", 0.01),
             parallaxImage("images/parallax1-2.png", 0.05),
             parallaxImage("images/parallax1-3.png", 0.2),
-            parallaxImage("images/parallax1-4.png", 0.75),
-            parallaxImage("images/parallax1-5.png", 1.0),
+            parallaxImage("images/parallax1-4.png", 0.5),
+            parallaxImage("images/parallax1-5.png", 0.9),
+            parallaxImage("images/parallax1-6.png", 1.2),
         ]
     },
     {
@@ -53,7 +54,7 @@ const parallaxImageSets = [
 const parallaxMotionMax = 100;
 const parallaxImageSwapSeconds = 6;
 
-let _parallaxImageSetCurrent = 0;
+let _parallaxImageSetCurrent = 3;
 
 function getCurrentParallaxImageSet()
 {
@@ -167,7 +168,7 @@ function updateCanvasSize()
     landingText.style.left = "0px";
     landingText.style.top = "0px";
     landingText.style.width = (margin * 18).toString() + "px";
-    landingText.style.height = (margin * 6).toString() + "px";
+    landingText.style.height = (margin * 3).toString() + "px";
 
     const landingSticker = document.getElementById("landingSticker");
     landingSticker.style.left = (margin * 4).toString() + "px";
