@@ -10,6 +10,46 @@ const WASM_PATH = if (config.DEBUG) "zig-out/yorstory.wasm" else "yorstory.wasm"
 // const DOMAIN = if (config.DEBUG) "localhost" else "yorstory.com";
 const SERVER_IP = "0.0.0.0";
 
+const Portfolio = struct {
+    title: []const u8,
+    uri: []const u8,
+};
+
+const PORTFOLIO_LIST = [_]Portfolio {
+    .{
+        .title = "Wandering Earth II",
+        .uri = "wandering-earth-ii",
+    },
+    .{
+        .title = "HALO",
+        .uri = "halo",
+    },
+    .{
+        .title = "Project X",
+        .uri = "project-x",
+    },
+    .{
+        .title = "Cerulea",
+        .uri = "cerulea",
+    },
+    .{
+        .title = "The Project",
+        .uri = "the-project",
+    },
+    .{
+        .title = "Project Y",
+        .uri = "project-y",
+    },
+    .{
+        .title = "123456",
+        .uri = "123456",
+    },
+    .{
+        .title = "Lorem ipsum",
+        .uri = "lorem-ipsum",
+    }
+};
+
 pub const log_level: std.log.Level = switch (builtin.mode) {
     .Debug => .debug,
     .ReleaseSafe => .info,
@@ -37,8 +77,31 @@ fn serverCallback(
 
     switch (request.method) {
         .Get => {
-            if (std.mem.eql(u8, request.uri, "/yorstory.wasm")) {
+            var isPortfolioUri = false;
+            for (PORTFOLIO_LIST) |portfolio| {
+                if (request.uri.len < 1) {
+                    break;
+                }
+                const trimmedUri = request.uri[1..];
+                if (std.mem.eql(u8, trimmedUri, portfolio.uri)) {
+                    isPortfolioUri = true;
+                }
+            }
+
+            if (isPortfolioUri) {
+                try server.writeFileResponse(writer, "static/entry.html", allocator);
+            } else if (std.mem.eql(u8, request.uri, "/yorstory.wasm")) {
                 try server.writeFileResponse(writer, WASM_PATH, allocator);
+            } else if (std.mem.eql(u8, request.uri, "/portfolio")) {
+                var json = std.ArrayList(u8).init(allocator);
+                defer json.deinit();
+                try std.json.stringify(PORTFOLIO_LIST, .{}, json.writer());
+
+                try server.writeCode(writer, ._200);
+                try server.writeContentType(writer, .ApplicationJson);
+                try server.writeContentLength(writer, json.items.len);
+                try server.writeEndHeader(writer);
+                try writer.writeAll(json.items);
             } else {
                 try server.serveStatic(writer, request.uri, "static", allocator);
             }

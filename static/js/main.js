@@ -6,7 +6,7 @@ function parallaxImage(url, factor)
     };
 }
 
-const parallaxImageSets = [
+const PARALLAX_IMAGE_SETS = [
     {
         color: "#101010",
         images: [
@@ -56,9 +56,71 @@ const parallaxImageSwapSeconds = 6;
 
 let _parallaxImageSetCurrent = 3;
 
+let _preloadedImages = {};
+
+function httpGet(url, callback)
+{
+    const Http = new XMLHttpRequest();
+    Http.open("GET", url);
+    Http.responseType = "text";
+    Http.send();
+    Http.onreadystatechange = function() {
+        if (this.readyState == 4) {
+            const responseOk = this.status === 200;
+            callback(this.status, responseOk ? Http.responseText : null);
+        }
+    };
+}
+
+function httpPost(url, data, callback)
+{
+    const Http = new XMLHttpRequest();
+    Http.open("POST", url);
+    Http.responseType = "text";
+    Http.send(data);
+    Http.onreadystatechange = function() {
+        if (this.readyState == 4) {
+            const responseOk = this.status === 200;
+            callback(this.status, responseOk ? Http.responseText : null);
+        }
+    };
+}
+
+// Takes an array of arrays of images to load, in sequence
+function preloadImages(imageSequence)
+{
+    for (let i = 0; i < imageSequence.length; i++) {
+        let loaded = false;
+        if (imageSequence[i][0] in _preloadedImages) {
+            loaded = true;
+            for (let j = 0; j < imageSequence[i].length; j++) {
+                const imgSrc = imageSequence[i][j];
+                if (!_preloadedImages[imgSrc].complete) {
+                    loaded = false;
+                    break;
+                }
+            }
+        } else {
+            for (let j = 0; j < imageSequence[i].length; j++) {
+                const imgSrc = imageSequence[i][j];
+                _preloadedImages[imgSrc] = new Image();
+                _preloadedImages[imgSrc].onload = function() {
+                    preloadImages(imageSequence);
+                };
+                _preloadedImages[imgSrc].src = imgSrc;
+            }
+        }
+
+        console.log(i.toString() + loaded);
+        if (!loaded) {
+            break;
+        }
+    }
+}
+
 function getCurrentParallaxImageSet()
 {
-    return parallaxImageSets[_parallaxImageSetCurrent];
+    return PARALLAX_IMAGE_SETS[_parallaxImageSetCurrent];
 }
 
 function parallaxImageId(i)
@@ -185,7 +247,15 @@ function updateCanvasSize()
     const content = document.getElementById("content");
     content.style.marginLeft = margin.toString() + "px";
     content.style.marginRight = margin.toString() + "px";
-    content.style.paddingTop = (margin * 4).toString() + "px";
+
+    const quickText = document.getElementById("quickText");
+    quickText.style.height = (margin * 4).toString() + "px";
+    const quickTextLeft = document.getElementById("quickTextLeft");
+    quickTextLeft.style.left = (margin).toString() + "px";
+    quickTextLeft.style.width = (margin * 17).toString() + "px";
+    const quickTextRight = document.getElementById("quickTextRight");
+    quickTextRight.style.left = "50%";
+    quickTextRight.style.width = (margin * 17).toString() + "px";
 
     const sections = document.getElementsByClassName("section");
     for (let i = 0; i < sections.length; i++) {
@@ -210,8 +280,67 @@ function updateCanvasSize()
     });
 }
 
+function generatePortfolio(portfolioList)
+{
+    const template = document.getElementsByClassName("portfolioGridItem")[0].cloneNode(true);
+
+    Array.from(document.getElementsByClassName("portfolioGridItem")).forEach(item => {
+        item.remove();
+    });
+
+    const portfolioGrid = document.getElementById("portfolioGrid");
+
+    for (let i = 0; i < portfolioList.length; i++) {
+        const port = portfolioList[i];
+        const el = template.cloneNode(true);
+        el.id = port.uri;
+        for (let j = 0; j < el.childNodes.length; j++) {
+            const child = el.childNodes[j];
+            if ("classList" in child) {
+                if (child.classList.contains("portfolioGridItemTitle")) {
+                    child.innerHTML = port.title;
+                }
+            }
+        }
+        portfolioGrid.appendChild(el);
+    }
+
+    template.remove();
+
+    Array.from(document.getElementsByClassName("portfolioGridItem")).forEach(item => {
+        item.addEventListener("click", function(event) {
+            let el = event.target;
+            let tries = 0;
+            while (true) {
+                const id = el.id;
+                if (id.length > 0) {
+                    break;
+                }
+                el = el.parentElement;
+                tries += 1;
+                if (tries > 100) {
+                    console.error("too many parent calls, giving up");
+                    return;
+                }
+            }
+
+            const uri = el.id;
+            window.location.href = "/" + uri;
+        })
+    });
+}
+
 window.onload = function() {
     console.log("window.onload");
+
+    httpGet("/portfolio", function(status, data) {
+        if (status !== 200) {
+            console.error("failed to get portfolios");
+            return;
+        }
+        const portfolioList = JSON.parse(data);
+        generatePortfolio(portfolioList);
+    });
 
     updateCanvasSize();
     addEventListener("resize", function(event) {
@@ -224,8 +353,20 @@ window.onload = function() {
         updateParallax(offsetX, 0.0);
     });
 
+    // preload images
+    let imageSequence = [];
+    for (let i = 0; i < PARALLAX_IMAGE_SETS.length; i++) {
+        const imageSet = PARALLAX_IMAGE_SETS[i];
+        let list = [];
+        for (let j = 0; j < imageSet.images.length; j++) {
+            list.push(imageSet.images[j].url);
+        }
+        imageSequence.push(list);
+    }
+    preloadImages(imageSequence);
+
     setInterval(function() {
-        _parallaxImageSetCurrent = (_parallaxImageSetCurrent + 1) % parallaxImageSets.length;
+        _parallaxImageSetCurrent = (_parallaxImageSetCurrent + 1) % PARALLAX_IMAGE_SETS.length;
         clearParallaxImages();
         updateCanvasSize();
         updateParallax(0.0, 0.0);
