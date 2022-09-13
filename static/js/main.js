@@ -73,13 +73,13 @@ function updateCanvasSize()
     landingDecalBottomRight.style.height = (margin * 6).toString() + "px";
     landingDecalBottomRight.style.transform = "rotate(180deg)";
 
-    if (IS_HOME) {
-        const landingText = document.getElementById("landingText");
-        landingText.style.left = "0px";
-        landingText.style.top = "0px";
-        landingText.style.width = (margin * 18).toString() + "px";
-        landingText.style.height = (margin * 3).toString() + "px";
-    } else {
+    const landingText = document.getElementById("landingText");
+    landingText.style.left = "0px";
+    landingText.style.top = "0px";
+    landingText.style.width = (margin * 18).toString() + "px";
+    landingText.style.height = (margin * 3).toString() + "px";
+
+    if (!IS_HOME) {
         const landingBackground = document.getElementById("landingBackground");
 
         const el = document.createElement("img");
@@ -121,16 +121,14 @@ function updateCanvasSize()
     content.style.marginLeft = margin.toString() + "px";
     content.style.marginRight = margin.toString() + "px";
 
-    if (IS_HOME) {
-        const quickText = document.getElementById("quickText");
-        quickText.style.height = (margin * 4).toString() + "px";
-        const quickTextLeft = document.getElementById("quickTextLeft");
-        quickTextLeft.style.left = (margin).toString() + "px";
-        quickTextLeft.style.width = (margin * 17).toString() + "px";
-        const quickTextRight = document.getElementById("quickTextRight");
-        quickTextRight.style.left = "50%";
-        quickTextRight.style.width = (margin * 17).toString() + "px";
-    }
+    const quickText = document.getElementById("quickText");
+    quickText.style.height = (margin * 4).toString() + "px";
+    const quickTextLeft = document.getElementById("quickTextLeft");
+    quickTextLeft.style.left = (margin).toString() + "px";
+    quickTextLeft.style.width = (margin * 17).toString() + "px";
+    const quickTextRight = document.getElementById("quickTextRight");
+    quickTextRight.style.left = "50%";
+    quickTextRight.style.width = (margin * 17).toString() + "px";
 
     const sections = document.getElementsByClassName("section");
     for (let i = 0; i < sections.length; i++) {
