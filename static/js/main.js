@@ -1,90 +1,6 @@
-function parallaxImage(url, factor)
-{
-    return {
-        url: url,
-        factor: factor,
-    };
-}
-
-const PARALLAX_IMAGE_SETS = [
-    {
-        color: "#101010",
-        images: [
-            parallaxImage("images/parallax1-1.png", 0.01),
-            parallaxImage("images/parallax1-2.png", 0.05),
-            parallaxImage("images/parallax1-3.png", 0.2),
-            parallaxImage("images/parallax1-4.png", 0.5),
-            parallaxImage("images/parallax1-5.png", 0.9),
-            parallaxImage("images/parallax1-6.png", 1.2),
-        ]
-    },
-    {
-        color: "#000000",
-        images: [
-            parallaxImage("images/parallax2-1.png", 0.05),
-            parallaxImage("images/parallax2-2.png", 0.1),
-            parallaxImage("images/parallax2-3.png", 0.25),
-            parallaxImage("images/parallax2-4.png", 1.0),
-        ]
-    },
-    {
-        color: "#212121",
-        images: [
-            parallaxImage("images/parallax3-1.png", 0.05),
-            parallaxImage("images/parallax3-2.png", 0.2),
-            parallaxImage("images/parallax3-3.png", 0.3),
-            parallaxImage("images/parallax3-4.png", 0.8),
-            parallaxImage("images/parallax3-5.png", 1.1),
-        ]
-    },
-    {
-        colorTop: "#1a1b1a",
-        colorBottom: "#ffffff",
-        images: [
-            parallaxImage("images/parallax4-1.png", 0.05),
-            parallaxImage("images/parallax4-2.png", 0.1),
-            parallaxImage("images/parallax4-3.png", 0.25),
-            parallaxImage("images/parallax4-4.png", 0.6),
-            parallaxImage("images/parallax4-5.png", 0.75),
-            parallaxImage("images/parallax4-6.png", 1.2),
-        ]
-    }
-];
-
-const parallaxMotionMax = 100;
-const parallaxImageSwapSeconds = 6;
-
-let _parallaxImageSetCurrent = 3;
+const IS_HOME = window.location.pathname === "/" || window.location.pathname === "/index.html";
 
 let _preloadedImages = {};
-
-function httpGet(url, callback)
-{
-    const Http = new XMLHttpRequest();
-    Http.open("GET", url);
-    Http.responseType = "text";
-    Http.send();
-    Http.onreadystatechange = function() {
-        if (this.readyState == 4) {
-            const responseOk = this.status === 200;
-            callback(this.status, responseOk ? Http.responseText : null);
-        }
-    };
-}
-
-function httpPost(url, data, callback)
-{
-    const Http = new XMLHttpRequest();
-    Http.open("POST", url);
-    Http.responseType = "text";
-    Http.send(data);
-    Http.onreadystatechange = function() {
-        if (this.readyState == 4) {
-            const responseOk = this.status === 200;
-            callback(this.status, responseOk ? Http.responseText : null);
-        }
-    };
-}
 
 // Takes an array of arrays of images to load, in sequence
 function preloadImages(imageSequence)
@@ -111,49 +27,14 @@ function preloadImages(imageSequence)
             }
         }
 
-        console.log(i.toString() + loaded);
         if (!loaded) {
             break;
         }
     }
 }
 
-function getCurrentParallaxImageSet()
-{
-    return PARALLAX_IMAGE_SETS[_parallaxImageSetCurrent];
-}
-
-function parallaxImageId(i)
-{
-    return "parallaxImage" + i.toString();
-}
-
-function clearParallaxImages()
-{
-    const parallaxImages = Array.from(document.getElementsByClassName("parallaxImage"));
-    parallaxImages.forEach(img => {
-        img.remove();
-    });
-}
-
-// offsetX, offsetY is in the range [-1, 1]
-function updateParallax(offsetX, offsetY)
-{
-    const imageSet = getCurrentParallaxImageSet();
-    for (let i = 0; i < imageSet.images.length; i++) {
-        const img = imageSet.images[i];
-
-        const offsetXPixels = offsetX * parallaxMotionMax * img.factor;
-        const offsetYPixels = offsetY * parallaxMotionMax * img.factor;
-        const el = document.getElementById(parallaxImageId(i));
-        el.style.transform = "translate(" + offsetXPixels.toString() + "px, " + offsetYPixels.toString() + "px)";
-    }
-}
-
 function updateCanvasSize()
 {
-    const imageSet = getCurrentParallaxImageSet();
-
     const width = window.innerWidth;
     const height = window.innerHeight;
     const margin = Math.round(height * 0.04);
@@ -163,44 +44,10 @@ function updateCanvasSize()
     const landing = document.getElementById("landing");
 
     const landingBackground = document.getElementById("landingBackground");
-    landingBackground.style.height = imageHeight.toString() + "px";
-    landingBackground.style.margin = margin.toString() + "px";
+    landingBackground.style.height = px(imageHeight);
+    landingBackground.style.margin = px(margin);
     landingBackground.style.marginBottom = (margin * 2).toString() + "px";
     landingBackground.style.borderRadius = borderRadius.toString() + "px";
-    if ("color" in imageSet) {
-        landingBackground.style.backgroundColor = imageSet.color;
-        landingBackground.style.backgroundImage = "";
-    } else if (("colorTop" in imageSet) && ("colorBottom" in imageSet)) {
-        landingBackground.style.backgroundColor = "";
-        landingBackground.style.backgroundImage = "linear-gradient(" + imageSet.colorTop + ", " + imageSet.colorBottom + ")";
-    } else {
-        console.error("no color info");
-    }
-
-    for (let i = 0; i < imageSet.images.length; i++) {
-        const id = parallaxImageId(i);
-        let el = document.getElementById(id);
-        const create = el === null;
-        if (create) {
-            el = document.createElement("img");
-            el.id = id;
-            el.classList.add("parallaxImage");
-        }
-
-        const img = imageSet.images[i];
-        el.style.position = "absolute";
-        el.style.height = "100%";
-        el.onload = function() {
-            const left = (landingBackground.offsetWidth / 2) - (this.width / 2);
-            this.style.left = left.toString() + "px";
-        };
-        el.src = img.url;
-        const blur = 2 * img.factor;
-
-        if (create) {
-            landingBackground.appendChild(el);
-        }
-    }
 
     const landingDecalTopLeft = document.getElementById("landingDecalTopLeft");
     landingDecalTopLeft.style.left = "0px";
@@ -226,17 +73,43 @@ function updateCanvasSize()
     landingDecalBottomRight.style.height = (margin * 6).toString() + "px";
     landingDecalBottomRight.style.transform = "rotate(180deg)";
 
-    const landingText = document.getElementById("landingText");
-    landingText.style.left = "0px";
-    landingText.style.top = "0px";
-    landingText.style.width = (margin * 18).toString() + "px";
-    landingText.style.height = (margin * 3).toString() + "px";
+    if (IS_HOME) {
+        const landingText = document.getElementById("landingText");
+        landingText.style.left = "0px";
+        landingText.style.top = "0px";
+        landingText.style.width = (margin * 18).toString() + "px";
+        landingText.style.height = (margin * 3).toString() + "px";
+    } else {
+        const landingBackground = document.getElementById("landingBackground");
+
+        const el = document.createElement("img");
+        el.id = "landingProjectImage";
+        el.style.position = "absolute";
+        el.style.height = "100%";
+        el.onload = function() {
+            const left = (landingBackground.offsetWidth / 2) - (this.width / 2);
+            this.style.left = left.toString() + "px";
+        };
+        el.src = "images/halo/1.png";
+        landingBackground.appendChild(el);
+    }
 
     const landingSticker = document.getElementById("landingSticker");
     landingSticker.style.left = (margin * 4).toString() + "px";
     landingSticker.style.bottom = (margin * 4).toString() + "px";
-    landingSticker.style.width = (margin * 16).toString() + "px";
-    landingSticker.style.height = (margin * 4).toString() + "px";
+    landingSticker.style.width = (margin * 14).toString() + "px";
+    landingSticker.style.height = (margin * 3).toString() + "px";
+
+    const landingStickerTitle = document.getElementById("landingStickerTitle");
+    landingStickerTitle.style.left = px(margin * 0.4);
+    landingStickerTitle.style.top = px(margin * 0.25);
+    const fontSize = margin * 1.6;
+    landingStickerTitle.style.lineHeight = px(fontSize);
+    landingStickerTitle.style.fontSize = px(fontSize);
+    landingStickerTitle.style.letterSpacing = px(-2.5);
+    if (!IS_HOME) {
+        landingStickerTitle.innerHTML = "HALO";
+    }
 
     const landingStickerShiny = document.getElementById("landingStickerShiny");
     landingStickerShiny.style.right = (margin * 6).toString() + "px";
@@ -248,127 +121,135 @@ function updateCanvasSize()
     content.style.marginLeft = margin.toString() + "px";
     content.style.marginRight = margin.toString() + "px";
 
-    const quickText = document.getElementById("quickText");
-    quickText.style.height = (margin * 4).toString() + "px";
-    const quickTextLeft = document.getElementById("quickTextLeft");
-    quickTextLeft.style.left = (margin).toString() + "px";
-    quickTextLeft.style.width = (margin * 17).toString() + "px";
-    const quickTextRight = document.getElementById("quickTextRight");
-    quickTextRight.style.left = "50%";
-    quickTextRight.style.width = (margin * 17).toString() + "px";
+    if (IS_HOME) {
+        const quickText = document.getElementById("quickText");
+        quickText.style.height = (margin * 4).toString() + "px";
+        const quickTextLeft = document.getElementById("quickTextLeft");
+        quickTextLeft.style.left = (margin).toString() + "px";
+        quickTextLeft.style.width = (margin * 17).toString() + "px";
+        const quickTextRight = document.getElementById("quickTextRight");
+        quickTextRight.style.left = "50%";
+        quickTextRight.style.width = (margin * 17).toString() + "px";
+    }
 
     const sections = document.getElementsByClassName("section");
     for (let i = 0; i < sections.length; i++) {
         sections[i].style.borderRadius = borderRadius.toString() + "px";
     }
 
-    const grid = document.getElementById("portfolioGrid");
+    const grid = document.getElementById("grid");
     grid.style.columnGap = margin.toString() + "px";
-    const gridItems = Array.from(document.getElementsByClassName("portfolioGridItem"));
+    const gridItems = Array.from(document.getElementsByClassName("gridItem"));
     gridItems.forEach(gridItem => {
-        gridItem.style.height = (margin * 12).toString() + "px";
+        const height = IS_HOME ? margin * 12 : margin * 10;
+        gridItem.style.height = height.toString() + "px";
     });
-    const gridItemBackgrounds = Array.from(document.getElementsByClassName("portfolioGridItemBackground"));
+    const gridItemBackgrounds = Array.from(document.getElementsByClassName("gridItemBackground"));
     gridItemBackgrounds.forEach(bg => {
         bg.style.height = (margin * 9).toString() + "px";
         bg.style.borderRadius = margin.toString() + "px";
     });
-    const gridItemTitles = Array.from(document.getElementsByClassName("portfolioGridItemTitle"));
+    const gridItemTitles = Array.from(document.getElementsByClassName("gridItemTitle"));
     gridItemTitles.forEach(title => {
         title.style.marginLeft = margin.toString() + "px";
         title.style.height = margin.toString() + "px";
     });
+
+    // DEBUG
+    const debugGrid = document.getElementById("debugGrid");
+    if (debugGrid) {
+        const hs = Array.from(document.getElementsByClassName("debugGridHorizontal"));
+        hs.forEach(h => {
+            h.remove();
+        });
+        const vs = Array.from(document.getElementsByClassName("debugGridVertical"));
+        vs.forEach(v => {
+            v.remove();
+        });
+
+        for (let i = 0; i < 20 * 2; i++) {
+            const el = document.createElement("div");
+            el.classList.add("debugGridHorizontal");
+            el.style.left = px(i * margin * 0.5);
+            debugGrid.appendChild(el);
+        }
+        for (let i = 0; i < 10; i++) {
+            const el = document.createElement("div");
+            el.classList.add("debugGridHorizontal");
+            el.style.right = px(i * margin);
+            debugGrid.appendChild(el);
+        }
+        for (let i = 0; i < 8; i++) {
+            const el = document.createElement("div");
+            el.classList.add("debugGridVertical");
+            el.style.top = px(i * margin);
+            debugGrid.appendChild(el);
+        }
+        for (let i = 0; i < 12 * 2; i++) {
+            const el = document.createElement("div");
+            el.classList.add("debugGridVertical");
+            el.style.bottom = px(i * margin * 0.5);
+            debugGrid.appendChild(el);
+        }
+    }
 }
 
-function generatePortfolio(portfolioList)
+function _documentOnLoad()
 {
-    const template = document.getElementsByClassName("portfolioGridItem")[0].cloneNode(true);
+    console.log("_documentOnLoad");
 
-    Array.from(document.getElementsByClassName("portfolioGridItem")).forEach(item => {
-        item.remove();
-    });
-
-    const portfolioGrid = document.getElementById("portfolioGrid");
-
-    for (let i = 0; i < portfolioList.length; i++) {
-        const port = portfolioList[i];
-        const el = template.cloneNode(true);
-        el.id = port.uri;
-        for (let j = 0; j < el.childNodes.length; j++) {
-            const child = el.childNodes[j];
-            if ("classList" in child) {
-                if (child.classList.contains("portfolioGridItemTitle")) {
-                    child.innerHTML = port.title;
-                }
+    updateCanvasSize();
+    if (IS_HOME) {
+        httpGet("/portfolio", function(status, data) {
+            if (status !== 200) {
+                console.error("failed to get portfolios");
+                return;
             }
+            const portfolioList = JSON.parse(data);
+            generatePortfolio(portfolioList);
+        });
+
+        updateParallaxImages();
+        addEventListener("mousemove", function(event) {
+            const offsetX = event.clientX / window.innerWidth * 2.0 - 1.0;
+            const offsetY = (event.clientY / window.innerWidth * 2.0 - 0.25) * 0.75;
+            updateParallax(offsetX, 0.0);
+        });
+
+        // preload images
+        let imageSequence = [];
+        for (let i = 0; i < PARALLAX_IMAGE_SETS.length; i++) {
+            const imageSet = PARALLAX_IMAGE_SETS[i];
+            let list = [];
+            for (let j = 0; j < imageSet.images.length; j++) {
+                list.push(imageSet.images[j].url);
+            }
+            imageSequence.push(list);
         }
-        portfolioGrid.appendChild(el);
+        preloadImages(imageSequence);
+
+        setInterval(function() {
+            _parallaxImageSetCurrent = (_parallaxImageSetCurrent + 1) % PARALLAX_IMAGE_SETS.length;
+            clearParallaxImages();
+            updateParallaxImages();
+            updateParallax(0.0, 0.0);
+        }, parallaxImageSwapSeconds * 1000);
+    } else {
+        let projectImages = [];
+        for (let i = 1; i <= 24; i++) {
+            projectImages.push("images/halo/" + i.toString() + ".png");
+        }
+        generateProjectImages(projectImages);
     }
 
-    template.remove();
-
-    Array.from(document.getElementsByClassName("portfolioGridItem")).forEach(item => {
-        item.addEventListener("click", function(event) {
-            let el = event.target;
-            let tries = 0;
-            while (true) {
-                const id = el.id;
-                if (id.length > 0) {
-                    break;
-                }
-                el = el.parentElement;
-                tries += 1;
-                if (tries > 100) {
-                    console.error("too many parent calls, giving up");
-                    return;
-                }
-            }
-
-            const uri = el.id;
-            window.location.href = "/" + uri;
-        })
+    addEventListener("resize", function(event) {
+        updateCanvasSize();
+        if (IS_HOME) {
+            updateParallaxImages();
+        }
     });
 }
 
 window.onload = function() {
     console.log("window.onload");
-
-    httpGet("/portfolio", function(status, data) {
-        if (status !== 200) {
-            console.error("failed to get portfolios");
-            return;
-        }
-        const portfolioList = JSON.parse(data);
-        generatePortfolio(portfolioList);
-    });
-
-    updateCanvasSize();
-    addEventListener("resize", function(event) {
-        updateCanvasSize();
-    });
-
-    addEventListener("mousemove", function(event) {
-        const offsetX = event.clientX / window.innerWidth * 2.0 - 1.0;
-        const offsetY = (event.clientY / window.innerWidth * 2.0 - 0.25) * 0.75;
-        updateParallax(offsetX, 0.0);
-    });
-
-    // preload images
-    let imageSequence = [];
-    for (let i = 0; i < PARALLAX_IMAGE_SETS.length; i++) {
-        const imageSet = PARALLAX_IMAGE_SETS[i];
-        let list = [];
-        for (let j = 0; j < imageSet.images.length; j++) {
-            list.push(imageSet.images[j].url);
-        }
-        imageSequence.push(list);
-    }
-    preloadImages(imageSequence);
-
-    setInterval(function() {
-        _parallaxImageSetCurrent = (_parallaxImageSetCurrent + 1) % PARALLAX_IMAGE_SETS.length;
-        clearParallaxImages();
-        updateCanvasSize();
-        updateParallax(0.0, 0.0);
-    }, parallaxImageSwapSeconds * 1000);
 };

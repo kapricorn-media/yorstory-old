@@ -25,11 +25,14 @@
     <!-- - - - - - - - - - - - - - - - - - - - - - - - - -->
 
     <link rel="stylesheet" type="text/css" href="css/main.css">
-    
+
+    <script type="application/javascript" src="js/common.js"></script>
+    <script type="application/javascript" src="js/home.js"></script>
     <script type="application/javascript" src="js/main.js"></script>
 </head>
 
 <body>
+    <!-- <div id="debugGrid"></div> -->
     <div id="landing">
         <div id="landingBackground">
             <img id="landingDecalTopLeft" class="landingFixedImage" src="images/decal-topleft.png"/>
@@ -37,7 +40,10 @@
             <img id="landingDecalBottomLeft" class="landingFixedImage" src="images/decal-topleft.png"/>
             <img id="landingDecalBottomRight" class="landingFixedImage" src="images/decal-topleft.png"/>
             <img id="landingText" class="landingFixedImage" src="images/text.png"/>
-            <img id="landingSticker" class="landingFixedImage" src="images/sticker.png"/>
+            <div id="landingSticker" class="landingFixedImage">
+                <div id="landingStickerTitle">Yorstory</div>
+                <img id="landingStickerBackground" class="landingFixedImage" src="images/sticker-background.png"/>
+            </div>
             <img id="landingStickerShiny" class="landingFixedImage" src="images/sticker-shiny.png"/>
         </div>
     </div>
@@ -47,12 +53,13 @@
             <p id="quickTextRight" class="quickTextSub">In alchemy, the term chrysopoeia (from Greek χρυσοποιία, khrusopoiia, "gold-making") refers to the artificial production of gold, most commonly by the alleged transmutation of base metals such as lead. A related term is argyropoeia (ἀργυροποιία, arguropoiia, "silver-making"), referring to the artificial production of silver, often by transmuting copper. Although alchemists pursued many different goals, the making of gold and silver remained one of the defining ambitions of alchemy throughout its history, from Zosimus of Panopolis (c. 300) to Robert Boyle (1627–1691).</p>
         </div>
         <div id="portfolio" class="section">
-             <div id="portfolioGrid">
+             <div id="grid">
                 <!-- template -->
-                <div class="portfolioGridItem"><div class="portfolioGridItemBackground"></div><div class="portfolioGridItemTitle"></div></div>
+                <div class="gridItem"><div class="gridItemBackground"></div><div class="gridItemTitle"></div></div>
             </div>
         </div>
     </div>
+    <script>_documentOnLoad();</script>
 </body>
 
 </html>
