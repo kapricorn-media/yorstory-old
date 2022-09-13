@@ -85,12 +85,12 @@ function updateCanvasSize()
         const el = document.createElement("img");
         el.id = "landingProjectImage";
         el.style.position = "absolute";
-        el.style.height = "100%";
+        el.style.width = "100%";
         el.onload = function() {
             const left = (landingBackground.offsetWidth / 2) - (this.width / 2);
             this.style.left = left.toString() + "px";
         };
-        el.src = "images/halo/1.png";
+        el.src = "images/halo/17.png";
         landingBackground.appendChild(el);
     }
 
