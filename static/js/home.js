@@ -70,16 +70,16 @@ const PARALLAX_IMAGE_SETS = [
             parallaxImage("images/parallax6-5.png", 1.0),
         ]
     },
-    {
-        color: "#111111",
-        images: [
-            parallaxImage("images/parallax7-1.png", 0.0),
-            parallaxImage("images/parallax7-2.png", 0.1),
-            parallaxImage("images/parallax7-3.png", 0.25),
-            parallaxImage("images/parallax7-4.png", 0.4),
-            parallaxImage("images/parallax7-5.png", 1.0),
-        ]
-    }
+    // {
+    //     color: "#111111",
+    //     images: [
+    //         parallaxImage("images/parallax7-1.png", 0.0),
+    //         parallaxImage("images/parallax7-2.png", 0.1),
+    //         parallaxImage("images/parallax7-3.png", 0.25),
+    //         parallaxImage("images/parallax7-4.png", 0.4),
+    //         parallaxImage("images/parallax7-5.png", 1.0),
+    //     ]
+    // }
 ];
 
 const parallaxMotionMax = 100;
@@ -177,6 +177,12 @@ function generatePortfolio(portfolioList)
         for (let j = 0; j < el.childNodes.length; j++) {
             const child = el.childNodes[j];
             if ("classList" in child) {
+                if (child.classList.contains("gridItemBackground")) {
+                    child.style.backgroundImage = "url('" + port.images[port.coverIndex] + "')";
+                    child.style.backgroundPosition = "center";
+                    child.style.backgroundRepeat = "no-repeat";
+                    child.style.backgroundSize = "cover";
+                }
                 if (child.classList.contains("gridItemTitle")) {
                     child.innerHTML = port.title;
                 }

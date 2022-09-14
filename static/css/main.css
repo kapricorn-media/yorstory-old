@@ -19,7 +19,6 @@ p {
     margin: 0;
     padding: 0;
     font-family: HelveticaMedium;
-    font-size: 12px;
 }
 
 /* LANDING */
@@ -89,7 +88,7 @@ p {
     opacity: 0.7;
 }
 .gridItemBackground {
-    background-color: #aaaaaa;
+    background-color: #222;
 }
 .gridItemTitle {
     font-family: sans-serif;

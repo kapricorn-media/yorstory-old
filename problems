@@ -1,4 +1,14 @@
-- loading of page (images shouldn't show until all ready for parallax)
 - parallax background clipping
-- contact work about (add yorstory to go back)
-- color (halo turns green)
+- mobile
+- contact/work/about (add yorstory to go back?) vs. shiny sticker
+
+09/13
+- [X] avoid extreme wide resizing
+- [X] color (halo turns green)
+- [X] spacing of "In alchemy" glue text
+
+09/14
+- [ ] film grain
+- [ ] finish sticker customization (emojis)
+- [ ] fix aggresive green in HALO
+- [ ] loading of page (images shouldn't show until all ready for parallax, show "..." until ready)

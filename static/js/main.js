@@ -1,5 +1,6 @@
 const IS_HOME = window.location.pathname === "/" || window.location.pathname === "/index.html";
 
+let _entry = null;
 let _preloadedImages = {};
 
 // Takes an array of arrays of images to load, in sequence
@@ -33,7 +34,8 @@ function preloadImages(imageSequence)
     }
 }
 
-function updateCanvasSize()
+// entry is null for home page, or if project info is not loaded yet
+function updateCanvasSize(entry)
 {
     const width = window.innerWidth;
     const height = window.innerHeight;
@@ -41,46 +43,64 @@ function updateCanvasSize()
     const imageHeight = height - margin * 3;
     const borderRadius = margin;
 
+    const maxAspect = 2.0;
+    let targetWidth = width;
+    if (width / height > maxAspect) {
+        targetWidth = height * maxAspect;
+    }
+    let marginX = (width - targetWidth) / 2;
+
+    let fontSizeP = targetWidth / 180;
+    fontSizeP = margin / 3.5;
+    let lineHeightP = fontSizeP * 20 / 12;
+
     const landing = document.getElementById("landing");
 
     const landingBackground = document.getElementById("landingBackground");
     landingBackground.style.height = px(imageHeight);
-    landingBackground.style.margin = px(margin);
-    landingBackground.style.marginBottom = (margin * 2).toString() + "px";
-    landingBackground.style.borderRadius = borderRadius.toString() + "px";
+    landingBackground.style.marginLeft = px(margin + marginX);
+    landingBackground.style.marginRight = px(margin + marginX);
+    landingBackground.style.marginTop = px(margin);
+    landingBackground.style.marginBottom = px(margin * 2);
+    landingBackground.style.borderRadius = px(borderRadius);
 
     const landingDecalTopLeft = document.getElementById("landingDecalTopLeft");
     landingDecalTopLeft.style.left = "0px";
     landingDecalTopLeft.style.top = "0px";
-    landingDecalTopLeft.style.width = (margin * 6).toString() + "px";
-    landingDecalTopLeft.style.height = (margin * 6).toString() + "px";
+    landingDecalTopLeft.style.width = px(margin * 6);
+    landingDecalTopLeft.style.height = px(margin * 6);
     const landingDecalTopRight = document.getElementById("landingDecalTopRight");
     landingDecalTopRight.style.right = "0px";
     landingDecalTopRight.style.top = "0px";
-    landingDecalTopRight.style.width = (margin * 6).toString() + "px";
-    landingDecalTopRight.style.height = (margin * 6).toString() + "px";
+    landingDecalTopRight.style.width = px(margin * 6);
+    landingDecalTopRight.style.height = px(margin * 6);
     landingDecalTopRight.style.transform = "rotate(90deg)";
     const landingDecalBottomLeft = document.getElementById("landingDecalBottomLeft");
     landingDecalBottomLeft.style.left = "0px";
     landingDecalBottomLeft.style.bottom = "0px";
-    landingDecalBottomLeft.style.width = (margin * 6).toString() + "px";
-    landingDecalBottomLeft.style.height = (margin * 6).toString() + "px";
+    landingDecalBottomLeft.style.width = px(margin * 6);
+    landingDecalBottomLeft.style.height = px(margin * 6);
     landingDecalBottomLeft.style.transform = "rotate(270deg)";
     const landingDecalBottomRight = document.getElementById("landingDecalBottomRight");
     landingDecalBottomRight.style.right = "0px";
     landingDecalBottomRight.style.bottom = "0px";
-    landingDecalBottomRight.style.width = (margin * 6).toString() + "px";
-    landingDecalBottomRight.style.height = (margin * 6).toString() + "px";
+    landingDecalBottomRight.style.width = px(margin * 6);
+    landingDecalBottomRight.style.height = px(margin * 6);
     landingDecalBottomRight.style.transform = "rotate(180deg)";
 
     const landingText = document.getElementById("landingText");
     landingText.style.left = "0px";
     landingText.style.top = "0px";
-    landingText.style.width = (margin * 18).toString() + "px";
-    landingText.style.height = (margin * 3).toString() + "px";
+    landingText.style.width = px(margin * 18);
+    landingText.style.height = px(margin * 3);
 
     if (!IS_HOME) {
         const landingBackground = document.getElementById("landingBackground");
+
+        let prevEl = document.getElementById("landingProjectImage");
+        if (prevEl) {
+            prevEl.remove();
+        }
 
         const el = document.createElement("img");
         el.id = "landingProjectImage";
@@ -88,17 +108,19 @@ function updateCanvasSize()
         el.style.width = "100%";
         el.onload = function() {
             const left = (landingBackground.offsetWidth / 2) - (this.width / 2);
-            this.style.left = left.toString() + "px";
+            this.style.left = px(left);
         };
-        el.src = "images/halo/17.png";
+        if (entry !== null) {
+            el.src = entry.images[entry.landingIndex];
+        }
         landingBackground.appendChild(el);
     }
 
     const landingSticker = document.getElementById("landingSticker");
-    landingSticker.style.left = (margin * 4).toString() + "px";
-    landingSticker.style.bottom = (margin * 4).toString() + "px";
-    landingSticker.style.width = (margin * 14).toString() + "px";
-    landingSticker.style.height = (margin * 3).toString() + "px";
+    landingSticker.style.left = px(margin * 4);
+    landingSticker.style.bottom = px(margin * 4);
+    landingSticker.style.width = px(margin * 14);
+    landingSticker.style.height = px(margin * 3);
 
     const landingStickerTitle = document.getElementById("landingStickerTitle");
     landingStickerTitle.style.left = px(margin * 0.4);
@@ -107,50 +129,68 @@ function updateCanvasSize()
     landingStickerTitle.style.lineHeight = px(fontSize);
     landingStickerTitle.style.fontSize = px(fontSize);
     landingStickerTitle.style.letterSpacing = px(-2.5);
+    if (!IS_HOME && entry !== null) {
+        landingStickerTitle.innerHTML = entry.title;
+    }
+
     if (!IS_HOME) {
-        landingStickerTitle.innerHTML = "HALO";
+        const colorFilter = "hue-rotate(75deg)";
+        const landingStickerBackground = document.getElementById("landingStickerBackground");
+        landingStickerBackground.style.filter = colorFilter;
+        const landingDecalTopLeft = document.getElementById("landingDecalTopLeft");
+        landingDecalTopLeft.style.filter = colorFilter;
+        const landingDecalTopRight = document.getElementById("landingDecalTopRight");
+        landingDecalTopRight.style.filter = colorFilter;
+        const landingDecalBottomLeft = document.getElementById("landingDecalBottomLeft");
+        landingDecalBottomLeft.style.filter = colorFilter;
+        const landingDecalBottomRight = document.getElementById("landingDecalBottomRight");
+        landingDecalBottomRight.style.filter = colorFilter;
+        const landingText = document.getElementById("landingText");
+        landingText.style.filter = colorFilter;
     }
 
     const landingStickerShiny = document.getElementById("landingStickerShiny");
-    landingStickerShiny.style.right = (margin * 6).toString() + "px";
-    landingStickerShiny.style.top = (margin * 2).toString() + "px";
-    landingStickerShiny.style.width = (margin * 5).toString() + "px";
-    landingStickerShiny.style.height = (margin * 3).toString() + "px";
+    landingStickerShiny.style.right = px(margin * 6);
+    landingStickerShiny.style.top = px(margin * 2);
+    landingStickerShiny.style.width = px(margin * 5);
+    landingStickerShiny.style.height = px(margin * 3);
 
     const content = document.getElementById("content");
-    content.style.marginLeft = margin.toString() + "px";
-    content.style.marginRight = margin.toString() + "px";
+    content.style.marginLeft = px(margin + marginX);
+    content.style.marginRight = px(margin + marginX);
 
     const quickText = document.getElementById("quickText");
-    quickText.style.height = (margin * 4).toString() + "px";
+    quickText.style.height = px(margin * 4);
+    quickText.style.fontSize = px(fontSizeP);
+    quickText.style.lineHeight = px(lineHeightP);
     const quickTextLeft = document.getElementById("quickTextLeft");
-    quickTextLeft.style.left = (margin).toString() + "px";
-    quickTextLeft.style.width = (margin * 17).toString() + "px";
+    quickTextLeft.style.left = px(margin);
+    quickTextLeft.style.width = px(margin * 17);
     const quickTextRight = document.getElementById("quickTextRight");
     quickTextRight.style.left = "50%";
-    quickTextRight.style.width = (margin * 17).toString() + "px";
+    quickTextRight.style.width = px(margin * 17);
 
     const sections = document.getElementsByClassName("section");
     for (let i = 0; i < sections.length; i++) {
-        sections[i].style.borderRadius = borderRadius.toString() + "px";
+        sections[i].style.borderRadius = px(borderRadius);
     }
 
     const grid = document.getElementById("grid");
-    grid.style.columnGap = margin.toString() + "px";
+    grid.style.columnGap = px(margin);
     const gridItems = Array.from(document.getElementsByClassName("gridItem"));
     gridItems.forEach(gridItem => {
         const height = IS_HOME ? margin * 12 : margin * 10;
-        gridItem.style.height = height.toString() + "px";
+        gridItem.style.height = px(height);
     });
     const gridItemBackgrounds = Array.from(document.getElementsByClassName("gridItemBackground"));
     gridItemBackgrounds.forEach(bg => {
-        bg.style.height = (margin * 9).toString() + "px";
-        bg.style.borderRadius = margin.toString() + "px";
+        bg.style.height = px(margin * 9);
+        bg.style.borderRadius = px(margin);
     });
     const gridItemTitles = Array.from(document.getElementsByClassName("gridItemTitle"));
     gridItemTitles.forEach(title => {
-        title.style.marginLeft = margin.toString() + "px";
-        title.style.height = margin.toString() + "px";
+        title.style.marginLeft = px(margin);
+        title.style.height = px(margin);
     });
 
     // DEBUG
@@ -196,17 +236,37 @@ function _documentOnLoad()
 {
     console.log("_documentOnLoad");
 
-    updateCanvasSize();
-    if (IS_HOME) {
-        httpGet("/portfolio", function(status, data) {
-            if (status !== 200) {
-                console.error("failed to get portfolios");
+    httpGet("/portfolio", function(status, data) {
+        if (status !== 200) {
+            console.error("failed to get portfolios");
+            return;
+        }
+
+        const portfolioList = JSON.parse(data);
+
+        if (IS_HOME) {
+            generatePortfolio(portfolioList);
+        } else {
+            for (let i = 0; i < portfolioList.length; i++) {
+                let e = portfolioList[i];
+                if (window.location.pathname === "/" + e.uri) {
+                    _entry = e;
+                    break;
+                }
+            }
+
+            if (_entry === null) {
+                console.error("Invalid entry page");
                 return;
             }
-            const portfolioList = JSON.parse(data);
-            generatePortfolio(portfolioList);
-        });
 
+            updateCanvasSize(_entry);
+            generateProjectImages(_entry.images);
+        }
+    });
+
+    updateCanvasSize(_entry);
+    if (IS_HOME) {
         updateParallaxImages();
         addEventListener("mousemove", function(event) {
             const offsetX = event.clientX / window.innerWidth * 2.0 - 1.0;
@@ -233,15 +293,10 @@ function _documentOnLoad()
             updateParallax(0.0, 0.0);
         }, parallaxImageSwapSeconds * 1000);
     } else {
-        let projectImages = [];
-        for (let i = 1; i <= 24; i++) {
-            projectImages.push("images/halo/" + i.toString() + ".png");
-        }
-        generateProjectImages(projectImages);
     }
 
     addEventListener("resize", function(event) {
-        updateCanvasSize();
+        updateCanvasSize(_entry);
         if (IS_HOME) {
             updateParallaxImages();
         }
