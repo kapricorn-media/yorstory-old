@@ -53,21 +53,22 @@ const PARALLAX_IMAGE_SETS = [
         color: "#111111",
         images: [
             parallaxImage("images/parallax5-1.png", 0.0),
-            parallaxImage("images/parallax5-2.png", 0.1),
-            parallaxImage("images/parallax5-3.png", 0.25),
-            parallaxImage("images/parallax5-4.png", 0.4),
-            parallaxImage("images/parallax5-5.png", 0.75),
-            parallaxImage("images/parallax5-6.png", 1.2),
+            parallaxImage("images/parallax5-2.png", 0.05),
+            parallaxImage("images/parallax5-3.png", 0.1),
+            parallaxImage("images/parallax5-4.png", 0.2),
+            parallaxImage("images/parallax5-5.png", 0.4),
+            parallaxImage("images/parallax5-6.png", 0.7),
+            parallaxImage("images/parallax5-7.png", 1.2),
         ]
     },
     {
         color: "#111111",
         images: [
-            parallaxImage("images/parallax6-1.png", 0.0),
+            parallaxImage("images/parallax6-1.png", 0.05),
             parallaxImage("images/parallax6-2.png", 0.1),
-            parallaxImage("images/parallax6-3.png", 0.25),
-            parallaxImage("images/parallax6-4.png", 0.5),
-            parallaxImage("images/parallax6-5.png", 1.0),
+            parallaxImage("images/parallax6-3.png", 0.4),
+            parallaxImage("images/parallax6-4.png", 0.7),
+            parallaxImage("images/parallax6-5.png", 1.5),
         ]
     },
     // {
@@ -83,9 +84,9 @@ const PARALLAX_IMAGE_SETS = [
 ];
 
 const parallaxMotionMax = 100;
-const parallaxImageSwapSeconds = 6;
+const parallaxImageSwapSeconds = 600;
 
-let _parallaxImageSetCurrent = 3;
+let _parallaxImageSetCurrent = 5;
 
 function getCurrentParallaxImageSet()
 {
