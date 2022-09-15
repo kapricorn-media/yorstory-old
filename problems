@@ -7,11 +7,13 @@
 - [X] color (halo turns green)
 - [X] spacing of "In alchemy" glue text
 
-09/14
 - [ ] new layout
+
+- [ ] marca reservada
+- [ ] render actual sticker info manually
+- [ ] figure out font size & leading conversions from Photoshop to web
 - [ ] on hover, multiply with project color
 
-09/15
 - [ ] film grain
 - [ ] fix aggresive green in HALO
 - [ ] loading of page (images shouldn't show until all ready for parallax, show "..." until ready)
