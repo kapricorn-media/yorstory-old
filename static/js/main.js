@@ -43,6 +43,8 @@ function updateCanvasSize(entry)
     const imageHeight = height - margin * 3;
     const borderRadius = margin;
 
+    const nGridItems = IS_HOME ? 3 : 6;
+
     const maxAspect = 2.0;
     let targetWidth = width;
     if (width / height > maxAspect) {
@@ -65,34 +67,52 @@ function updateCanvasSize(entry)
     landingBackground.style.borderRadius = px(borderRadius);
 
     const landingDecalTopLeft = document.getElementById("landingDecalTopLeft");
-    landingDecalTopLeft.style.left = "0px";
-    landingDecalTopLeft.style.top = "0px";
+    landingDecalTopLeft.style.left = px(0);
+    landingDecalTopLeft.style.top = px(0);
     landingDecalTopLeft.style.width = px(margin * 6);
     landingDecalTopLeft.style.height = px(margin * 6);
     const landingDecalTopRight = document.getElementById("landingDecalTopRight");
-    landingDecalTopRight.style.right = "0px";
-    landingDecalTopRight.style.top = "0px";
+    landingDecalTopRight.style.right = px(0);
+    landingDecalTopRight.style.top = px(0);
     landingDecalTopRight.style.width = px(margin * 6);
     landingDecalTopRight.style.height = px(margin * 6);
     landingDecalTopRight.style.transform = "rotate(90deg)";
     const landingDecalBottomLeft = document.getElementById("landingDecalBottomLeft");
-    landingDecalBottomLeft.style.left = "0px";
-    landingDecalBottomLeft.style.bottom = "0px";
+    landingDecalBottomLeft.style.left = px(0);
+    landingDecalBottomLeft.style.bottom = px(0);
     landingDecalBottomLeft.style.width = px(margin * 6);
     landingDecalBottomLeft.style.height = px(margin * 6);
     landingDecalBottomLeft.style.transform = "rotate(270deg)";
     const landingDecalBottomRight = document.getElementById("landingDecalBottomRight");
-    landingDecalBottomRight.style.right = "0px";
-    landingDecalBottomRight.style.bottom = "0px";
+    landingDecalBottomRight.style.right = px(0);
+    landingDecalBottomRight.style.bottom = px(0);
     landingDecalBottomRight.style.width = px(margin * 6);
     landingDecalBottomRight.style.height = px(margin * 6);
     landingDecalBottomRight.style.transform = "rotate(180deg)";
 
-    const landingText = document.getElementById("landingText");
-    landingText.style.left = "0px";
-    landingText.style.top = "0px";
-    landingText.style.width = px(margin * 18);
-    landingText.style.height = px(margin * 3);
+    const iconStartX = margin * 4;
+    const iconSpacingX = margin * 2.5;
+    const iconSize = margin * 2.162;
+    const landingIconHome = document.getElementById("landingIconHome");
+    landingIconHome.style.left = px(margin * 4);
+    landingIconHome.style.top = px(margin * 4);
+    landingIconHome.style.width = px(iconSize);
+    landingIconHome.style.height = px(iconSize);
+    const landingIconWork = document.getElementById("landingIconWork");
+    landingIconWork.style.left = px(margin * 4 + iconSpacingX);
+    landingIconWork.style.top = px(margin * 4);
+    landingIconWork.style.width = px(iconSize);
+    landingIconWork.style.height = px(iconSize);
+    const landingIconPortfolio = document.getElementById("landingIconPortfolio");
+    landingIconPortfolio.style.left = px(margin * 4 + iconSpacingX * 2);
+    landingIconPortfolio.style.top = px(margin * 4);
+    landingIconPortfolio.style.width = px(iconSize);
+    landingIconPortfolio.style.height = px(iconSize);
+    const landingIconContact = document.getElementById("landingIconContact");
+    landingIconContact.style.left = px(margin * 4 + iconSpacingX * 3);
+    landingIconContact.style.top = px(margin * 4);
+    landingIconContact.style.width = px(iconSize);
+    landingIconContact.style.height = px(iconSize);
 
     if (!IS_HOME) {
         const landingBackground = document.getElementById("landingBackground");
@@ -116,86 +136,150 @@ function updateCanvasSize(entry)
         landingBackground.appendChild(el);
     }
 
+    Array.from(document.getElementsByClassName("bigSticker")).forEach(function(sticker) {
+        sticker.style.width = px(margin * 14);
+        sticker.style.height = px(margin * 3);
+    });
+    Array.from(document.getElementsByClassName("bigStickerTitle")).forEach(function(title) {
+        title.style.left = px(margin * 0.4);
+        title.style.top = px(margin * 0.25);
+        const fontSize = margin * 1.6;
+        title.style.lineHeight = px(fontSize);
+        title.style.fontSize = px(fontSize);
+        title.style.letterSpacing = px(-2.5);
+    });
+
     const landingSticker = document.getElementById("landingSticker");
     landingSticker.style.left = px(margin * 4);
     landingSticker.style.bottom = px(margin * 4);
-    landingSticker.style.width = px(margin * 14);
-    landingSticker.style.height = px(margin * 3);
 
     const landingStickerTitle = document.getElementById("landingStickerTitle");
-    landingStickerTitle.style.left = px(margin * 0.4);
-    landingStickerTitle.style.top = px(margin * 0.25);
-    const fontSize = margin * 1.6;
-    landingStickerTitle.style.lineHeight = px(fontSize);
-    landingStickerTitle.style.fontSize = px(fontSize);
-    landingStickerTitle.style.letterSpacing = px(-2.5);
     if (!IS_HOME && entry !== null) {
         landingStickerTitle.innerHTML = entry.title;
     }
 
-    if (!IS_HOME) {
-        const colorFilter = "hue-rotate(75deg)";
-        const landingStickerBackground = document.getElementById("landingStickerBackground");
-        landingStickerBackground.style.filter = colorFilter;
-        const landingDecalTopLeft = document.getElementById("landingDecalTopLeft");
-        landingDecalTopLeft.style.filter = colorFilter;
-        const landingDecalTopRight = document.getElementById("landingDecalTopRight");
-        landingDecalTopRight.style.filter = colorFilter;
-        const landingDecalBottomLeft = document.getElementById("landingDecalBottomLeft");
-        landingDecalBottomLeft.style.filter = colorFilter;
-        const landingDecalBottomRight = document.getElementById("landingDecalBottomRight");
-        landingDecalBottomRight.style.filter = colorFilter;
-        const landingText = document.getElementById("landingText");
-        landingText.style.filter = colorFilter;
-    }
-
     const landingStickerShiny = document.getElementById("landingStickerShiny");
-    landingStickerShiny.style.right = px(margin * 6);
-    landingStickerShiny.style.top = px(margin * 2);
+    landingStickerShiny.style.right = px(margin * 4);
+    landingStickerShiny.style.top = px(margin * 4);
     landingStickerShiny.style.width = px(margin * 5);
     landingStickerShiny.style.height = px(margin * 3);
 
     const content = document.getElementById("content");
-    content.style.marginLeft = px(margin + marginX);
-    content.style.marginRight = px(margin + marginX);
+    content.style.paddingLeft = px(margin + marginX);
+    content.style.paddingRight = px(margin + marginX);
 
     const quickText = document.getElementById("quickText");
-    quickText.style.height = px(margin * 4);
+    quickText.style.height = px(margin);
     quickText.style.fontSize = px(fontSizeP);
     quickText.style.lineHeight = px(lineHeightP);
     const quickTextLeft = document.getElementById("quickTextLeft");
-    quickTextLeft.style.left = px(margin);
+    quickTextLeft.style.left = px(margin * 4);
     quickTextLeft.style.width = px(margin * 17);
-    const quickTextRight = document.getElementById("quickTextRight");
-    quickTextRight.style.left = "50%";
-    quickTextRight.style.width = px(margin * 17);
 
     const sections = document.getElementsByClassName("section");
     for (let i = 0; i < sections.length; i++) {
         sections[i].style.borderRadius = px(borderRadius);
     }
 
+    const portfolioDecalTopLeft = document.getElementById("portfolioDecalTopLeft");
+    portfolioDecalTopLeft.style.left = px(0);
+    portfolioDecalTopLeft.style.top = px(0);
+    portfolioDecalTopLeft.style.width = px(margin * 6);
+    portfolioDecalTopLeft.style.height = px(margin * 6);
+    const portfolioDecalTopRight = document.getElementById("portfolioDecalTopRight");
+    portfolioDecalTopRight.style.right = px(0);
+    portfolioDecalTopRight.style.top = px(0);
+    portfolioDecalTopRight.style.width = px(margin * 6);
+    portfolioDecalTopRight.style.height = px(margin * 6);
+    portfolioDecalTopRight.style.transform = "rotate(90deg)";
+
+    const sectionSticker = document.getElementById("sectionSticker");
+    sectionSticker.style.left = px(margin * 4);
+    sectionSticker.style.top = px(margin * 4);
+    const sectionStickerTitle = document.getElementById("sectionStickerTitle");
+
+    const sectionQuickText = document.getElementById("sectionQuickText");
+    sectionQuickText.style.fontSize = px(fontSizeP);
+    sectionQuickText.style.lineHeight = px(lineHeightP);
+    sectionQuickText.style.left = px(margin * 4);
+    sectionQuickText.style.top = px(margin * 8);
+
     const grid = document.getElementById("grid");
-    grid.style.columnGap = px(margin);
+    const gridSpacing = IS_HOME ? margin : margin * 0.25;
+    const gridWidth = (grid.offsetWidth - (gridSpacing * (nGridItems - 1))) / nGridItems;
+    sectionQuickText.style.width = px(gridWidth * (Math.floor(nGridItems / 2) + 1) + margin - margin * 4);
+
+    grid.style.columnGap = px(gridSpacing);
+    grid.style.paddingTop = px(margin * 11);
+    grid.style.gridTemplateColumns = "auto ".repeat(nGridItems);
+
+    const gridItemAspect = 1.82;
     const gridItems = Array.from(document.getElementsByClassName("gridItem"));
     gridItems.forEach(gridItem => {
-        const height = IS_HOME ? margin * 12 : margin * 10;
-        gridItem.style.height = px(height);
+        const extraHeight = IS_HOME ? margin : 0;
+        // const height = IS_HOME ? margin * 12 : margin * 10;
+        gridItem.style.width = px(gridWidth);
+        gridItem.style.height = px(gridWidth / gridItemAspect + gridSpacing + extraHeight);
     });
     const gridItemBackgrounds = Array.from(document.getElementsByClassName("gridItemBackground"));
     gridItemBackgrounds.forEach(bg => {
-        bg.style.height = px(margin * 9);
-        bg.style.borderRadius = px(margin);
+        bg.style.height = px(gridWidth / gridItemAspect);
+        bg.style.borderRadius = px(gridSpacing);
     });
     const gridItemTitles = Array.from(document.getElementsByClassName("gridItemTitle"));
     gridItemTitles.forEach(title => {
+        title.style.marginTop = px(margin * 0.6);
         title.style.marginLeft = px(margin);
         title.style.height = px(margin);
     });
 
+    const footer = document.getElementById("footer");
+    footer.style.height = px(margin * 8);
+
+    const footerDecalBottomLeft = document.getElementById("footerDecalBottomLeft");
+    footerDecalBottomLeft.style.left = px(0);
+    footerDecalBottomLeft.style.bottom = px(0);
+    footerDecalBottomLeft.style.width = px(margin * 6);
+    footerDecalBottomLeft.style.height = px(margin * 6);
+    footerDecalBottomLeft.style.transform = "rotate(270deg)";
+    const footerDecalBottomRight = document.getElementById("footerDecalBottomRight");
+    footerDecalBottomRight.style.right = px(0);
+    footerDecalBottomRight.style.bottom = px(0);
+    footerDecalBottomRight.style.width = px(margin * 6);
+    footerDecalBottomRight.style.height = px(margin * 6);
+    footerDecalBottomRight.style.transform = "rotate(180deg)";
+
+    if (!IS_HOME) {
+        const colorFilter = "hue-rotate(75deg)";
+        const landingStickerBackground = document.getElementById("landingStickerBackground");
+        landingStickerBackground.style.filter = colorFilter;
+        landingDecalTopLeft.style.filter = colorFilter;
+        landingDecalTopRight.style.filter = colorFilter;
+        landingDecalBottomLeft.style.filter = colorFilter;
+        landingDecalBottomRight.style.filter = colorFilter;
+        landingIconHome.style.filter = colorFilter;
+        landingIconWork.style.filter = colorFilter;
+        landingIconPortfolio.style.filter = colorFilter;
+        landingIconContact.style.filter = colorFilter;
+
+        quickText.style.filter = colorFilter;
+
+        portfolioDecalTopLeft.style.filter = colorFilter;
+        portfolioDecalTopRight.style.filter = colorFilter;
+        sectionStickerTitle.style.filter = colorFilter;
+        sectionQuickText.style.filter = colorFilter;
+
+        footerDecalBottomLeft.style.filter = colorFilter;
+        footerDecalBottomRight.style.filter = colorFilter;
+
+        content.style.backgroundImage = "linear-gradient(#000, #013620)";
+    }
+
     // DEBUG
     const debugGrid = document.getElementById("debugGrid");
     if (debugGrid) {
+        debugGrid.style.left = px(marginX);
+        debugGrid.style.right = px(marginX);
         const hs = Array.from(document.getElementsByClassName("debugGridHorizontal"));
         hs.forEach(h => {
             h.remove();
@@ -208,6 +292,9 @@ function updateCanvasSize(entry)
         for (let i = 0; i < 20 * 2; i++) {
             const el = document.createElement("div");
             el.classList.add("debugGridHorizontal");
+            if (i % 2 == 1) {
+                el.classList.add("debugGridHalfStep");
+            }
             el.style.left = px(i * margin * 0.5);
             debugGrid.appendChild(el);
         }
@@ -226,6 +313,9 @@ function updateCanvasSize(entry)
         for (let i = 0; i < 12 * 2; i++) {
             const el = document.createElement("div");
             el.classList.add("debugGridVertical");
+            if (i % 2 == 1) {
+                el.classList.add("debugGridHalfStep");
+            }
             el.style.bottom = px(i * margin * 0.5);
             debugGrid.appendChild(el);
         }

@@ -8,6 +8,10 @@
 - [X] spacing of "In alchemy" glue text
 
 09/14
+- [ ] new layout
+- [ ] on hover, multiply with project color
+
+09/15
 - [ ] film grain
 - [ ] fix aggresive green in HALO
 - [ ] loading of page (images shouldn't show until all ready for parallax, show "..." until ready)
