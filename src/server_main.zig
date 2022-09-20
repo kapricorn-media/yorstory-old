@@ -15,7 +15,6 @@ const Portfolio = struct {
     uri: []const u8,
     images: []const []const u8,
     coverIndex: usize,
-    landingIndex: usize,
 };
 
 const PORTFOLIO_LIST = [_]Portfolio {
@@ -49,56 +48,48 @@ const PORTFOLIO_LIST = [_]Portfolio {
             "images/halo/24.png",
         },
         .coverIndex = 16,
-        .landingIndex = 16,
     },
     .{
         .title = "Wandering Earth II",
         .uri = "wandering-earth-ii",
         .images = undefined,
         .coverIndex = undefined,
-        .landingIndex = undefined,
     },
     .{
         .title = "Project X",
         .uri = "project-x",
         .images = undefined,
         .coverIndex = undefined,
-        .landingIndex = undefined,
     },
     .{
         .title = "Cerulea",
         .uri = "cerulea",
         .images = undefined,
         .coverIndex = undefined,
-        .landingIndex = undefined,
     },
     .{
         .title = "The Project",
         .uri = "the-project",
         .images = undefined,
         .coverIndex = undefined,
-        .landingIndex = undefined,
     },
     .{
         .title = "Project Y",
         .uri = "project-y",
         .images = undefined,
         .coverIndex = undefined,
-        .landingIndex = undefined,
     },
     .{
         .title = "123456",
         .uri = "123456",
         .images = undefined,
         .coverIndex = undefined,
-        .landingIndex = undefined,
     },
     .{
         .title = "Lorem ipsum",
         .uri = "lorem-ipsum",
         .images = undefined,
         .coverIndex = undefined,
-        .landingIndex = undefined,
     }
 };
 

@@ -1,38 +1,6 @@
 const IS_HOME = window.location.pathname === "/" || window.location.pathname === "/index.html";
 
 let _entry = null;
-let _preloadedImages = {};
-
-// Takes an array of arrays of images to load, in sequence
-function preloadImages(imageSequence)
-{
-    for (let i = 0; i < imageSequence.length; i++) {
-        let loaded = false;
-        if (imageSequence[i][0] in _preloadedImages) {
-            loaded = true;
-            for (let j = 0; j < imageSequence[i].length; j++) {
-                const imgSrc = imageSequence[i][j];
-                if (!_preloadedImages[imgSrc].complete) {
-                    loaded = false;
-                    break;
-                }
-            }
-        } else {
-            for (let j = 0; j < imageSequence[i].length; j++) {
-                const imgSrc = imageSequence[i][j];
-                _preloadedImages[imgSrc] = new Image();
-                _preloadedImages[imgSrc].onload = function() {
-                    preloadImages(imageSequence);
-                };
-                _preloadedImages[imgSrc].src = imgSrc;
-            }
-        }
-
-        if (!loaded) {
-            break;
-        }
-    }
-}
 
 // entry is null for home page, or if project info is not loaded yet
 function updateCanvasSize(entry)
@@ -113,28 +81,6 @@ function updateCanvasSize(entry)
     landingIconContact.style.top = px(margin * 4);
     landingIconContact.style.width = px(iconSize);
     landingIconContact.style.height = px(iconSize);
-
-    if (!IS_HOME) {
-        const landingBackground = document.getElementById("landingBackground");
-
-        let prevEl = document.getElementById("landingProjectImage");
-        if (prevEl) {
-            prevEl.remove();
-        }
-
-        const el = document.createElement("img");
-        el.id = "landingProjectImage";
-        el.style.position = "absolute";
-        el.style.width = "100%";
-        el.onload = function() {
-            const left = (landingBackground.offsetWidth / 2) - (this.width / 2);
-            this.style.left = px(left);
-        };
-        if (entry !== null) {
-            el.src = entry.images[entry.landingIndex];
-        }
-        landingBackground.appendChild(el);
-    }
 
     Array.from(document.getElementsByClassName("bigSticker")).forEach(function(sticker) {
         sticker.style.width = px(margin * 14);
@@ -374,7 +320,9 @@ function _documentOnLoad()
             }
             imageSequence.push(list);
         }
-        preloadImages(imageSequence);
+        loadImages(imageSequence, function(i) {
+            console.log("loaded list " + i.toString());
+        });
 
         setInterval(function() {
             _parallaxImageSetCurrent = (_parallaxImageSetCurrent + 1) % PARALLAX_IMAGE_SETS.length;
