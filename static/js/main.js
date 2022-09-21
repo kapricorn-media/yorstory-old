@@ -7,21 +7,31 @@ function updateCanvasSize(entry)
 {
     const width = window.innerWidth;
     const height = window.innerHeight;
-    const margin = Math.round(height * 0.04);
-    const imageHeight = height - margin * 3;
+
+    const margin = Math.round(height / 31.0);
+    const marginNumTop = 1;
+    const marginNumBot = 6;
+    const imageHeight = height - margin * marginNumTop - margin * marginNumBot;
+
+    // const margin = Math.round(height * 0.04);
+    // const imageHeight = height - margin * 3 - margin * 4;
     const borderRadius = margin;
 
     const nGridItems = IS_HOME ? 3 : 6;
 
-    const maxAspect = 2.0;
-    let targetWidth = width;
-    if (width / height > maxAspect) {
-        targetWidth = height * maxAspect;
-    }
-    let marginX = (width - targetWidth) / 2;
+    const imageAspect = 2.0;
+    const imageWidth = imageHeight * imageAspect;
+    const marginX = (width - imageWidth) / 2;
+    const targetWidth = imageWidth;
 
-    let fontSizeP = targetWidth / 180;
-    fontSizeP = margin / 3.5;
+    // const maxAspect = 1.77777777778;
+    // let targetWidth = width;
+    // if (width / height > maxAspect) {
+    //     targetWidth = height * maxAspect;
+    // }
+    // let marginX = (width - targetWidth) / 2;
+
+    let fontSizeP = margin / 2.68;
     let lineHeightP = fontSizeP * 20 / 12;
 
     const landing = document.getElementById("landing");
@@ -82,26 +92,53 @@ function updateCanvasSize(entry)
     landingIconContact.style.width = px(iconSize);
     landingIconContact.style.height = px(iconSize);
 
-    Array.from(document.getElementsByClassName("bigSticker")).forEach(function(sticker) {
-        sticker.style.width = px(margin * 14);
-        sticker.style.height = px(margin * 3);
+    Array.from(document.getElementsByClassName("bigSticker")).forEach(function(el) {
+        el.style.width = px(margin * 15.5);
+        el.style.height = px(margin * 3);
     });
-    Array.from(document.getElementsByClassName("bigStickerTitle")).forEach(function(title) {
-        title.style.left = px(margin * 0.4);
-        title.style.top = px(margin * 0.25);
+    Array.from(document.getElementsByClassName("bigStickerBackground")).forEach(function(el) {
+        // el.style.left = px(margin);
+        // el.style.right = px(margin);
+    });
+    Array.from(document.getElementsByClassName("bigStickerTitle")).forEach(function(el) {
+        el.style.left = px(margin * 1.4);
+        el.style.top = px(margin * 0.25);
         const fontSize = margin * 1.6;
-        title.style.lineHeight = px(fontSize);
-        title.style.fontSize = px(fontSize);
-        title.style.letterSpacing = px(-2.5);
+        el.style.lineHeight = px(fontSize);
+        el.style.fontSize = px(fontSize);
+        el.style.letterSpacing = px(-margin * 0.08);
+    });
+    Array.from(document.getElementsByClassName("bigStickerTextBottom")).forEach(function(el) {
+        el.style.left = px(margin * 1.5);
+        el.style.top = px(margin * 2.2);
+        const fontSize = margin * 0.31;
+        el.style.lineHeight = px(fontSize);
+        el.style.fontSize = px(fontSize);
+        el.style.letterSpacing = px(-margin * 0.01);
+    });
+    Array.from(document.getElementsByClassName("bigStickerTextRight")).forEach(function(el) {
+        el.style.left = px(margin * 8);
+        el.style.width = px(margin * 6);
+        el.style.top = px(margin * 0.45);
+        const fontSize = margin * 0.31;
+        el.style.lineHeight = px(fontSize);
+        el.style.fontSize = px(fontSize);
+        el.style.letterSpacing = px(-margin * 0.01);
     });
 
     const landingSticker = document.getElementById("landingSticker");
-    landingSticker.style.left = px(margin * 4);
+    landingSticker.style.left = px(margin * 3);
     landingSticker.style.bottom = px(margin * 4);
 
     const landingStickerTitle = document.getElementById("landingStickerTitle");
     if (!IS_HOME && entry !== null) {
         landingStickerTitle.innerHTML = entry.title;
+    }
+    if (IS_HOME) {
+        const landingStickerTitleR = document.getElementById("landingStickerTitleR");
+        landingStickerTitleR.style.left = px(margin * 6.25);
+        landingStickerTitleR.style.top = px(-margin * 0.15);
+        landingStickerTitleR.style.fontSize = px(margin * 0.35);
     }
 
     const landingStickerShiny = document.getElementById("landingStickerShiny");
@@ -120,7 +157,10 @@ function updateCanvasSize(entry)
     quickText.style.lineHeight = px(lineHeightP);
     const quickTextLeft = document.getElementById("quickTextLeft");
     quickTextLeft.style.left = px(margin * 4);
-    quickTextLeft.style.width = px(margin * 17);
+    quickTextLeft.style.width = px(margin * 13.5);
+    const quickTextRight = document.getElementById("quickTextRight");
+    quickTextRight.style.left = px(margin * 19.5);
+    quickTextRight.style.width = px(margin * 13.6);
 
     const sections = document.getElementsByClassName("section");
     for (let i = 0; i < sections.length; i++) {
@@ -256,7 +296,7 @@ function updateCanvasSize(entry)
             el.style.top = px(i * margin);
             debugGrid.appendChild(el);
         }
-        for (let i = 0; i < 12 * 2; i++) {
+        for (let i = 0; i < 14 * 2; i++) {
             const el = document.createElement("div");
             el.classList.add("debugGridVertical");
             if (i % 2 == 1) {

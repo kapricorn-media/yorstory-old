@@ -1,6 +1,6 @@
-- parallax background clipping
-- mobile
-- contact/work/about (add yorstory to go back?) vs. shiny sticker
+- [ ] parallax background clipping
+- [ ] mobile
+- [X] contact/work/about (add yorstory to go back?) vs. shiny sticker
 
 09/13
 - [X] avoid extreme wide resizing
@@ -9,14 +9,16 @@
 
 - [X] new layout
 
-- [ ] sequential images
+- [X] sequential images
 - [ ] marca reservada
 - [ ] loading of page (images shouldn't show until all ready for parallax, show "..." until ready)
 - [ ] render actual sticker info manually
 - [ ] figure out font size & leading conversions from Photoshop to web
 
-- [ ] on hover, multiply with project color
-
 - [ ] film grain
 - [ ] fix aggresive green in HALO
 - [ ] finish sticker customization (emojis)
+
+- [ ] click on a project's individual images
+
+- [ ] on hover, multiply with project color (kinda done thru background)
