@@ -8,28 +8,28 @@ function updateCanvasSize(entry)
     const width = window.innerWidth;
     const height = window.innerHeight;
 
-    const margin = Math.round(height / 31.0);
-    const marginNumTop = 1;
-    const marginNumBot = 6;
-    const imageHeight = height - margin * marginNumTop - margin * marginNumBot;
+    // const margin = Math.round(height / 31.0);
+    // const marginNumTop = 1;
+    // const marginNumBot = 6;
+    // const imageHeight = height - margin * marginNumTop - margin * marginNumBot;
 
-    // const margin = Math.round(height * 0.04);
-    // const imageHeight = height - margin * 3 - margin * 4;
+    const margin = Math.round(height * 0.04);
+    const imageHeight = height - margin * 3;
     const borderRadius = margin;
 
     const nGridItems = IS_HOME ? 3 : 6;
 
-    const imageAspect = 2.0;
-    const imageWidth = imageHeight * imageAspect;
-    const marginX = (width - imageWidth) / 2 - margin;
-    const targetWidth = imageWidth;
+    // const imageAspect = 2.0;
+    // const imageWidth = imageHeight * imageAspect;
+    // const marginX = (width - imageWidth) / 2 - margin;
+    // const targetWidth = imageWidth;
 
-    // const maxAspect = 1.77777777778;
-    // let targetWidth = width;
-    // if (width / height > maxAspect) {
-    //     targetWidth = height * maxAspect;
-    // }
-    // let marginX = (width - targetWidth) / 2;
+    const maxAspect = 2.0;
+    let targetWidth = width;
+    if (width / height > maxAspect) {
+        targetWidth = height * maxAspect;
+    }
+    let marginX = (width - targetWidth) / 2;
 
     let fontSizeP = margin / 2.68;
     let lineHeightP = fontSizeP * 20 / 12;
