@@ -73,7 +73,7 @@ p {
     vertical-align: baseline;
 }
 #landingStickerTitleR {
-    font-family: HelveticaHeavy;
+    font-family: HelveticaBold;
 }
 .bigStickerTextBottom, .bigStickerTextRight {
     position: absolute;

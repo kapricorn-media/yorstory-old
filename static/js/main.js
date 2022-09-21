@@ -21,7 +21,7 @@ function updateCanvasSize(entry)
 
     const imageAspect = 2.0;
     const imageWidth = imageHeight * imageAspect;
-    const marginX = (width - imageWidth) / 2;
+    const marginX = (width - imageWidth) / 2 - margin;
     const targetWidth = imageWidth;
 
     // const maxAspect = 1.77777777778;
@@ -136,9 +136,9 @@ function updateCanvasSize(entry)
     }
     if (IS_HOME) {
         const landingStickerTitleR = document.getElementById("landingStickerTitleR");
-        landingStickerTitleR.style.left = px(margin * 6.25);
+        landingStickerTitleR.style.left = px(margin * 7.25);
         landingStickerTitleR.style.top = px(-margin * 0.15);
-        landingStickerTitleR.style.fontSize = px(margin * 0.35);
+        landingStickerTitleR.style.fontSize = px(margin * 0.34);
     }
 
     const landingStickerShiny = document.getElementById("landingStickerShiny");
