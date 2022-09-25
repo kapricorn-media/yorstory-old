@@ -9,6 +9,8 @@
 
 - [X] new layout
 
+- [ ] fix the label
+
 - [X] sequential images
 - [ ] marca reservada
 - [ ] loading of page (images shouldn't show until all ready for parallax, show "..." until ready)
@@ -22,3 +24,4 @@
 - [ ] click on a project's individual images
 
 - [ ] on hover, multiply with project color (kinda done thru background)
+
