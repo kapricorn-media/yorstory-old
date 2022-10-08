@@ -33,14 +33,8 @@ function httpPost(url, data, callback)
 
 let _loadedImages = {};
 
-// Takes an array of arrays of images to load, in sequence
-function loadImages(imageSequence, callbackComplete)
+function loadImagesInternal(imageSequence, callbackComplete, sequenceLoaded)
 {
-    let sequenceLoaded = [];
-    for (let i = 0; i < imageSequence.length; i++) {
-        sequenceLoaded.push(false);
-    }
-
     for (let i = 0; i < imageSequence.length; i++) {
         if (sequenceLoaded[i]) {
             continue;
@@ -61,7 +55,7 @@ function loadImages(imageSequence, callbackComplete)
                 const imgSrc = imageSequence[i][j];
                 _loadedImages[imgSrc] = new Image();
                 _loadedImages[imgSrc].onload = function() {
-                    loadImages(imageSequence, callbackComplete);
+                    loadImagesInternal(imageSequence, callbackComplete, sequenceLoaded);
                 };
                 _loadedImages[imgSrc].src = imgSrc;
             }
@@ -74,4 +68,14 @@ function loadImages(imageSequence, callbackComplete)
             break;
         }
     }
+}
+
+// Takes an array of arrays of images to load, in sequence
+function loadImages(imageSequence, callbackComplete)
+{
+    let sequenceLoaded = [];
+    for (let i = 0; i < imageSequence.length; i++) {
+        sequenceLoaded.push(false);
+    }
+    loadImagesInternal(imageSequence, callbackComplete, sequenceLoaded);
 }
