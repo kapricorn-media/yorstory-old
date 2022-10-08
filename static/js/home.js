@@ -10,75 +10,75 @@ const PARALLAX_IMAGE_SETS = [
     {
         color: "#101010",
         images: [
-            parallaxImage("images/parallax1-1.png", 0.01),
-            parallaxImage("images/parallax1-2.png", 0.05),
-            parallaxImage("images/parallax1-3.png", 0.2),
-            parallaxImage("images/parallax1-4.png", 0.5),
-            parallaxImage("images/parallax1-5.png", 0.9),
-            parallaxImage("images/parallax1-6.png", 1.2),
+            parallaxImage("images/parallax/parallax1-1.png", 0.01),
+            parallaxImage("images/parallax/parallax1-2.png", 0.05),
+            parallaxImage("images/parallax/parallax1-3.png", 0.2),
+            parallaxImage("images/parallax/parallax1-4.png", 0.5),
+            parallaxImage("images/parallax/parallax1-5.png", 0.9),
+            parallaxImage("images/parallax/parallax1-6.png", 1.2),
         ]
     },
     {
         color: "#000000",
         images: [
-            parallaxImage("images/parallax2-1.png", 0.05),
-            parallaxImage("images/parallax2-2.png", 0.1),
-            parallaxImage("images/parallax2-3.png", 0.25),
-            parallaxImage("images/parallax2-4.png", 1.0),
+            parallaxImage("images/parallax/parallax2-1.png", 0.05),
+            parallaxImage("images/parallax/parallax2-2.png", 0.1),
+            parallaxImage("images/parallax/parallax2-3.png", 0.25),
+            parallaxImage("images/parallax/parallax2-4.png", 1.0),
         ]
     },
     {
         color: "#212121",
         images: [
-            parallaxImage("images/parallax3-1.png", 0.05),
-            parallaxImage("images/parallax3-2.png", 0.2),
-            parallaxImage("images/parallax3-3.png", 0.3),
-            parallaxImage("images/parallax3-4.png", 0.8),
-            parallaxImage("images/parallax3-5.png", 1.1),
+            parallaxImage("images/parallax/parallax3-1.png", 0.05),
+            parallaxImage("images/parallax/parallax3-2.png", 0.2),
+            parallaxImage("images/parallax/parallax3-3.png", 0.3),
+            parallaxImage("images/parallax/parallax3-4.png", 0.8),
+            parallaxImage("images/parallax/parallax3-5.png", 1.1),
         ]
     },
     {
         colorTop: "#1a1b1a",
         colorBottom: "#ffffff",
         images: [
-            parallaxImage("images/parallax4-1.png", 0.05),
-            parallaxImage("images/parallax4-2.png", 0.1),
-            parallaxImage("images/parallax4-3.png", 0.25),
-            parallaxImage("images/parallax4-4.png", 0.6),
-            parallaxImage("images/parallax4-5.png", 0.75),
-            parallaxImage("images/parallax4-6.png", 1.2),
+            parallaxImage("images/parallax/parallax4-1.png", 0.05),
+            parallaxImage("images/parallax/parallax4-2.png", 0.1),
+            parallaxImage("images/parallax/parallax4-3.png", 0.25),
+            parallaxImage("images/parallax/parallax4-4.png", 0.6),
+            parallaxImage("images/parallax/parallax4-5.png", 0.75),
+            parallaxImage("images/parallax/parallax4-6.png", 1.2),
         ]
     },
     {
         color: "#111111",
         images: [
-            parallaxImage("images/parallax5-1.png", 0.0),
-            parallaxImage("images/parallax5-2.png", 0.05),
-            parallaxImage("images/parallax5-3.png", 0.1),
-            parallaxImage("images/parallax5-4.png", 0.2),
-            parallaxImage("images/parallax5-5.png", 0.4),
-            parallaxImage("images/parallax5-6.png", 0.7),
-            parallaxImage("images/parallax5-7.png", 1.2),
+            parallaxImage("images/parallax/parallax5-1.png", 0.0),
+            parallaxImage("images/parallax/parallax5-2.png", 0.05),
+            parallaxImage("images/parallax/parallax5-3.png", 0.1),
+            parallaxImage("images/parallax/parallax5-4.png", 0.2),
+            parallaxImage("images/parallax/parallax5-5.png", 0.4),
+            parallaxImage("images/parallax/parallax5-6.png", 0.7),
+            parallaxImage("images/parallax/parallax5-7.png", 1.2),
         ]
     },
     {
         color: "#111111",
         images: [
-            parallaxImage("images/parallax6-1.png", 0.05),
-            parallaxImage("images/parallax6-2.png", 0.1),
-            parallaxImage("images/parallax6-3.png", 0.4),
-            parallaxImage("images/parallax6-4.png", 0.7),
-            parallaxImage("images/parallax6-5.png", 1.5),
+            parallaxImage("images/parallax/parallax6-1.png", 0.05),
+            parallaxImage("images/parallax/parallax6-2.png", 0.1),
+            parallaxImage("images/parallax/parallax6-3.png", 0.4),
+            parallaxImage("images/parallax/parallax6-4.png", 0.7),
+            parallaxImage("images/parallax/parallax6-5.png", 1.5),
         ]
     },
     // {
     //     color: "#111111",
     //     images: [
-    //         parallaxImage("images/parallax7-1.png", 0.0),
-    //         parallaxImage("images/parallax7-2.png", 0.1),
-    //         parallaxImage("images/parallax7-3.png", 0.25),
-    //         parallaxImage("images/parallax7-4.png", 0.4),
-    //         parallaxImage("images/parallax7-5.png", 1.0),
+    //         parallaxImage("images/parallax/parallax7-1.png", 0.0),
+    //         parallaxImage("images/parallax/parallax7-2.png", 0.1),
+    //         parallaxImage("images/parallax/parallax7-3.png", 0.25),
+    //         parallaxImage("images/parallax/parallax7-4.png", 0.4),
+    //         parallaxImage("images/parallax/parallax7-5.png", 1.0),
     //     ]
     // }
 ];
@@ -163,36 +163,41 @@ function updateParallaxImages()
 
 function generatePortfolio(portfolioList)
 {
-    const template = document.getElementsByClassName("gridItem")[0].cloneNode(true);
-
-    Array.from(document.getElementsByClassName("gridItem")).forEach(item => {
-        item.remove();
+    Array.from(document.getElementsByClassName("grid")).forEach(function(el) {
+        el.remove();
+    });
+    Array.from(document.getElementsByClassName("gridItem")).forEach(function(el) {
+        el.remove();
     });
 
-    const portfolioGrid = document.getElementById("grid");
+    const portfolio = document.getElementById("portfolio");
+
+    const grid = document.createElement("div");
+    grid.classList.add("grid");
 
     for (let i = 0; i < portfolioList.length; i++) {
         const port = portfolioList[i];
-        const el = template.cloneNode(true);
-        el.id = port.uri;
-        for (let j = 0; j < el.childNodes.length; j++) {
-            const child = el.childNodes[j];
-            if ("classList" in child) {
-                if (child.classList.contains("gridItemBackground")) {
-                    child.style.backgroundImage = "url('" + port.images[port.coverIndex] + "')";
-                    child.style.backgroundPosition = "center";
-                    child.style.backgroundRepeat = "no-repeat";
-                    child.style.backgroundSize = "cover";
-                }
-                if (child.classList.contains("gridItemTitle")) {
-                    child.innerHTML = port.title;
-                }
-            }
-        }
-        portfolioGrid.appendChild(el);
+        const gridItem = document.createElement("div");
+        gridItem.id = port.uri;
+        gridItem.classList.add("gridItem");
+
+        const gridItemBackground = document.createElement("div");
+        gridItemBackground.classList.add("gridItemBackground");
+        gridItemBackground.style.backgroundImage = "url('" + port.cover + "')";
+        gridItemBackground.style.backgroundPosition = "center";
+        gridItemBackground.style.backgroundRepeat = "no-repeat";
+        gridItemBackground.style.backgroundSize = "cover";
+        gridItem.appendChild(gridItemBackground);
+
+        const gridItemTitle = document.createElement("div");
+        gridItemTitle.classList.add("gridItemTitle");
+        gridItemTitle.innerHTML = port.title;
+        gridItem.appendChild(gridItemTitle);
+
+        grid.appendChild(gridItem);
     }
 
-    template.remove();
+    portfolio.appendChild(grid);
 
     Array.from(document.getElementsByClassName("gridItem")).forEach(item => {
         item.addEventListener("click", function(event) {

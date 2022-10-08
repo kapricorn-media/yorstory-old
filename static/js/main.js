@@ -14,7 +14,7 @@ function updateCanvasSize(entry)
     // const imageHeight = height - margin * marginNumTop - margin * marginNumBot;
 
     const margin = Math.round(height * 0.04);
-    const imageHeight = height - margin * 3;
+    const imageHeight = height - margin * 3 - margin * 3;
     const borderRadius = margin;
 
     const nGridItems = IS_HOME ? 3 : 6;
@@ -31,8 +31,15 @@ function updateCanvasSize(entry)
     }
     let marginX = (width - targetWidth) / 2;
 
+    let fontSizeH1 = margin * 1.6;
+    let fontSizeH2 = margin * 1.06;
     let fontSizeP = margin / 2.68;
-    let lineHeightP = fontSizeP * 20 / 12;
+    let lineHeightP = fontSizeP * 20 / 14;
+
+    Array.from(document.getElementsByTagName("h1")).forEach(function(el) {
+        el.style.fontSize = px(fontSizeH1);
+        el.style.letterSpacing = px(margin * -0.08);
+    });
 
     const landing = document.getElementById("landing");
 
@@ -103,9 +110,8 @@ function updateCanvasSize(entry)
     Array.from(document.getElementsByClassName("bigStickerTitle")).forEach(function(el) {
         el.style.left = px(margin * 1.4);
         el.style.top = px(margin * 0.25);
-        const fontSize = margin * 1.6;
-        el.style.lineHeight = px(fontSize);
-        el.style.fontSize = px(fontSize);
+        el.style.lineHeight = px(fontSizeH1);
+        el.style.fontSize = px(fontSizeH1);
         el.style.letterSpacing = px(-margin * 0.08);
     });
     Array.from(document.getElementsByClassName("bigStickerTextBottom")).forEach(function(el) {
@@ -152,11 +158,11 @@ function updateCanvasSize(entry)
     content.style.paddingRight = px(margin + marginX);
 
     const quickText = document.getElementById("quickText");
-    quickText.style.height = px(margin);
+    quickText.style.height = px(margin * 2);
     quickText.style.fontSize = px(fontSizeP);
     quickText.style.lineHeight = px(lineHeightP);
     const quickTextLeft = document.getElementById("quickTextLeft");
-    quickTextLeft.style.left = px(margin * 4);
+    quickTextLeft.style.left = px(margin * 4.5);
     quickTextLeft.style.width = px(margin * 13.5);
     const quickTextRight = document.getElementById("quickTextRight");
     quickTextRight.style.left = px(margin * 19.5);
@@ -179,25 +185,59 @@ function updateCanvasSize(entry)
     portfolioDecalTopRight.style.height = px(margin * 6);
     portfolioDecalTopRight.style.transform = "rotate(90deg)";
 
-    const sectionSticker = document.getElementById("sectionSticker");
-    sectionSticker.style.left = px(margin * 4);
-    sectionSticker.style.top = px(margin * 4);
-    const sectionStickerTitle = document.getElementById("sectionStickerTitle");
+    const sectionTitle = document.getElementById("sectionTitle");
+    sectionTitle.style.paddingLeft = px(margin * 4.45);
+    sectionTitle.style.paddingTop = px(margin * 4.08);
 
     const sectionQuickText = document.getElementById("sectionQuickText");
     sectionQuickText.style.fontSize = px(fontSizeP);
     sectionQuickText.style.lineHeight = px(lineHeightP);
-    sectionQuickText.style.left = px(margin * 4);
-    sectionQuickText.style.top = px(margin * 8);
+    sectionQuickText.style.marginLeft = px(margin * 4.5);
+    sectionQuickText.style.marginRight = px(margin * 4.5);
+    sectionQuickText.style.marginTop = px(margin * 1.5);
 
-    const grid = document.getElementById("grid");
+    // TODO generate subprojects
+
+    Array.from(document.getElementsByTagName("h2")).forEach(function(el) {
+        el.style.fontSize = px(fontSizeH2);
+    });
+
+    Array.from(document.getElementsByClassName("subproject")).forEach(function(el) {
+        el.style.marginTop = px(margin * 0.8);
+    });
+
+    Array.from(document.getElementsByClassName("subprojectNumber")).forEach(function(el) {
+        el.style.width = px(margin * 2);
+        el.style.height = px(margin * 2);
+        el.style.left = px(margin * 1.5);
+    });
+    Array.from(document.getElementsByClassName("subprojectNumberText")).forEach(function(el) {
+        el.style.fontSize = px(margin * 1.6);
+    });
+
+    Array.from(document.getElementsByClassName("subprojectTitle")).forEach(function(el) {
+        el.style.paddingTop = px(margin * 1.3);
+        el.style.marginLeft = px(margin * 4.5);
+    });
+    Array.from(document.getElementsByClassName("subprojectText")).forEach(function(el) {
+        el.style.paddingTop = px(margin * 0.5);
+        el.style.marginLeft = px(margin * 4.5);
+        el.style.fontSize = px(fontSizeP);
+    });
+
     const gridSpacing = IS_HOME ? margin : margin * 0.25;
-    const gridWidth = (grid.offsetWidth - (gridSpacing * (nGridItems - 1))) / nGridItems;
-    sectionQuickText.style.width = px(gridWidth * (Math.floor(nGridItems / 2) + 1) + margin - margin * 4);
+    let gridWidth = null;
 
-    grid.style.columnGap = px(gridSpacing);
-    grid.style.paddingTop = px(margin * 11);
-    grid.style.gridTemplateColumns = "auto ".repeat(nGridItems);
+    Array.from(document.getElementsByClassName("grid")).forEach(function(grid) {
+        grid.style.marginLeft = px(margin * 4.5);
+        grid.style.marginRight = px(margin * 4.5);
+        gridWidth = (grid.offsetWidth - (gridSpacing * (nGridItems - 1))) / nGridItems;
+
+        grid.style.columnGap = px(gridSpacing);
+        grid.style.paddingTop = px(margin * 2);
+        grid.style.gridTemplateColumns = "auto ".repeat(nGridItems);
+    })
+    // sectionQuickText.style.width = px(gridWidth * (Math.floor(nGridItems / 2) + 1) + margin - margin * 4);
 
     const gridItemAspect = 1.82;
     const gridItems = Array.from(document.getElementsByClassName("gridItem"));
@@ -252,8 +292,14 @@ function updateCanvasSize(entry)
 
         portfolioDecalTopLeft.style.filter = colorFilter;
         portfolioDecalTopRight.style.filter = colorFilter;
-        sectionStickerTitle.style.filter = colorFilter;
+        sectionTitle.style.filter = colorFilter;
         sectionQuickText.style.filter = colorFilter;
+        Array.from(document.getElementsByClassName("subprojectTitle")).forEach(function(el) {
+            el.style.filter = colorFilter;
+        });
+        Array.from(document.getElementsByClassName("subprojectText")).forEach(function(el) {
+            el.style.filter = colorFilter;
+        });
 
         footerDecalBottomLeft.style.filter = colorFilter;
         footerDecalBottomRight.style.filter = colorFilter;
@@ -322,6 +368,7 @@ function _documentOnLoad()
 
         if (IS_HOME) {
             generatePortfolio(portfolioList);
+            updateCanvasSize(_entry);
         } else {
             for (let i = 0; i < portfolioList.length; i++) {
                 let e = portfolioList[i];
@@ -337,7 +384,8 @@ function _documentOnLoad()
             }
 
             updateCanvasSize(_entry);
-            generateProjectImages(_entry.images);
+            generateEntry(_entry);
+            updateCanvasSize(_entry);
         }
     });
 
