@@ -196,8 +196,6 @@ function updateCanvasSize(entry)
     sectionQuickText.style.marginRight = px(margin * 4.5);
     sectionQuickText.style.marginTop = px(margin * 1.5);
 
-    // TODO generate subprojects
-
     Array.from(document.getElementsByTagName("h2")).forEach(function(el) {
         el.style.fontSize = px(fontSizeH2);
     });
@@ -274,6 +272,22 @@ function updateCanvasSize(entry)
     footerDecalBottomRight.style.width = px(margin * 6);
     footerDecalBottomRight.style.height = px(margin * 6);
     footerDecalBottomRight.style.transform = "rotate(180deg)";
+
+    if (!IS_HOME) {
+        const galleryImage = document.getElementById("galleryImage");
+        galleryImage.style.borderRadius = px(borderRadius);
+
+        const galleryImageLeft = document.getElementById("galleryImageLeft");
+        const galleryImageRight = document.getElementById("galleryImageRight");
+        [galleryImageLeft, galleryImageRight].forEach(function(el) {
+            el.style.paddingLeft = px(margin);
+            el.style.paddingRight = px(margin);
+            el.style.fontSize = px(fontSizeH1);
+            el.addEventListener("click", function(event) {
+                console.log(event);
+            });
+        });
+    }
 
     if (!IS_HOME) {
         const colorFilter = "hue-rotate(75deg)";

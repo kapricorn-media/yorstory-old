@@ -187,6 +187,45 @@ p {
     position: relative;
 }
 
+#gallery {
+    position: fixed;
+    z-index: 20;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    background-color: #000000cc;
+}
+#galleryImageLeft, #galleryImageRight {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    line-height: 100vh;
+    transition: opacity 0.2s;
+}
+#galleryImageLeft:hover, #galleryImageRight:hover {
+    background-color: #fff;
+}
+#galleryImageLeft {
+    left: 0;
+}
+#galleryImageRight {
+    right: 0;
+}
+#galleryImageFrame {
+    position: fixed;
+    left: 0;
+    right: 0;
+    top: 10%;
+    bottom: 10%;
+}
+#galleryImage {
+    display: block;
+    margin: auto;
+    width: auto;
+    height: 100%;
+}
+
 /* DEBUG */
 
 #debugGrid {
