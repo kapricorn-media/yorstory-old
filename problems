@@ -1,19 +1,20 @@
 - parallax background clipping
+- click on a project's individual images, blow up, gallery, you can scroll through
+
+- sticker background weirdness
+
+- figure out font size & leading conversions from Photoshop to web
+
+
+- parallax background clipping
+- logos of brands we've worked with
+
+- mobile
 
 - make color changes nicer (multiply?)
 
 - fix the label
 - loading of page (images shouldn't show until all ready for parallax, show "..." until ready)
-- render actual sticker info manually
-- figure out font size & leading conversions from Photoshop to web
 
 - film grain
 - finish sticker customization (emojis)
-
-- click on a project's individual images, blow up
-
-- gallery, image pops up and you can scroll through
-- other projects at the bottom
-
-- logos of brands we've worked with
-- mobile
