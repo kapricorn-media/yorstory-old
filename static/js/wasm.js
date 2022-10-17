@@ -1,6 +1,9 @@
 let _wasmInstance = null;
+let _memory = null;
 let _canvas = null;
 let gl = null;
+
+let _currentHeight = null;
 
 function consoleMessage(isError, messagePtr, messageLen) {
     const message = readCharStr(messagePtr, messageLen);
@@ -15,10 +18,32 @@ function isPowerOfTwo(x) {
     return (Math.log(x)/Math.log(2)) % 1 === 0;
 }
 
-const readCharStr = function(ptr, len) {
+function readCharStr(ptr, len) {
     const bytes = new Uint8Array(_wasmInstance.exports.memory.buffer, ptr, len);
     return new TextDecoder("utf-8").decode(bytes);
 };
+
+function clearAllText() {
+    Array.from(document.getElementsByClassName("_wasmText")).forEach(function(el) {
+        el.remove();
+    });
+}
+
+function addText(textPtr, textLen, left, top, fontSize) {
+    const text = readCharStr(textPtr, textLen);
+
+    const div = document.createElement("div");
+    div.classList.add("_wasmText");
+    div.style.position = "absolute";
+    div.style.top = px(top - fontSize);
+    div.style.left = px(left);
+    const span = document.createElement("span");
+    span.innerHTML = text;
+    span.style.fontSize = px(fontSize);
+    span.style.verticalAlign = "baseline";
+    div.appendChild(span);
+    document.getElementById("dummyBackground").appendChild(div);
+}
 
 const glShaders = [];
 const glPrograms = [];
@@ -167,7 +192,14 @@ const glDrawArrays = function(type, offset, count) {
 };
 
 const env = {
+    // Debug functions
     consoleMessage,
+
+    // DOM functions
+    clearAllText,
+    addText,
+
+    // GL functions
     compileShader,
     linkShaderProgram,
     createTexture,
@@ -203,16 +235,6 @@ const env = {
     glDrawArrays,
 };
 
-function fetchAndInstantiate(url, importObject) {
-    return fetch(url).then(function(response) {
-        return response.arrayBuffer();
-    }).then(function(bytes) {
-        return WebAssembly.instantiate(bytes, importObject);
-    }).then(function(results) {
-        return results.instance;
-    });
-}
-
 function updateCanvasSize()
 {
     _canvas.width = window.innerWidth;
@@ -223,27 +245,52 @@ function updateCanvasSize()
     console.log(`canvas resize: ${_canvas.width} x ${_canvas.height}`);
 }
 
-window.onload = function() {
-    console.log("window.onload");
-
+function wasmInit()
+{
     _canvas = document.getElementById("canvas");
     gl = _canvas.getContext("webgl") || _canvas.getContext("experimental-webgl");
     updateCanvasSize();
+
+    _canvas.addEventListener("click", function(event) {
+        if (_wasmInstance !== null) {
+            _wasmInstance.exports.onClick(event.clientX, window.innerHeight - event.clientY);
+        }
+    });
 
     addEventListener("resize", function() {
         updateCanvasSize();
     });
 
-    fetchAndInstantiate("yorstory.wasm", {env}).then(function(instance) {
-        _wasmInstance = instance;
-        instance.exports.onInit();
+    const WASM_PAGE_SIZE = 64 * 1024;
+    const memoryBytes = 4 * 1024 * 1024;
+    const memoryPages = Math.ceil(memoryBytes / WASM_PAGE_SIZE);
+    _memory = new WebAssembly.Memory({
+        initial: memoryPages,
+        maximum: memoryPages,
+    });
+    console.log(`Allocated ${memoryPages} wasm pages`);
 
-        const onAnimationFrame = instance.exports.onAnimationFrame;
+    let importObject = {
+        env: env,
+    };
+    console.log(importObject);
+
+    WebAssembly.instantiateStreaming(fetch("yorstory.wasm"), importObject).then(function(obj) {
+        _wasmInstance = obj.instance;
+        obj.instance.exports.onInit(_memory.buffer);
+
+        const onAnimationFrame = obj.instance.exports.onAnimationFrame;
+        const dummyBackground = document.getElementById("dummyBackground");
 
         function step(timestamp) {
-            onAnimationFrame(_canvas.width, _canvas.height, timestamp);
+            const scrollY = document.documentElement.scrollTop || document.body.scrollTop;
+            const totalHeight = onAnimationFrame(_canvas.width, _canvas.height, scrollY, timestamp);
+            if (_currentHeight !== totalHeight) {
+                _currentHeight = totalHeight;
+                dummyBackground.style.height = px(totalHeight);
+            }
             window.requestAnimationFrame(step);
         }
         window.requestAnimationFrame(step);
     });
-};
+}

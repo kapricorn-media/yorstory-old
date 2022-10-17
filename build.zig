@@ -34,6 +34,10 @@ pub fn build(b: *std.build.Builder) void
         .cpu_arch = .wasm32,
         .os_tag = .freestanding,
     });
+    // TODO broken in 0.9.1, might not need anyway. not sure I understand how this works...
+    // wasm.import_memory = true;
+    // wasm.initial_memory = 4 * 1024 * 1024;
+    // wasm.max_memory = 4 * 1024 * 1024;
     wasm.override_dest_dir = installDirRoot;
     wasm.install();
 
