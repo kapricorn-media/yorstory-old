@@ -195,7 +195,7 @@ const env = {
     // Debug functions
     consoleMessage,
 
-    // DOM functions
+    // browser / DOM functions
     clearAllText,
     addText,
 
@@ -285,7 +285,7 @@ function wasmInit()
         function step(timestamp) {
             const scrollY = document.documentElement.scrollTop || document.body.scrollTop;
             const totalHeight = onAnimationFrame(_canvas.width, _canvas.height, scrollY, timestamp);
-            if (_currentHeight !== totalHeight) {
+            if (totalHeight !== 0 && _currentHeight !== totalHeight) {
                 _currentHeight = totalHeight;
                 dummyBackground.style.height = px(totalHeight);
             }

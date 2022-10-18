@@ -494,8 +494,6 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
     const deltaS = @intToFloat(f32, deltaMs) / 1000.0;
     _ = deltaS;
 
-    const totalHeight = height * 2;
-
     var drawText = false;
     if (!m.Vec2i.eql(_state.screenSizePrev, screenSizeI)) {
         _state.screenSizePrev = screenSizeI;
@@ -504,30 +502,62 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
         w.clearAllText();
         drawText = true;
     }
+
     if (_state.scrollYPrev != scrollY) {
         _state.scrollYPrev = scrollY;
-    } else {
-        return totalHeight;
     }
+    // TODO
+    // } else {
+    //     return 0;
+    // }
 
-    const gridSize = std.math.round(screenSizeF.y * 0.04);
-    _ = gridSize;
+    const refSize = m.Vec2i.init(3840, 2000);
+    const gridRefSize = 80;
+
+    const gridSize = std.math.round(
+        @intToFloat(f32, gridRefSize) / @intToFloat(f32, refSize.y) * screenSizeF.y
+    );
+    const halfGridSize = gridSize / 2.0;
 
     w.glClear(w.GL_COLOR_BUFFER_BIT | w.GL_DEPTH_BUFFER_BIT);
 
-    const colorBlack = m.Vec4.init(0.0, 0.0, 0.0, 1.0);
+    const icons = [_]TextureData {
+        _state.assets.getTextureData(Texture.IconContact),
+        _state.assets.getTextureData(Texture.IconHome),
+        _state.assets.getTextureData(Texture.IconPortfolio),
+        _state.assets.getTextureData(Texture.IconWork),
+    };
+    var allLoaded = true;
+    for (icons) |icon| {
+        if (!icon.loaded()) {
+            allLoaded = false;
+            break;
+        }
+    }
 
-    const p1 = m.Vec2.init(50, screenSizeF.y - 100 + @intToFloat(f32, scrollY));
-    const s1 = m.Vec2.init(50, 50);
-    _state.renderState.quadState.drawQuad(p1, s1, colorBlack, screenSizeF);
+    if (allLoaded) {
+        for (icons) |icon, i| {
+            const iF = @intToFloat(f32, i);
+            const iconSizeF = m.Vec2.init(
+                gridSize * 2.162,
+                gridSize * 2.162,
+            );
+            const iconPos = m.Vec2.init(
+                gridSize * 5 + gridSize * 2.5 * iF,
+                screenSizeF.y - gridSize * 5 - iconSizeF.y,
+            );
+            _state.renderState.quadTexState.drawQuad(
+                iconPos, iconSizeF, icon.id, screenSizeF
+            );
+        }
+    }
+
+    const colorLightGray = m.Vec4.init(0.8, 0.8, 0.8, 1.0);
+    const colorBlack = m.Vec4.init(0.0, 0.0, 0.0, 1.0);
 
     const p2 = m.Vec2.init(50, screenSizeF.y - 400 + @intToFloat(f32, scrollY));
     const s2 = m.Vec2.init(800, 1);
     _state.renderState.quadState.drawQuad(p2, s2, colorBlack, screenSizeF);
-
-    const pos = m.Vec2.init(screenSizeF.x - 100, 50 + @intToFloat(f32, scrollY));
-    const size = m.Vec2.init(50, 50);
-    _state.renderState.quadState.drawQuad(pos, size, colorBlack, screenSizeF);
 
     const p3 = m.Vec2.init(0, screenSizeF.y - screenSizeF.y * 1.5 + @intToFloat(f32, scrollY));
     const s3 = m.Vec2.init(screenSizeF.x, 1);
@@ -538,9 +568,38 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
         createText("F gello, yorlf", m.Vec2i.init(0, @floatToInt(i32, screenSizeF.y * 1.5)), 32);
     }
 
+    // debug grid
+    if (true) {
+        var i: i32 = undefined;
+
+        const nH = 20;
+        const sizeH = m.Vec2.init(screenSizeF.x, 1);
+        i = 1;
+        while (i < nH) : (i += 1) {
+            const iF = @intToFloat(f32, i);
+            const color = if (@rem(i, 2) == 0) colorBlack else colorLightGray;
+            const posTop = m.Vec2.init(0, screenSizeF.y - halfGridSize * iF);
+            _state.renderState.quadState.drawQuad(posTop, sizeH, color, screenSizeF);
+            const posBottom = m.Vec2.init(0, halfGridSize * iF);
+            _state.renderState.quadState.drawQuad(posBottom, sizeH, color, screenSizeF);
+        }
+
+        const nV = 40;
+        const sizeV = m.Vec2.init(1, screenSizeF.y);
+        i = 1;
+        while (i < nV) : (i += 1) {
+            const iF = @intToFloat(f32, i);
+            const color = if (@rem(i, 2) == 0) colorBlack else colorLightGray;
+            const posLeft = m.Vec2.init(halfGridSize * iF, 0);
+            _state.renderState.quadState.drawQuad(posLeft, sizeV, color, screenSizeF);
+            const posRight = m.Vec2.init(screenSizeF.x - halfGridSize * iF, 0);
+            _state.renderState.quadState.drawQuad(posRight, sizeV, color, screenSizeF);
+        }
+    }
+
     _state.timestampMsPrev = timestampMs;
 
-    return totalHeight;
+    return height * 2;
 }
 
 export fn onTextureLoaded(textureId: c_uint, width: c_int, height: c_int) void

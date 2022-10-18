@@ -3,7 +3,7 @@ const std = @import("std");
 // Debug
 pub extern fn consoleMessage(isError: bool, messagePtr: *const u8, messageLen: c_uint) void;
 
-// DOM
+// browser / DOM
 pub extern fn clearAllText() void;
 pub extern fn addText(textPtr: *const u8, textLen: c_uint, left: c_int, top: c_int, fontSize: c_int) void;
 
