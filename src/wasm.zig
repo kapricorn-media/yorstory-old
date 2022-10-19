@@ -5,7 +5,11 @@ pub extern fn consoleMessage(isError: bool, messagePtr: *const u8, messageLen: c
 
 // browser / DOM
 pub extern fn clearAllText() void;
-pub extern fn addText(textPtr: *const u8, textLen: c_uint, left: c_int, top: c_int, fontSize: c_int) void;
+pub extern fn addText(
+    textPtr: *const u8, textLen: c_uint,
+    left: c_int, top: c_int,
+    fontSize: c_int,
+    hexColorPtr: *const u8, hexColorLen: c_uint) void;
 
 // GL
 pub extern fn compileShader(source: *const u8 , len: c_uint, type: c_uint) c_uint;

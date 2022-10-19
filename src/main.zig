@@ -70,69 +70,6 @@ fn sizeToNdc(comptime T: type, size: T, canvas: T) T
     }
 }
 
-const Texture = enum(usize) {
-    IconContact,
-    IconHome,
-    IconPortfolio,
-    IconWork,
-};
-
-const TextureData = struct {
-    id: c_uint,
-    size: m.Vec2i,
-
-    const Self = @This();
-
-    fn init(url: []const u8, wrapMode: c_uint) !Self
-    {
-        const texture = w.createTexture(&url[0], url.len, wrapMode);
-        if (texture == -1) {
-            return error.createTextureFailed;
-        }
-
-        return Self {
-            .id = texture,
-            .size = m.Vec2i.zero, // set later when the image is loaded from URL
-        };
-    }
-
-    fn loaded(self: Self) bool
-    {
-        return !m.Vec2i.eql(self.size, m.Vec2i.zero);
-    }
-};
-
-const Assets = struct {
-    const numTextures = @typeInfo(Texture).Enum.fields.len;
-
-    textures: [numTextures]TextureData,
-
-    const Self = @This();
-
-    fn init() !Self
-    {
-        var self: Self = undefined;
-        self.textures[@enumToInt(Texture.IconContact)] = try TextureData.init(
-            "images/icon-contact.png", w.GL_CLAMP_TO_EDGE
-        );
-        self.textures[@enumToInt(Texture.IconHome)] = try TextureData.init(
-            "images/icon-home.png", w.GL_CLAMP_TO_EDGE
-        );
-        self.textures[@enumToInt(Texture.IconPortfolio)] = try TextureData.init(
-            "images/icon-portfolio.png", w.GL_CLAMP_TO_EDGE
-        );
-        self.textures[@enumToInt(Texture.IconWork)] = try TextureData.init(
-            "images/icon-work.png", w.GL_CLAMP_TO_EDGE
-        );
-        return self;
-    }
-
-    fn getTextureData(self: Self, texture: Texture) TextureData
-    {
-        return self.textures[@enumToInt(texture)];
-    }
-};
-
 const QuadState = struct {
     positionBuffer: c_uint,
 
@@ -426,6 +363,73 @@ const RenderState = struct {
     }
 };
 
+const Texture = enum(usize) {
+    DecalTopLeft,
+    IconContact,
+    IconHome,
+    IconPortfolio,
+    IconWork,
+};
+
+const TextureData = struct {
+    id: c_uint,
+    size: m.Vec2i,
+
+    const Self = @This();
+
+    fn init(url: []const u8, wrapMode: c_uint) !Self
+    {
+        const texture = w.createTexture(&url[0], url.len, wrapMode);
+        if (texture == -1) {
+            return error.createTextureFailed;
+        }
+
+        return Self {
+            .id = texture,
+            .size = m.Vec2i.zero, // set later when the image is loaded from URL
+        };
+    }
+
+    fn loaded(self: Self) bool
+    {
+        return !m.Vec2i.eql(self.size, m.Vec2i.zero);
+    }
+};
+
+const Assets = struct {
+    const numTextures = @typeInfo(Texture).Enum.fields.len;
+
+    textures: [numTextures]TextureData,
+
+    const Self = @This();
+
+    fn init() !Self
+    {
+        var self: Self = undefined;
+        self.textures[@enumToInt(Texture.DecalTopLeft)] = try TextureData.init(
+            "images/decal-topleft.png", w.GL_CLAMP_TO_EDGE
+        );
+        self.textures[@enumToInt(Texture.IconContact)] = try TextureData.init(
+            "images/icon-contact.png", w.GL_CLAMP_TO_EDGE
+        );
+        self.textures[@enumToInt(Texture.IconHome)] = try TextureData.init(
+            "images/icon-home.png", w.GL_CLAMP_TO_EDGE
+        );
+        self.textures[@enumToInt(Texture.IconPortfolio)] = try TextureData.init(
+            "images/icon-portfolio.png", w.GL_CLAMP_TO_EDGE
+        );
+        self.textures[@enumToInt(Texture.IconWork)] = try TextureData.init(
+            "images/icon-work.png", w.GL_CLAMP_TO_EDGE
+        );
+        return self;
+    }
+
+    fn getTextureData(self: Self, texture: Texture) TextureData
+    {
+        return self.textures[@enumToInt(texture)];
+    }
+};
+
 const State = struct {
     renderState: RenderState,
 
@@ -456,9 +460,20 @@ const State = struct {
     }
 };
 
-pub fn createText(text: []const u8, topLeft: m.Vec2i, fontSize: c_int) void
+pub fn createText(text: []const u8, topLeft: m.Vec2i, fontSize: c_int, color: m.Vec4) void
 {
-    w.addText(&text[0], text.len, topLeft.x, topLeft.y, fontSize);
+    // TODO custom byte color type?
+    const r = @floatToInt(u8, std.math.round(color.x * 255.0));
+    const g = @floatToInt(u8, std.math.round(color.y * 255.0));
+    const b = @floatToInt(u8, std.math.round(color.z * 255.0));
+    const a = @floatToInt(u8, std.math.round(color.w * 255.0));
+
+    var buf: [16]u8 = undefined;
+    const hexColor = std.fmt.bufPrint(
+        &buf, "#{x:0>2}{x:0>2}{x:0>2}{x:0>2}", .{r, g, b, a}
+    ) catch return;
+
+    w.addText(&text[0], text.len, topLeft.x, topLeft.y, fontSize, &hexColor[0], hexColor.len);
 }
 
 export fn onInit() void
@@ -470,7 +485,7 @@ export fn onInit() void
     std.log.info("onInit", .{});
     // std.log.info("{}", .{_state});
 
-    w.glClearColor(1.0, 1.0, 1.0, 1.0);
+    w.glClearColor(0.0, 0.0, 0.0, 1.0);
     w.glEnable(w.GL_DEPTH_TEST);
     w.glDepthFunc(w.GL_LEQUAL);
 
@@ -489,6 +504,8 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
     const screenSizeF = m.Vec2.initFromVec2i(screenSizeI);
     const halfScreenSizeF = m.Vec2.divScalar(screenSizeF, 2.0);
     _ = halfScreenSizeF;
+
+    const scrollYF = @intToFloat(f32, scrollY);
 
     const deltaMs = if (_state.timestampMsPrev > 0) (timestampMs - _state.timestampMsPrev) else 0;
     const deltaS = @intToFloat(f32, deltaMs) / 1000.0;
@@ -544,7 +561,7 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
             );
             const iconPos = m.Vec2.init(
                 gridSize * 5 + gridSize * 2.5 * iF,
-                screenSizeF.y - gridSize * 5 - iconSizeF.y,
+                screenSizeF.y - gridSize * 5 - iconSizeF.y + scrollYF,
             );
             _state.renderState.quadTexState.drawQuad(
                 iconPos, iconSizeF, icon.id, screenSizeF
@@ -552,24 +569,77 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
         }
     }
 
-    const colorLightGray = m.Vec4.init(0.8, 0.8, 0.8, 1.0);
-    const colorBlack = m.Vec4.init(0.0, 0.0, 0.0, 1.0);
+    const decalTopLeft = _state.assets.getTextureData(Texture.DecalTopLeft);
+    if (decalTopLeft.loaded()) {
+        const decalSize = m.Vec2.init(gridSize * 6, gridSize * 6);
 
-    const p2 = m.Vec2.init(50, screenSizeF.y - 400 + @intToFloat(f32, scrollY));
+        const posTL = m.Vec2.init(
+            gridSize,
+            screenSizeF.y - gridSize - decalSize.y + scrollYF,
+        );
+        const uvOriginTL = m.Vec2.init(0, 0);
+        const uvSizeTL = m.Vec2.init(1, 1);
+        _state.renderState.quadTexState.drawQuadUvOffset(
+            posTL, decalSize, uvOriginTL, uvSizeTL, decalTopLeft.id, screenSizeF
+        );
+
+        const posBL = m.Vec2.init(
+            gridSize,
+            gridSize + scrollYF,
+        );
+        const uvOriginBL = m.Vec2.init(0, 1);
+        const uvSizeBL = m.Vec2.init(1, -1);
+        _state.renderState.quadTexState.drawQuadUvOffset(
+            posBL, decalSize, uvOriginBL, uvSizeBL, decalTopLeft.id, screenSizeF
+        );
+
+        const posTR = m.Vec2.init(
+            screenSizeF.x - gridSize - decalSize.x,
+            screenSizeF.y - gridSize - decalSize.y + scrollYF,
+        );
+        const uvOriginTR = m.Vec2.init(1, 0);
+        const uvSizeTR = m.Vec2.init(-1, 1);
+        _state.renderState.quadTexState.drawQuadUvOffset(
+            posTR, decalSize, uvOriginTR, uvSizeTR, decalTopLeft.id, screenSizeF
+        );
+
+        const posBR = m.Vec2.init(
+            screenSizeF.x - gridSize - decalSize.x,
+            gridSize + scrollYF,
+        );
+        const uvOriginBR = m.Vec2.init(1, 1);
+        const uvSizeBR = m.Vec2.init(-1, -1);
+        _state.renderState.quadTexState.drawQuadUvOffset(
+            posBR, decalSize, uvOriginBR, uvSizeBR, decalTopLeft.id, screenSizeF
+        );
+    }
+
+    const colorWhite = m.Vec4.init(1.0, 1.0, 1.0, 1.0);
+
+    const p2 = m.Vec2.init(50, screenSizeF.y - 400 + scrollYF);
     const s2 = m.Vec2.init(800, 1);
-    _state.renderState.quadState.drawQuad(p2, s2, colorBlack, screenSizeF);
+    _state.renderState.quadState.drawQuad(p2, s2, colorWhite, screenSizeF);
 
-    const p3 = m.Vec2.init(0, screenSizeF.y - screenSizeF.y * 1.5 + @intToFloat(f32, scrollY));
+    const p3 = m.Vec2.init(0, screenSizeF.y - screenSizeF.y * 1.5 + scrollYF);
     const s3 = m.Vec2.init(screenSizeF.x, 1);
-    _state.renderState.quadState.drawQuad(p3, s3, colorBlack, screenSizeF);
+    _state.renderState.quadState.drawQuad(p3, s3, colorWhite, screenSizeF);
 
     if (drawText) {
-        createText("hello, world", m.Vec2i.init(100, 400), 32);
-        createText("F gello, yorlf", m.Vec2i.init(0, @floatToInt(i32, screenSizeF.y * 1.5)), 32);
+        createText(
+            "hello, world",
+            m.Vec2i.init(100, 400), 32, m.Vec4.init(0.5, 0.05, 0.2, 1.0),
+        );
+        createText(
+            "F gello, yorlf",
+            m.Vec2i.init(0, @floatToInt(i32, screenSizeF.y * 1.5)), 32, colorWhite
+        );
     }
 
     // debug grid
     if (true) {
+        const colorGrid = m.Vec4.init(0.6, 0.6, 0.6, 1.0);
+        const colorGridHalf = m.Vec4.init(0.2, 0.2, 0.2, 1.0);
+
         var i: i32 = undefined;
 
         const nH = 20;
@@ -577,7 +647,7 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
         i = 1;
         while (i < nH) : (i += 1) {
             const iF = @intToFloat(f32, i);
-            const color = if (@rem(i, 2) == 0) colorBlack else colorLightGray;
+            const color = if (@rem(i, 2) == 0) colorGrid else colorGridHalf;
             const posTop = m.Vec2.init(0, screenSizeF.y - halfGridSize * iF);
             _state.renderState.quadState.drawQuad(posTop, sizeH, color, screenSizeF);
             const posBottom = m.Vec2.init(0, halfGridSize * iF);
@@ -589,7 +659,7 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
         i = 1;
         while (i < nV) : (i += 1) {
             const iF = @intToFloat(f32, i);
-            const color = if (@rem(i, 2) == 0) colorBlack else colorLightGray;
+            const color = if (@rem(i, 2) == 0) colorGrid else colorGridHalf;
             const posLeft = m.Vec2.init(halfGridSize * iF, 0);
             _state.renderState.quadState.drawQuad(posLeft, sizeV, color, screenSizeF);
             const posRight = m.Vec2.init(screenSizeF.x - halfGridSize * iF, 0);

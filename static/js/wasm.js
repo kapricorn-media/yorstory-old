@@ -29,8 +29,9 @@ function clearAllText() {
     });
 }
 
-function addText(textPtr, textLen, left, top, fontSize) {
+function addText(textPtr, textLen, left, top, fontSize, hexColorPtr, hexColorLen) {
     const text = readCharStr(textPtr, textLen);
+    const hexColor = readCharStr(hexColorPtr, hexColorLen);
 
     const div = document.createElement("div");
     div.classList.add("_wasmText");
@@ -39,6 +40,8 @@ function addText(textPtr, textLen, left, top, fontSize) {
     div.style.left = px(left);
     const span = document.createElement("span");
     span.innerHTML = text;
+    console.log(hexColor);
+    span.style.color = hexColor;
     span.style.fontSize = px(fontSize);
     span.style.verticalAlign = "baseline";
     div.appendChild(span);
