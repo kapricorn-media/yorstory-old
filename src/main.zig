@@ -380,7 +380,7 @@ const State = struct {
             .parallaxImageSets = try initParallaxSets(fbAllocator.allocator()),
             .parallaxTX = 0,
 
-            .debug = true,
+            .debug = false,
         };
     }
 
