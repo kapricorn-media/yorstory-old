@@ -6,6 +6,7 @@ uniform vec4 u_colorTL;
 uniform vec4 u_colorTR;
 uniform vec4 u_colorBL;
 uniform vec4 u_colorBR;
+uniform float u_borderRadius;
 
 void main()
 {

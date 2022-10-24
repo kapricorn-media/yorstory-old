@@ -2,6 +2,7 @@ const std = @import("std");
 
 const m = @import("math.zig");
 const parallax = @import("parallax.zig");
+const portfolio = @import("portfolio.zig");
 const render = @import("render.zig");
 const w = @import("wasm_bindings.zig");
 const ww = @import("wasm.zig");
@@ -816,6 +817,33 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
         m.Vec2.zero, screenSizeF, 0, framePos, frameSize, 0.0, colorBlack, screenSizeF
     );
 
+    { // grid
+        const totalWidth = screenSizeF.x - marginX * 2 - gridSize * 5.5 * 2;
+        const itemsPerRow: usize = switch (state.page) {
+            .Home => 3,
+            .Entry => 6,
+        };
+        const spacing: f32 = switch (state.page) {
+            .Home => gridSize,
+            .Entry => gridSize * 0.25,
+        };
+        for (portfolio.PORTFOLIO_LIST) |pf, i| {
+            const row = i / itemsPerRow;
+            const col = i % itemsPerRow;
+            const itemWidth = totalWidth / @intToFloat(f32, itemsPerRow);
+            const itemSize = m.Vec2.init(itemWidth, itemWidth * 0.5);
+            const itemPos = m.Vec2.init(
+                marginX + gridSize * 5.5 + @intToFloat(f32, col) * (itemSize.x + spacing),
+                -gridSize * 11 - itemSize.y - @intToFloat(f32, row) * (itemSize.y + spacing) + scrollYF,
+            );
+            state.renderState.quadState.drawQuad(
+                itemPos, itemSize, 0, m.Vec4.init(0.5, 0.5, 0.5, 1.0), screenSizeF
+            );
+
+            _ = pf;
+        }
+    }
+
     if (drawText) {
         // sticker
         const stickerText = switch (state.page) {
@@ -914,7 +942,7 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
 
         const nH = 20;
         const sizeH = m.Vec2.init(screenSizeF.x, 1);
-        i = 1;
+        i = 0;
         while (i < nH) : (i += 1) {
             const iF = @intToFloat(f32, i);
             const color = if (@rem(i, 2) == 0) colorGrid else colorGridHalf;
@@ -926,18 +954,18 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
 
         const nV = 40;
         const sizeV = m.Vec2.init(1, screenSizeF.y);
-        i = 1;
+        i = 0;
         while (i < nV) : (i += 1) {
             const iF = @intToFloat(f32, i);
             const color = if (@rem(i, 2) == 0) colorGrid else colorGridHalf;
-            const posLeft = m.Vec2.init(halfGridSize * iF, 0);
+            const posLeft = m.Vec2.init(marginX + halfGridSize * iF, 0);
             state.renderState.quadState.drawQuad(posLeft, sizeV, 0, color, screenSizeF);
-            const posRight = m.Vec2.init(screenSizeF.x - halfGridSize * iF, 0);
+            const posRight = m.Vec2.init(-marginX + screenSizeF.x - halfGridSize * iF, 0);
             state.renderState.quadState.drawQuad(posRight, sizeV, 0, color, screenSizeF);
         }
     }
 
-    return height * 2;
+    return @floatToInt(c_int, screenSizeF.y * 2.5);
 }
 
 export fn onTextureLoaded(textureId: c_uint, width: c_int, height: c_int) void
