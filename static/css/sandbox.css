@@ -38,37 +38,15 @@ html, body {
     width: 100%;
 }
 
-#testing {
+._wasmTextOuter {
     position: absolute;
-    left: 50px;
-    top: 400px;
-    font-size: 14px;
-    line-height: 14px;
 }
-#testing2 {
-    position: absolute;
-    left: 400px;
-    top: 400px;
-    font-size: 14px;
-    line-height: 14px;
+._wasmTextInner {
 }
-#testing2 {
-    position: absolute;
-    left: 400px;
-    top: 400px;
-    font-size: 14px;
-    line-height: 14px;
-}
-#testing3 {
-    position: absolute;
-    left: 400px;
-    top: 150vh;
-    font-size: 14px;
-    line-height: 14px;
+._wasmTextStrut {
+    display: inline-block;
 }
 
-.wasmText::before {
-    display: inline-block;
-    height: 100%;
-    content: '';
+._wasmTextBox {
+    position: absolute;
 }

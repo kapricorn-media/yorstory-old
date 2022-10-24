@@ -1,9 +1,54 @@
 const std = @import("std");
 
 const m = @import("math.zig");
+const parallax = @import("parallax.zig");
+const render = @import("render.zig");
 const w = @import("wasm.zig");
 
-var _state: State = undefined;
+const Memory = struct {
+    persistent: [64 * 1024]u8 align(8),
+    transient: [64 * 1024]u8 align(8),
+
+    const Self = @This();
+
+    fn getState(self: *Self) *State
+    {
+        return @ptrCast(*State, @alignCast(8, &self.persistent[0]));
+    }
+
+    fn getTransientAllocator(self: *Self) std.heap.ArenaAllocator
+    {
+        return std.heap.ArenaAllocator(std.heap.FixedBufferAllocator(&self.transient[0]));
+    }
+};
+
+var _memory: *Memory = undefined;
+
+fn hexU8ToFloatNormalized(hexString: []const u8) !f32
+{
+    return @intToFloat(f32, try std.fmt.parseUnsigned(u8, hexString, 16)) / 255.0;
+}
+
+fn colorHexToVec4(hexString: []const u8) !m.Vec4
+{
+    if (hexString.len != 7 and hexString.len != 9) {
+        return error.BadHexStringLength;
+    }
+    if (hexString[0] != '#') {
+        return error.BadHexString;
+    }
+
+    const rHex = hexString[1..3];
+    const gHex = hexString[3..5];
+    const bHex = hexString[5..7];
+    const aHex = if (hexString.len == 9) hexString[7..9] else "ff";
+    return m.Vec4.init(
+        try hexU8ToFloatNormalized(rHex),
+        try hexU8ToFloatNormalized(gHex),
+        try hexU8ToFloatNormalized(bHex),
+        try hexU8ToFloatNormalized(aHex),
+    );
+}
 
 pub fn log(
     comptime message_level: std.log.Level,
@@ -14,361 +59,13 @@ pub fn log(
     w.log(message_level, scope, format, args);
 }
 
-fn floatPosToNdc(pos: f32, canvas: f32) f32
-{
-    return pos / canvas * 2.0 - 1.0;
-}
-
-fn floatSizeToNdc(size: f32, canvas: f32) f32
-{
-    return size / canvas * 2.0;
-}
-
-fn posToNdc(comptime T: type, pos: T, canvas: T) T
-{
-    switch (T) {
-        f32 => {
-            return floatPosToNdc(pos, canvas);
-        },
-        m.Vec2 => {
-            return m.Vec2.init(
-                floatPosToNdc(pos.x, canvas.x),
-                floatPosToNdc(pos.y, canvas.y)
-            );
-        },
-        m.Vec3 => {
-            return m.Vec3.init(
-                floatPosToNdc(pos.x, canvas.x),
-                floatPosToNdc(pos.y, canvas.y),
-                floatPosToNdc(pos.z, canvas.z)
-            );
-        },
-        else => @compileError("nope"),
-    }
-}
-
-fn sizeToNdc(comptime T: type, size: T, canvas: T) T
-{
-    switch (T) {
-        f32 => {
-            return floatSizeToNdc(size, canvas);
-        },
-        m.Vec2 => {
-            return m.Vec2.init(
-                floatSizeToNdc(size.x, canvas.x),
-                floatSizeToNdc(size.y, canvas.y)
-            );
-        },
-        m.Vec3 => {
-            return m.Vec3.init(
-                floatSizeToNdc(size.x, canvas.x),
-                floatSizeToNdc(size.y, canvas.y),
-                floatSizeToNdc(size.z, canvas.z)
-            );
-        },
-        else => @compileError("nope"),
-    }
-}
-
-const QuadState = struct {
-    positionBuffer: c_uint,
-
-    programId: c_uint,
-
-    positionAttrLoc: c_int,
-
-    offsetPosUniLoc: c_int,
-    scalePosUniLoc: c_int,
-    colorUniLoc: c_int,
-
-    const positions = [6]m.Vec2 {
-        m.Vec2.init(0.0, 0.0),
-        m.Vec2.init(0.0, 1.0),
-        m.Vec2.init(1.0, 1.0),
-        m.Vec2.init(1.0, 1.0),
-        m.Vec2.init(1.0, 0.0),
-        m.Vec2.init(0.0, 0.0),
-    };
-
-    const vert = @embedFile("shaders/quad.vert");
-    const frag = @embedFile("shaders/quad.frag");
-
-    const Self = @This();
-
-    pub fn init() !Self
-    {
-        // TODO error check all these
-        const vertQuadId = w.compileShader(&vert[0], vert.len, w.GL_VERTEX_SHADER);
-        const fragQuadId = w.compileShader(&frag[0], frag.len, w.GL_FRAGMENT_SHADER);
-
-        const positionBuffer = w.glCreateBuffer();
-        w.glBindBuffer(w.GL_ARRAY_BUFFER, positionBuffer);
-        w.glBufferData(w.GL_ARRAY_BUFFER, @alignCast(4, &positions[0].x), positions.len * 2, w.GL_STATIC_DRAW);
-
-        const programId = w.linkShaderProgram(vertQuadId, fragQuadId);
-
-        const a_position = "a_position";
-        const positionAttrLoc = w.glGetAttribLocation(programId, &a_position[0], a_position.len);
-        if (positionAttrLoc == -1) {
-            return error.MissingAttrLoc;
-        }
-
-        const u_offsetPos = "u_offsetPos";
-        const offsetPosUniLoc = w.glGetUniformLocation(programId, &u_offsetPos[0], u_offsetPos.len);
-        if (offsetPosUniLoc == -1) {
-            return error.MissingUniformLoc;
-        }
-        const u_scalePos = "u_scalePos";
-        const scalePosUniLoc = w.glGetUniformLocation(programId, &u_scalePos[0], u_scalePos.len);
-        if (scalePosUniLoc == -1) {
-            return error.MissingUniformLoc;
-        }
-        const u_color = "u_color";
-        const colorUniLoc = w.glGetUniformLocation(programId, &u_color[0], u_color.len);
-        if (colorUniLoc == -1) {
-            return error.MissingUniformLoc;
-        }
-
-        return Self {
-            .positionBuffer = positionBuffer,
-
-            .programId = programId,
-
-            .positionAttrLoc = positionAttrLoc,
-
-            .offsetPosUniLoc = offsetPosUniLoc,
-            .scalePosUniLoc = scalePosUniLoc,
-            .colorUniLoc = colorUniLoc,
-        };
-    }
-
-    pub fn drawQuadNdc(
-        self: Self,
-        posNdc: m.Vec2,
-        scaleNdc: m.Vec2,
-        color: m.Vec4) void
-    {
-        w.glUseProgram(self.programId);
-
-        w.glEnableVertexAttribArray(@intCast(c_uint, self.positionAttrLoc));
-        w.glBindBuffer(w.GL_ARRAY_BUFFER, self.positionBuffer);
-        w.glVertexAttribPointer(@intCast(c_uint, self.positionAttrLoc), 2, w.GL_f32, 0, 0, 0);
-
-        w.glUniform2fv(self.offsetPosUniLoc, posNdc.x, posNdc.y);
-        w.glUniform2fv(self.scalePosUniLoc, scaleNdc.x, scaleNdc.y);
-        w.glUniform4fv(self.colorUniLoc, color.x, color.y, color.z, color.w);
-
-        w.glDrawArrays(w.GL_TRIANGLES, 0, positions.len);
-    }
-
-    pub fn drawQuad(
-        self: Self,
-        posPixels: m.Vec2,
-        scalePixels: m.Vec2,
-        color: m.Vec4,
-        screenSize: m.Vec2) void
-    {
-        const posNdc = posToNdc(m.Vec2, posPixels, screenSize);
-        const scaleNdc = sizeToNdc(m.Vec2, scalePixels, screenSize);
-        self.drawQuadNdc(posNdc, scaleNdc, color);
-    }
-};
-
-const QuadTextureState = struct {
-    positionBuffer: c_uint,
-    uvBuffer: c_uint,
-
-    programId: c_uint,
-
-    positionAttrLoc: c_int,
-    uvAttrLoc: c_int,
-
-    offsetPosUniLoc: c_int,
-    scalePosUniLoc: c_int,
-    offsetUvUniLoc: c_int,
-    scaleUvUniLoc: c_int,
-    samplerUniLoc: c_int,
-
-    const positions = [6]m.Vec2 {
-        m.Vec2.init(0.0, 0.0),
-        m.Vec2.init(0.0, 1.0),
-        m.Vec2.init(1.0, 1.0),
-        m.Vec2.init(1.0, 1.0),
-        m.Vec2.init(1.0, 0.0),
-        m.Vec2.init(0.0, 0.0),
-    };
-
-    const vert = @embedFile("shaders/quadTexture.vert");
-    const frag = @embedFile("shaders/quadTexture.frag");
-
-    const Self = @This();
-
-    pub fn init() !Self
-    {
-        // TODO error check all these
-        const vertQuadId = w.compileShader(&vert[0], vert.len, w.GL_VERTEX_SHADER);
-        const fragQuadId = w.compileShader(&frag[0], frag.len, w.GL_FRAGMENT_SHADER);
-
-        const positionBuffer = w.glCreateBuffer();
-        w.glBindBuffer(w.GL_ARRAY_BUFFER, positionBuffer);
-        w.glBufferData(w.GL_ARRAY_BUFFER, @alignCast(4, &positions[0].x), positions.len * 2, w.GL_STATIC_DRAW);
-
-        const uvBuffer = w.glCreateBuffer();
-        w.glBindBuffer(w.GL_ARRAY_BUFFER, uvBuffer);
-        // UVs are the same as positions
-        w.glBufferData(w.GL_ARRAY_BUFFER, @alignCast(4, &positions[0].x), positions.len * 2, w.GL_STATIC_DRAW);
-
-        const programId = w.linkShaderProgram(vertQuadId, fragQuadId);
-
-        const a_position = "a_position";
-        const positionAttrLoc = w.glGetAttribLocation(programId, &a_position[0], a_position.len);
-        if (positionAttrLoc == -1) {
-            return error.MissingAttrLoc;
-        }
-        const a_uv = "a_uv";
-        const uvAttrLoc = w.glGetAttribLocation(programId, &a_uv[0], a_uv.len);
-        if (uvAttrLoc == -1) {
-            return error.MissingAttrLoc;
-        }
-
-        const u_offsetPos = "u_offsetPos";
-        const offsetPosUniLoc = w.glGetUniformLocation(programId, &u_offsetPos[0], u_offsetPos.len);
-        if (offsetPosUniLoc == -1) {
-            return error.MissingUniformLoc;
-        }
-        const u_scalePos = "u_scalePos";
-        const scalePosUniLoc = w.glGetUniformLocation(programId, &u_scalePos[0], u_scalePos.len);
-        if (scalePosUniLoc == -1) {
-            return error.MissingUniformLoc;
-        }
-        const u_offsetUv = "u_offsetUv";
-        const offsetUvUniLoc = w.glGetUniformLocation(programId, &u_offsetUv[0], u_offsetUv.len);
-        if (offsetUvUniLoc == -1) {
-            return error.MissingUniformLoc;
-        }
-        const u_scaleUv = "u_scaleUv";
-        const scaleUvUniLoc = w.glGetUniformLocation(programId, &u_scaleUv[0], u_scaleUv.len);
-        if (scaleUvUniLoc == -1) {
-            return error.MissingUniformLoc;
-        }
-        const u_sampler = "u_sampler";
-        const samplerUniLoc = w.glGetUniformLocation(programId, &u_sampler[0], u_sampler.len);
-        if (samplerUniLoc == -1) {
-            return error.MissingUniformLoc;
-        }
-
-        return Self {
-            .positionBuffer = positionBuffer,
-            .uvBuffer = uvBuffer,
-
-            .programId = programId,
-
-            .positionAttrLoc = positionAttrLoc,
-            .uvAttrLoc = uvAttrLoc,
-
-            .offsetPosUniLoc = offsetPosUniLoc,
-            .scalePosUniLoc = scalePosUniLoc,
-            .offsetUvUniLoc = offsetUvUniLoc,
-            .scaleUvUniLoc = scaleUvUniLoc,
-            .samplerUniLoc = samplerUniLoc,
-        };
-    }
-
-    pub fn drawQuadNdc(
-        self: Self,
-        posNdc: m.Vec2,
-        scaleNdc: m.Vec2,
-        uvOffset: m.Vec2,
-        uvScale: m.Vec2,
-        texture: c_uint) void
-    {
-        w.glUseProgram(self.programId);
-
-        w.glEnableVertexAttribArray(@intCast(c_uint, self.positionAttrLoc));
-        w.glBindBuffer(w.GL_ARRAY_BUFFER, self.positionBuffer);
-        w.glVertexAttribPointer(@intCast(c_uint, self.positionAttrLoc), 2, w.GL_f32, 0, 0, 0);
-        w.glEnableVertexAttribArray(@intCast(c_uint, self.uvAttrLoc));
-        w.glBindBuffer(w.GL_ARRAY_BUFFER, self.uvBuffer);
-        w.glVertexAttribPointer(@intCast(c_uint, self.uvAttrLoc), 2, w.GL_f32, 0, 0, 0);
-
-        w.glUniform2fv(self.offsetPosUniLoc, posNdc.x, posNdc.y);
-        w.glUniform2fv(self.scalePosUniLoc, scaleNdc.x, scaleNdc.y);
-        w.glUniform2fv(self.offsetUvUniLoc, uvOffset.x, uvOffset.y);
-        w.glUniform2fv(self.scaleUvUniLoc, uvScale.x, uvScale.y);
-
-        w.glActiveTexture(w.GL_TEXTURE0);
-        w.glBindTexture(w.GL_TEXTURE_2D, texture);
-        w.glUniform1i(self.samplerUniLoc, 0);
-
-        w.glDrawArrays(w.GL_TRIANGLES, 0, positions.len);
-    }
-
-    pub fn drawQuadUvOffset(
-        self: Self,
-        posPixels: m.Vec2,
-        scalePixels: m.Vec2,
-        uvOffset: m.Vec2,
-        uvScale: m.Vec2,
-        texture: c_uint,
-        screenSize: m.Vec2) void
-    {
-        const posNdc = posToNdc(m.Vec2, posPixels, screenSize);
-        const scaleNdc = sizeToNdc(m.Vec2, scalePixels, screenSize);
-        self.drawQuadNdc(posNdc, scaleNdc, uvOffset, uvScale, texture);
-    }
-
-    pub fn drawQuad(
-        self: Self,
-        posPixels: m.Vec2,
-        scalePixels: m.Vec2,
-        texture: c_uint,
-        screenSize: m.Vec2) void
-    {
-        self.drawQuadUvOffset(posPixels, scalePixels, m.Vec2.zero, m.Vec2.one, texture, screenSize);
-    }
-};
-
-const QuadDraw = struct {
-    posNdc: m.Vec2,
-    scaleNdc: m.Vec2,
-    color: m.Vec4,
-};
-
-const QuadTextureDraw = struct {
-    posNdc: m.Vec2,
-    scaleNdc: m.Vec2,
-    uvOffset: m.Vec2,
-    uvScale: m.Vec2,
-    texture: c_uint,
-};
-
-const RenderState = struct {
-    quadState: QuadState,
-    quadTexState: QuadTextureState,
-
-    const Self = @This();
-
-    pub fn init() !Self
-    {
-        return Self {
-            .quadState = try QuadState.init(),
-            .quadTexState = try QuadTextureState.init(),
-        };
-    }
-
-    pub fn deinit(self: *Self) void
-    {
-        self.quadState.deinit();
-        self.quadTexState.deinit();
-    }
-};
-
 const Texture = enum(usize) {
     DecalTopLeft,
     IconContact,
     IconHome,
     IconPortfolio,
     IconWork,
+    StickerBackgroundWithIcons,
 };
 
 const TextureData = struct {
@@ -397,60 +94,229 @@ const TextureData = struct {
 };
 
 const Assets = struct {
-    const numTextures = @typeInfo(Texture).Enum.fields.len;
+    const numStaticTextures = @typeInfo(Texture).Enum.fields.len;
+    const maxDynamicTextures = 256;
 
-    textures: [numTextures]TextureData,
+    staticTextures: [numStaticTextures]TextureData,
+    numDynamicTextures: usize,
+    dynamicTextures: [maxDynamicTextures]TextureData,
 
     const Self = @This();
 
     fn init() !Self
     {
         var self: Self = undefined;
-        self.textures[@enumToInt(Texture.DecalTopLeft)] = try TextureData.init(
-            "images/decal-topleft.png", w.GL_CLAMP_TO_EDGE
+        self.staticTextures[@enumToInt(Texture.DecalTopLeft)] = try TextureData.init(
+            "images/decal-topleft-white.png", w.GL_CLAMP_TO_EDGE
         );
-        self.textures[@enumToInt(Texture.IconContact)] = try TextureData.init(
+        self.staticTextures[@enumToInt(Texture.IconContact)] = try TextureData.init(
             "images/icon-contact.png", w.GL_CLAMP_TO_EDGE
         );
-        self.textures[@enumToInt(Texture.IconHome)] = try TextureData.init(
+        self.staticTextures[@enumToInt(Texture.IconHome)] = try TextureData.init(
             "images/icon-home.png", w.GL_CLAMP_TO_EDGE
         );
-        self.textures[@enumToInt(Texture.IconPortfolio)] = try TextureData.init(
+        self.staticTextures[@enumToInt(Texture.IconPortfolio)] = try TextureData.init(
             "images/icon-portfolio.png", w.GL_CLAMP_TO_EDGE
         );
-        self.textures[@enumToInt(Texture.IconWork)] = try TextureData.init(
+        self.staticTextures[@enumToInt(Texture.IconWork)] = try TextureData.init(
             "images/icon-work.png", w.GL_CLAMP_TO_EDGE
         );
+        self.staticTextures[@enumToInt(Texture.StickerBackgroundWithIcons)] = try TextureData.init(
+            "images/sticker-background-white.png", w.GL_CLAMP_TO_EDGE
+        );
+        self.numDynamicTextures = 0;
         return self;
     }
 
-    fn getTextureData(self: Self, texture: Texture) TextureData
+    fn getStaticTextureData(self: Self, texture: Texture) TextureData
     {
-        return self.textures[@enumToInt(texture)];
+        return self.staticTextures[@enumToInt(texture)];
+    }
+
+    fn getDynamicTextureData(self: Self, id: usize) ?TextureData
+    {
+        if (id >= self.numDynamicTextures) {
+            return null;
+        }
+        return self.dynamicTextures[id];
+    }
+
+    fn registerDynamicTexture(self: *Self, url: []const u8, wrapMode: c_uint) !usize
+    {
+        if (self.numDynamicTextures >= self.dynamicTextures.len) {
+            return error.FullDynamicTextures;
+        }
+        const id = self.numDynamicTextures;
+        self.dynamicTextures[id] = try TextureData.init(url, wrapMode);
+        self.numDynamicTextures += 1;
+        return id;
     }
 };
 
+const ParallaxImage = struct {
+    url: []const u8,
+    factor: f32,
+    assetId: ?usize,
+
+    const Self = @This();
+
+    pub fn init(url: []const u8, factor: f32) Self
+    {
+        return Self{
+            .url = url,
+            .factor = factor,
+            .assetId = null,
+        };
+    }
+};
+
+const ParallaxBgColorType = enum {
+    Color,
+    Gradient,
+};
+
+const ParallaxBgColor = union(ParallaxBgColorType) {
+    Color: m.Vec4,
+    Gradient: struct {
+        colorTop: m.Vec4,
+        colorBottom: m.Vec4,
+    },
+};
+
+const ParallaxSet = struct {
+    bgColor: ParallaxBgColor,
+    images: []ParallaxImage,
+};
+
+fn initParallaxSets(allocator: std.mem.Allocator) ![]ParallaxSet
+{
+    return try allocator.dupe(ParallaxSet, &[_]ParallaxSet{
+        .{
+            .bgColor = .{
+                .Color = try colorHexToVec4("#101010"),
+            },
+            .images = try allocator.dupe(ParallaxImage, &[_]ParallaxImage{
+                ParallaxImage.init("images/parallax/parallax1-1.png", 0.01),
+                ParallaxImage.init("images/parallax/parallax1-2.png", 0.05),
+                ParallaxImage.init("images/parallax/parallax1-3.png", 0.2),
+                ParallaxImage.init("images/parallax/parallax1-4.png", 0.5),
+                ParallaxImage.init("images/parallax/parallax1-5.png", 0.9),
+                ParallaxImage.init("images/parallax/parallax1-6.png", 1.2),
+            }),
+        },
+        .{
+            .bgColor = .{
+                .Color = try colorHexToVec4("#000000"),
+            },
+            .images = try allocator.dupe(ParallaxImage, &[_]ParallaxImage{
+                ParallaxImage.init("images/parallax/parallax2-1.png", 0.05),
+                ParallaxImage.init("images/parallax/parallax2-2.png", 0.1),
+                ParallaxImage.init("images/parallax/parallax2-3.png", 0.25),
+                ParallaxImage.init("images/parallax/parallax2-4.png", 1.0),
+            }),
+        },
+        .{
+            .bgColor = .{
+                .Color = try colorHexToVec4("#212121"),
+            },
+            .images = try allocator.dupe(ParallaxImage, &[_]ParallaxImage{
+                ParallaxImage.init("images/parallax/parallax3-1.png", 0.05),
+                ParallaxImage.init("images/parallax/parallax3-2.png", 0.2),
+                ParallaxImage.init("images/parallax/parallax3-3.png", 0.3),
+                ParallaxImage.init("images/parallax/parallax3-4.png", 0.8),
+                ParallaxImage.init("images/parallax/parallax3-5.png", 1.1),
+            }),
+        },
+        .{
+            .bgColor = .{
+                .Gradient = .{
+                    .colorTop = try colorHexToVec4("#1a1b1a"),
+                    .colorBottom = try colorHexToVec4("#ffffff"),
+                },
+            },
+            .images = try allocator.dupe(ParallaxImage, &[_]ParallaxImage{
+                ParallaxImage.init("images/parallax/parallax4-1.png", 0.05),
+                ParallaxImage.init("images/parallax/parallax4-2.png", 0.1),
+                ParallaxImage.init("images/parallax/parallax4-3.png", 0.25),
+                ParallaxImage.init("images/parallax/parallax4-4.png", 0.6),
+                ParallaxImage.init("images/parallax/parallax4-5.png", 0.75),
+                ParallaxImage.init("images/parallax/parallax4-6.png", 1.2),
+            }),
+        },
+        .{
+            .bgColor = .{
+                .Color = try colorHexToVec4("#111111"),
+            },
+            .images = try allocator.dupe(ParallaxImage, &[_]ParallaxImage{
+                ParallaxImage.init("images/parallax/parallax5-1.png", 0.0),
+                ParallaxImage.init("images/parallax/parallax5-2.png", 0.05),
+                ParallaxImage.init("images/parallax/parallax5-3.png", 0.1),
+                ParallaxImage.init("images/parallax/parallax5-4.png", 0.2),
+                ParallaxImage.init("images/parallax/parallax5-5.png", 0.4),
+                ParallaxImage.init("images/parallax/parallax5-6.png", 0.7),
+                ParallaxImage.init("images/parallax/parallax5-7.png", 1.2),
+            }),
+        },
+        .{
+            .bgColor = .{
+                .Color = try colorHexToVec4("#111111"),
+            },
+            .images = try allocator.dupe(ParallaxImage, &[_]ParallaxImage{
+                ParallaxImage.init("images/parallax/parallax6-1.png", 0.05),
+                ParallaxImage.init("images/parallax/parallax6-2.png", 0.1),
+                ParallaxImage.init("images/parallax/parallax6-3.png", 0.4),
+                ParallaxImage.init("images/parallax/parallax6-4.png", 0.7),
+                ParallaxImage.init("images/parallax/parallax6-5.png", 1.5),
+            }),
+        },
+    });
+}
+
 const State = struct {
-    renderState: RenderState,
+    fbAllocator: std.heap.FixedBufferAllocator,
+
+    renderState: render.RenderState,
 
     assets: Assets,
 
     screenSizePrev: m.Vec2i,
     scrollYPrev: c_int,
     timestampMsPrev: c_int,
+    mousePos: m.Vec2i,
+    activeParallaxSetIndex: usize,
+    parallaxImageSets: []ParallaxSet,
+    parallaxTX: f32,
+
+    debug: bool,
 
     const Self = @This();
+    const PARALLAX_SET_INDEX_START = 3;
+    comptime {
+        if (PARALLAX_SET_INDEX_START >= parallax.PARALLAX_SETS.len) {
+            @compileError("start parallax index out of bounds");
+        }
+    }
 
-    pub fn init() !Self
+    pub fn init(buf: []u8) !Self
     {
+        var fbAllocator = std.heap.FixedBufferAllocator.init(buf);
+
         return Self {
-            .renderState = try RenderState.init(),
+            .fbAllocator = fbAllocator,
+
+            .renderState = try render.RenderState.init(),
 
             .assets = try Assets.init(),
 
             .screenSizePrev = m.Vec2i.zero,
             .scrollYPrev = -1,
             .timestampMsPrev = 0,
+            .mousePos = m.Vec2i.zero,
+            .activeParallaxSetIndex = PARALLAX_SET_INDEX_START,
+            .parallaxImageSets = try initParallaxSets(fbAllocator.allocator()),
+            .parallaxTX = 0,
+
+            .debug = true,
         };
     }
 
@@ -458,9 +324,15 @@ const State = struct {
     {
         self.gpa.deinit();
     }
+
+    pub fn allocator(self: Self) std.mem.Allocator
+    {
+        return self.fbAllocator.allocator();
+    }
 };
 
-pub fn createText(text: []const u8, topLeft: m.Vec2i, fontSize: c_int, color: m.Vec4) void
+pub fn createTextLine(text: []const u8, topLeft: m.Vec2i, fontSize: i32,
+                      color: m.Vec4, fontFamily: []const u8) void
 {
     // TODO custom byte color type?
     const r = @floatToInt(u8, std.math.round(color.x * 255.0));
@@ -473,17 +345,51 @@ pub fn createText(text: []const u8, topLeft: m.Vec2i, fontSize: c_int, color: m.
         &buf, "#{x:0>2}{x:0>2}{x:0>2}{x:0>2}", .{r, g, b, a}
     ) catch return;
 
-    w.addText(&text[0], text.len, topLeft.x, topLeft.y, fontSize, &hexColor[0], hexColor.len);
+    w.addTextLine(
+        &text[0], text.len,
+        topLeft.x, topLeft.y, fontSize,
+        &hexColor[0], hexColor.len,
+        &fontFamily[0], fontFamily.len
+    );
+}
+
+pub fn createTextBox(text: []const u8, topLeft: m.Vec2i, width: i32, fontSize: i32, lineHeight: i32,
+                     color: m.Vec4, fontFamily: []const u8) void
+{
+    // TODO custom byte color type?
+    const r = @floatToInt(u8, std.math.round(color.x * 255.0));
+    const g = @floatToInt(u8, std.math.round(color.y * 255.0));
+    const b = @floatToInt(u8, std.math.round(color.z * 255.0));
+    const a = @floatToInt(u8, std.math.round(color.w * 255.0));
+
+    var buf: [16]u8 = undefined;
+    const hexColor = std.fmt.bufPrint(
+        &buf, "#{x:0>2}{x:0>2}{x:0>2}{x:0>2}", .{r, g, b, a}
+    ) catch return;
+
+    w.addTextBox(
+        &text[0], text.len,
+        topLeft.x, topLeft.y, width, fontSize, lineHeight,
+        &hexColor[0], hexColor.len,
+        &fontFamily[0], fontFamily.len
+    );
 }
 
 export fn onInit() void
 {
-    _state = State.init() catch |err| {
+    std.log.info("onInit", .{});
+
+    _memory = std.heap.page_allocator.create(Memory) catch |err| {
+        std.log.err("Failed to allocate WASM memory, error {}", .{err});
+        return;
+    };
+
+    var state = _memory.getState();
+    var remaining = _memory.persistent[@sizeOf(State)..];
+    state.* = State.init(remaining) catch |err| {
         std.log.err("State init failed, err {}", .{err});
         return;
     };
-    std.log.info("onInit", .{});
-    // std.log.info("{}", .{_state});
 
     w.glClearColor(0.0, 0.0, 0.0, 1.0);
     w.glEnable(w.GL_DEPTH_TEST);
@@ -493,13 +399,32 @@ export fn onInit() void
     w.glBlendFunc(w.GL_SRC_ALPHA, w.GL_ONE_MINUS_SRC_ALPHA);
 }
 
+export fn onMouseMove(x: c_int, y: c_int) void
+{
+    var state = _memory.getState();
+    state.mousePos = m.Vec2i.init(x, y);
+}
+
 export fn onClick(x: c_int, y: c_int) void
 {
-    _ = x; _ = y;
+    std.log.info("onClick: ({}, {})", .{x, y});
+}
+
+export fn onKeyDown(keyCode: c_int) void
+{
+    std.log.info("onKeyDown: {}", .{keyCode});
+
+    var state = _memory.getState();
+
+    if (keyCode == 71) {
+        state.debug = !state.debug;
+    }
 }
 
 export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestampMs: c_int) c_int
 {
+    var state = _memory.getState();
+
     const screenSizeI = m.Vec2i.init(@intCast(i32, width), @intCast(i32, height));
     const screenSizeF = m.Vec2.initFromVec2i(screenSizeI);
     const halfScreenSizeF = m.Vec2.divScalar(screenSizeF, 2.0);
@@ -507,21 +432,48 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
 
     const scrollYF = @intToFloat(f32, scrollY);
 
-    const deltaMs = if (_state.timestampMsPrev > 0) (timestampMs - _state.timestampMsPrev) else 0;
+    const mousePosF = m.Vec2.initFromVec2i(state.mousePos);
+
+    const deltaMs = if (state.timestampMsPrev > 0) (timestampMs - state.timestampMsPrev) else 0;
     const deltaS = @intToFloat(f32, deltaMs) / 1000.0;
     _ = deltaS;
 
     var drawText = false;
-    if (!m.Vec2i.eql(_state.screenSizePrev, screenSizeI)) {
-        _state.screenSizePrev = screenSizeI;
+    if (!m.Vec2i.eql(state.screenSizePrev, screenSizeI)) {
+        state.screenSizePrev = screenSizeI;
 
         std.log.info("resize, clearing text", .{});
         w.clearAllText();
         drawText = true;
     }
 
-    if (_state.scrollYPrev != scrollY) {
-        _state.scrollYPrev = scrollY;
+    // Determine whether the active parallax set is loaded
+    var activeParallaxSet = state.parallaxImageSets[state.activeParallaxSetIndex];
+    var parallaxSetLoaded = true;
+    for (activeParallaxSet.images) |*parallaxImage| {
+        if (parallaxImage.assetId) |id| {
+            if (state.assets.getDynamicTextureData(id)) |parallaxTexData| {
+                if (!parallaxTexData.loaded()) {
+                    parallaxSetLoaded = false;
+                    break;
+                }
+            } else {
+                std.log.err("Bad asset ID {}", .{id});
+            }
+        } else {
+            std.log.info("register", .{});
+            parallaxImage.assetId = state.assets.registerDynamicTexture(
+                parallaxImage.url, w.GL_CLAMP_TO_EDGE
+            ) catch |err| {
+                std.log.err("register texture error {}", .{err});
+                parallaxSetLoaded = false;
+                break;
+            };
+        }
+    }
+
+    if (state.scrollYPrev != scrollY) {
+        state.scrollYPrev = scrollY;
     }
     // TODO
     // } else {
@@ -530,19 +482,99 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
 
     const refSize = m.Vec2i.init(3840, 2000);
     const gridRefSize = 80;
+    const fontStickerRefSize = 124;
+    const fontStickerSmallRefSize = 26;
 
+    const fontStickerSize = @floatToInt(
+        i32, fontStickerRefSize / @intToFloat(f32, refSize.y) * screenSizeF.y
+    );
+    const fontStickerSmallSize = @floatToInt(
+        i32, fontStickerSmallRefSize / @intToFloat(f32, refSize.y) * screenSizeF.y
+    );
     const gridSize = std.math.round(
         @intToFloat(f32, gridRefSize) / @intToFloat(f32, refSize.y) * screenSizeF.y
     );
     const halfGridSize = gridSize / 2.0;
 
+    const maxAspect = 2.0;
+    var targetWidth = screenSizeF.x;
+    if (screenSizeF.x / screenSizeF.y > maxAspect) {
+        targetWidth = screenSizeF.y * maxAspect;
+    }
+    const marginX = (screenSizeF.x - targetWidth) / 2.0;
+
     w.glClear(w.GL_COLOR_BUFFER_BIT | w.GL_DEPTH_BUFFER_BIT);
 
+    const uiColor = m.Vec4.init(234.0 / 255.0, 1.0, 0.0, 1.0);
+    const parallaxMotionMax = screenSizeF.x / 8.0;
+
+    const parallaxTXLerpSpeed = 0.1;
+    const tX = mousePosF.x / screenSizeF.x * 2.0 - 1.0; // -1 to 1
+    state.parallaxTX = m.lerpFloat(f32, state.parallaxTX, tX, parallaxTXLerpSpeed);
+
+    if (parallaxSetLoaded) {
+        const landingImagePos = m.Vec2.init(
+            marginX + gridSize * 1,
+            gridSize * 2 + scrollYF
+        );
+        const landingImageSize = m.Vec2.init(
+            screenSizeF.x - marginX * 2 - gridSize * 2,
+            screenSizeF.y - gridSize * 3
+        );
+
+        switch (activeParallaxSet.bgColor) {
+            .Color => |color| {
+                state.renderState.quadState.drawQuad(
+                    landingImagePos, landingImageSize, 1.0, color, screenSizeF
+                );
+            },
+            .Gradient => |gradient| {
+                state.renderState.quadState.drawQuadGradient(
+                    landingImagePos, landingImageSize, 1.0,
+                    gradient.colorTop, gradient.colorTop,
+                    gradient.colorBottom, gradient.colorBottom,
+                    screenSizeF
+                );
+            },
+        }
+
+        for (activeParallaxSet.images) |parallaxImage| {
+            const assetId = parallaxImage.assetId orelse continue;
+            const textureData = state.assets.getDynamicTextureData(assetId) orelse continue;
+            if (!textureData.loaded()) continue;
+
+            const textureSizeF = m.Vec2.initFromVec2i(textureData.size);
+            const scaledWidth = landingImageSize.y * textureSizeF.x / textureSizeF.y;
+            if (scaledWidth < landingImageSize.x) {
+                // hmm, unexpected
+                continue;
+            }
+
+            const fracX = landingImageSize.x / scaledWidth;
+            const uvOffset = m.Vec2.init(
+                (1.0 - fracX) / 2.0,
+                0.0
+            );
+            const uvSize = m.Vec2.init(fracX, 1.0);
+
+            const imgPos = m.Vec2.init(
+                landingImagePos.x + state.parallaxTX * parallaxMotionMax * parallaxImage.factor,
+                landingImagePos.y
+            );
+            state.renderState.quadTexState.drawQuadUvOffset(
+                imgPos, landingImageSize, 0.5, uvOffset, uvSize,
+                textureData.id, m.Vec4.one, screenSizeF
+            );
+        }
+    } else {
+        // render temp thingy
+    }
+
     const icons = [_]TextureData {
-        _state.assets.getTextureData(Texture.IconContact),
-        _state.assets.getTextureData(Texture.IconHome),
-        _state.assets.getTextureData(Texture.IconPortfolio),
-        _state.assets.getTextureData(Texture.IconWork),
+        state.assets.getStaticTextureData(Texture.IconContact),
+        state.assets.getStaticTextureData(Texture.IconHome),
+        state.assets.getStaticTextureData(Texture.IconPortfolio),
+        state.assets.getStaticTextureData(Texture.IconWork),
     };
     var allLoaded = true;
     for (icons) |icon| {
@@ -560,83 +592,111 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
                 gridSize * 2.162,
             );
             const iconPos = m.Vec2.init(
-                gridSize * 5 + gridSize * 2.5 * iF,
+                marginX + gridSize * 5 + gridSize * 2.5 * iF,
                 screenSizeF.y - gridSize * 5 - iconSizeF.y + scrollYF,
             );
-            _state.renderState.quadTexState.drawQuad(
-                iconPos, iconSizeF, icon.id, screenSizeF
+            state.renderState.quadTexState.drawQuad(
+                iconPos, iconSizeF, 0.0, icon.id, m.Vec4.one, screenSizeF
             );
         }
     }
 
-    const decalTopLeft = _state.assets.getTextureData(Texture.DecalTopLeft);
+    const decalTopLeft = state.assets.getStaticTextureData(Texture.DecalTopLeft);
     if (decalTopLeft.loaded()) {
-        const decalSize = m.Vec2.init(gridSize * 6, gridSize * 6);
+        const decalSize = m.Vec2.init(gridSize * 5, gridSize * 5);
+        const decalMargin = gridSize * 2;
 
         const posTL = m.Vec2.init(
-            gridSize,
-            screenSizeF.y - gridSize - decalSize.y + scrollYF,
+            marginX + decalMargin,
+            screenSizeF.y - decalMargin - decalSize.y + scrollYF,
         );
         const uvOriginTL = m.Vec2.init(0, 0);
         const uvSizeTL = m.Vec2.init(1, 1);
-        _state.renderState.quadTexState.drawQuadUvOffset(
-            posTL, decalSize, uvOriginTL, uvSizeTL, decalTopLeft.id, screenSizeF
+        state.renderState.quadTexState.drawQuadUvOffset(
+            posTL, decalSize, 0, uvOriginTL, uvSizeTL, decalTopLeft.id, uiColor, screenSizeF
         );
 
         const posBL = m.Vec2.init(
-            gridSize,
-            gridSize + scrollYF,
+            marginX + decalMargin,
+            decalMargin + gridSize + scrollYF,
         );
         const uvOriginBL = m.Vec2.init(0, 1);
         const uvSizeBL = m.Vec2.init(1, -1);
-        _state.renderState.quadTexState.drawQuadUvOffset(
-            posBL, decalSize, uvOriginBL, uvSizeBL, decalTopLeft.id, screenSizeF
+        state.renderState.quadTexState.drawQuadUvOffset(
+            posBL, decalSize, 0, uvOriginBL, uvSizeBL, decalTopLeft.id, uiColor, screenSizeF
         );
 
         const posTR = m.Vec2.init(
-            screenSizeF.x - gridSize - decalSize.x,
-            screenSizeF.y - gridSize - decalSize.y + scrollYF,
+            screenSizeF.x - marginX - decalMargin - decalSize.x,
+            screenSizeF.y - decalMargin - decalSize.y + scrollYF,
         );
         const uvOriginTR = m.Vec2.init(1, 0);
         const uvSizeTR = m.Vec2.init(-1, 1);
-        _state.renderState.quadTexState.drawQuadUvOffset(
-            posTR, decalSize, uvOriginTR, uvSizeTR, decalTopLeft.id, screenSizeF
+        state.renderState.quadTexState.drawQuadUvOffset(
+            posTR, decalSize, 0, uvOriginTR, uvSizeTR, decalTopLeft.id, uiColor, screenSizeF
         );
 
         const posBR = m.Vec2.init(
-            screenSizeF.x - gridSize - decalSize.x,
-            gridSize + scrollYF,
+            screenSizeF.x - marginX - decalMargin - decalSize.x,
+            decalMargin + gridSize + scrollYF,
         );
         const uvOriginBR = m.Vec2.init(1, 1);
         const uvSizeBR = m.Vec2.init(-1, -1);
-        _state.renderState.quadTexState.drawQuadUvOffset(
-            posBR, decalSize, uvOriginBR, uvSizeBR, decalTopLeft.id, screenSizeF
+        state.renderState.quadTexState.drawQuadUvOffset(
+            posBR, decalSize, 0, uvOriginBR, uvSizeBR, decalTopLeft.id, uiColor, screenSizeF
         );
     }
 
-    const colorWhite = m.Vec4.init(1.0, 1.0, 1.0, 1.0);
+    const stickerBackground = state.assets.getStaticTextureData(Texture.StickerBackgroundWithIcons);
+    if (stickerBackground.loaded()) {
+        const stickerPos = m.Vec2.init(
+            marginX + gridSize * 4.5,
+            gridSize * 6 + scrollYF
+        );
+        const stickerSize = m.Vec2.init(gridSize * 14.5, gridSize * 3);
+        state.renderState.quadTexState.drawQuad(
+            stickerPos, stickerSize, 0, stickerBackground.id, uiColor, screenSizeF
+        );
+    }
 
-    const p2 = m.Vec2.init(50, screenSizeF.y - 400 + scrollYF);
-    const s2 = m.Vec2.init(800, 1);
-    _state.renderState.quadState.drawQuad(p2, s2, colorWhite, screenSizeF);
-
-    const p3 = m.Vec2.init(0, screenSizeF.y - screenSizeF.y * 1.5 + scrollYF);
-    const s3 = m.Vec2.init(screenSizeF.x, 1);
-    _state.renderState.quadState.drawQuad(p3, s3, colorWhite, screenSizeF);
+    // const colorWhite = m.Vec4.init(1.0, 1.0, 1.0, 1.0);
+    const colorBlack = m.Vec4.init(0.0, 0.0, 0.0, 1.0);
 
     if (drawText) {
-        createText(
-            "hello, world",
-            m.Vec2i.init(100, 400), 32, m.Vec4.init(0.5, 0.05, 0.2, 1.0),
+        const textStickerPos1 = m.Vec2i.init(
+            @floatToInt(i32, marginX + gridSize * 5.5),
+            screenSizeI.y - @floatToInt(i32, gridSize * 7.4)
         );
-        createText(
-            "F gello, yorlf",
-            m.Vec2i.init(0, @floatToInt(i32, screenSizeF.y * 1.5)), 32, colorWhite
+        createTextLine(
+            "HALO IV",
+            textStickerPos1, fontStickerSize,
+            colorBlack, "HelveticaBold",
+        );
+
+        const textStickerPos2 = m.Vec2i.init(
+            @floatToInt(i32, marginX + gridSize * 5.5),
+            screenSizeI.y - @floatToInt(i32, gridSize * 6.5)
+        );
+        createTextLine(
+            "A YORSTORY company © 2018-2022.",
+            textStickerPos2, fontStickerSmallSize,
+            colorBlack, "HelveticaBold",
+        );
+
+        const textStickerPos3 = m.Vec2i.init(
+            @floatToInt(i32, marginX + gridSize * 12),
+            screenSizeI.y - @floatToInt(i32, gridSize * 8.55)
+        );
+        createTextBox(
+            "At Yorstory, alchemists and wizards fashion your story with style, light, and shadow.",
+            textStickerPos3, @floatToInt(i32, gridSize * 6), fontStickerSmallSize,
+            fontStickerSmallSize,
+            colorBlack, "HelveticaBold",
         );
     }
 
     // debug grid
-    if (true) {
+    if (state.debug) {
         const colorGrid = m.Vec4.init(0.6, 0.6, 0.6, 1.0);
         const colorGridHalf = m.Vec4.init(0.2, 0.2, 0.2, 1.0);
 
@@ -649,9 +709,9 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
             const iF = @intToFloat(f32, i);
             const color = if (@rem(i, 2) == 0) colorGrid else colorGridHalf;
             const posTop = m.Vec2.init(0, screenSizeF.y - halfGridSize * iF);
-            _state.renderState.quadState.drawQuad(posTop, sizeH, color, screenSizeF);
+            state.renderState.quadState.drawQuad(posTop, sizeH, 0, color, screenSizeF);
             const posBottom = m.Vec2.init(0, halfGridSize * iF);
-            _state.renderState.quadState.drawQuad(posBottom, sizeH, color, screenSizeF);
+            state.renderState.quadState.drawQuad(posBottom, sizeH, 0, color, screenSizeF);
         }
 
         const nV = 40;
@@ -661,13 +721,13 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
             const iF = @intToFloat(f32, i);
             const color = if (@rem(i, 2) == 0) colorGrid else colorGridHalf;
             const posLeft = m.Vec2.init(halfGridSize * iF, 0);
-            _state.renderState.quadState.drawQuad(posLeft, sizeV, color, screenSizeF);
+            state.renderState.quadState.drawQuad(posLeft, sizeV, 0, color, screenSizeF);
             const posRight = m.Vec2.init(screenSizeF.x - halfGridSize * iF, 0);
-            _state.renderState.quadState.drawQuad(posRight, sizeV, color, screenSizeF);
+            state.renderState.quadState.drawQuad(posRight, sizeV, 0, color, screenSizeF);
         }
     }
 
-    _state.timestampMsPrev = timestampMs;
+    state.timestampMsPrev = timestampMs;
 
     return height * 2;
 }
@@ -676,8 +736,17 @@ export fn onTextureLoaded(textureId: c_uint, width: c_int, height: c_int) void
 {
     std.log.info("onTextureLoaded {}: {} x {}", .{textureId, width, height});
 
+    var state = _memory.getState();
+
     var found = false;
-    for (_state.assets.textures) |*texture| {
+    for (state.assets.staticTextures) |*texture| {
+        if (texture.id == textureId) {
+            texture.size = m.Vec2i.init(width, height);
+            found = true;
+            break;
+        }
+    }
+    for (state.assets.dynamicTextures) |*texture| {
         if (texture.id == textureId) {
             texture.size = m.Vec2i.init(width, height);
             found = true;

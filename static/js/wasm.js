@@ -24,27 +24,63 @@ function readCharStr(ptr, len) {
 };
 
 function clearAllText() {
-    Array.from(document.getElementsByClassName("_wasmText")).forEach(function(el) {
+    Array.from(document.getElementsByClassName("_wasmTextOuter")).forEach(function(el) {
         el.remove();
     });
 }
 
-function addText(textPtr, textLen, left, top, fontSize, hexColorPtr, hexColorLen) {
+// there is a margin on the left of text boxes for some reason - return an estimate of that "gap"
+// TODO might depend on font family...
+function getTextLeftGap(fontSize) {
+    return fontSize * 0.08;
+}
+
+function addTextLine(
+    textPtr, textLen, left, baselineFromTop, fontSize,
+    hexColorPtr, hexColorLen, fontFamilyPtr, fontFamilyLen) {
     const text = readCharStr(textPtr, textLen);
     const hexColor = readCharStr(hexColorPtr, hexColorLen);
+    const fontFamily = readCharStr(fontFamilyPtr, fontFamilyLen);
+
+    const outer = document.createElement("div");
+    outer.classList.add("_wasmTextOuter");
+    outer.style.left = px(left - getTextLeftGap(fontSize));
+    outer.style.top = px(baselineFromTop - fontSize);
+    outer.style.height = px(fontSize);
+
+    const inner = document.createElement("div");
+    inner.classList.add("_wasmTextInner");
+    inner.style.color = hexColor;
+    inner.style.fontSize = px(fontSize);
+    inner.style.lineHeight = px(fontSize);
+    inner.style.fontFamily = fontFamily;
+    inner.innerHTML = text;
+    const strut = document.createElement("div");
+    strut.classList.add("_wasmTextStrut");
+    strut.style.height = px(fontSize);
+    inner.appendChild(strut);
+
+    outer.appendChild(inner);
+    document.getElementById("dummyBackground").appendChild(outer);
+}
+
+function addTextBox(
+    textPtr, textLen, left, top, width, fontSize, lineHeight,
+    hexColorPtr, hexColorLen, fontFamilyPtr, fontFamilyLen) {
+    const text = readCharStr(textPtr, textLen);
+    const hexColor = readCharStr(hexColorPtr, hexColorLen);
+    const fontFamily = readCharStr(fontFamilyPtr, fontFamilyLen);
 
     const div = document.createElement("div");
-    div.classList.add("_wasmText");
-    div.style.position = "absolute";
-    div.style.top = px(top - fontSize);
-    div.style.left = px(left);
-    const span = document.createElement("span");
-    span.innerHTML = text;
-    console.log(hexColor);
-    span.style.color = hexColor;
-    span.style.fontSize = px(fontSize);
-    span.style.verticalAlign = "baseline";
-    div.appendChild(span);
+    div.classList.add("_wasmTextBox");
+    div.style.left = px(left - getTextLeftGap(fontSize));
+    div.style.top = px(top);
+    div.style.width = px(width);
+    div.style.color = hexColor;
+    div.style.fontSize = px(fontSize);
+    div.style.lineHeight = px(lineHeight);
+    div.style.fontFamily = fontFamily;
+    div.innerHTML = text;
     document.getElementById("dummyBackground").appendChild(div);
 }
 
@@ -200,7 +236,8 @@ const env = {
 
     // browser / DOM functions
     clearAllText,
-    addText,
+    addTextLine,
+    addTextBox,
 
     // GL functions
     compileShader,
@@ -254,9 +291,19 @@ function wasmInit()
     gl = _canvas.getContext("webgl") || _canvas.getContext("experimental-webgl");
     updateCanvasSize();
 
-    _canvas.addEventListener("click", function(event) {
+    document.addEventListener("mousemove", function(event) {
+        if (_wasmInstance !== null) {
+            _wasmInstance.exports.onMouseMove(event.clientX, window.innerHeight - event.clientY);
+        }
+    });
+    document.addEventListener("click", function(event) {
         if (_wasmInstance !== null) {
             _wasmInstance.exports.onClick(event.clientX, window.innerHeight - event.clientY);
+        }
+    });
+    document.addEventListener("keydown", function(event) {
+        if (_wasmInstance !== null) {
+            _wasmInstance.exports.onKeyDown(event.keyCode);
         }
     });
 
@@ -265,24 +312,27 @@ function wasmInit()
     });
 
     const WASM_PAGE_SIZE = 64 * 1024;
-    const memoryBytes = 4 * 1024 * 1024;
+    const memoryBytes = 512 * 1024;
     const memoryPages = Math.ceil(memoryBytes / WASM_PAGE_SIZE);
-    _memory = new WebAssembly.Memory({
-        initial: memoryPages,
-        maximum: memoryPages,
-    });
-    console.log(`Allocated ${memoryPages} wasm pages`);
+    // _memory = new WebAssembly.Memory({
+    //     initial: memoryPages,
+    //     maximum: memoryPages,
+    // });
+    // console.log(`Allocated ${memoryPages} wasm pages`);
 
     let importObject = {
         env: env,
     };
-    console.log(importObject);
 
     WebAssembly.instantiateStreaming(fetch("yorstory.wasm"), importObject).then(function(obj) {
         _wasmInstance = obj.instance;
-        obj.instance.exports.onInit(_memory.buffer);
+        const pages = Math.round(_wasmInstance.exports.memory.buffer.byteLength / WASM_PAGE_SIZE);
+        if (pages < memoryPages) {
+            _wasmInstance.exports.memory.grow(memoryPages - pages);
+        }
+        _wasmInstance.exports.onInit();
 
-        const onAnimationFrame = obj.instance.exports.onAnimationFrame;
+        const onAnimationFrame = _wasmInstance.exports.onAnimationFrame;
         const dummyBackground = document.getElementById("dummyBackground");
 
         function step(timestamp) {

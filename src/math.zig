@@ -1,3 +1,13 @@
+pub fn lerpFloat(comptime T: type, v1: T, v2: T, t: f32) T
+{
+    return v1 * (1.0 - t) + v2 * t;
+}
+
+pub fn lerpVec(comptime T: type, v1: T, v2: T, t: f32) T
+{
+    return T.add(T.multScalar(v1, 1.0 - t), T.multScalar(v2, t));
+}
+
 pub const Vec2i = packed struct {
     x: i32,
     y: i32,
@@ -32,6 +42,14 @@ pub const Vec2i = packed struct {
         return Self {
             .x = v1.x - v2.x,
             .y = v1.y - v2.y,
+        };
+    }
+
+    pub fn multScalar(v: Self, s: i32) Self
+    {
+        return Self {
+            .x = v.x * s,
+            .y = v.y * s,
         };
     }
 
@@ -91,6 +109,14 @@ pub const Vec2 = packed struct {
         };
     }
 
+    pub fn multScalar(v: Self, s: f32) Self
+    {
+        return Self {
+            .x = v.x * s,
+            .y = v.y * s,
+        };
+    }
+
     pub fn divScalar(v: Self, s: f32) Self
     {
         return Self {
@@ -143,6 +169,15 @@ pub const Vec3 = packed struct {
             .x = v1.x - v2.x,
             .y = v1.y - v2.y,
             .z = v1.z - v2.z,
+        };
+    }
+
+    pub fn multScalar(v: Self, s: f32) Self
+    {
+        return Self {
+            .x = v.x * s,
+            .y = v.y * s,
+            .z = v.z * s,
         };
     }
 
@@ -199,6 +234,16 @@ pub const Vec4 = packed struct {
             .y = v1.y - v2.y,
             .z = v1.z - v2.z,
             .w = v1.w - v2.w,
+        };
+    }
+
+    pub fn multScalar(v: Self, s: f32) Self
+    {
+        return Self {
+            .x = v.x * s,
+            .y = v.y * s,
+            .z = v.z * s,
+            .w = v.w * s,
         };
     }
 

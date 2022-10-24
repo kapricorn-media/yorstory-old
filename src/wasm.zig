@@ -5,11 +5,16 @@ pub extern fn consoleMessage(isError: bool, messagePtr: *const u8, messageLen: c
 
 // browser / DOM
 pub extern fn clearAllText() void;
-pub extern fn addText(
+pub extern fn addTextLine(
     textPtr: *const u8, textLen: c_uint,
-    left: c_int, top: c_int,
-    fontSize: c_int,
-    hexColorPtr: *const u8, hexColorLen: c_uint) void;
+    left: c_int, baselineFromTop: c_int, fontSize: c_int,
+    hexColorPtr: *const u8, hexColorLen: c_uint,
+    fontFamilyPtr: *const u8, fontFamilyLen: c_uint) void;
+pub extern fn addTextBox(
+    textPtr: *const u8, textLen: c_uint,
+    left: c_int, top: c_int, width: c_int, fontSize: c_int, lineHeight: c_int,
+    hexColorPtr: *const u8, hexColorLen: c_uint,
+    fontFamilyPtr: *const u8, fontFamilyLen: c_uint) void;
 
 // GL
 pub extern fn compileShader(source: *const u8 , len: c_uint, type: c_uint) c_uint;
@@ -55,6 +60,7 @@ pub const GL_STATIC_DRAW: c_uint = 35044;
 pub const GL_f32: c_uint = 5126;
 
 pub const GL_DEPTH_TEST: c_uint = 2929;
+pub const GL_LESS: c_uint = 513;
 pub const GL_LEQUAL: c_uint = 515;
 
 pub const GL_BLEND: c_uint = 3042;

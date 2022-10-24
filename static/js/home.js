@@ -84,7 +84,7 @@ const PARALLAX_IMAGE_SETS = [
 ];
 
 const parallaxMotionMax = 100;
-const parallaxImageSwapSeconds = 6;
+const parallaxImageSwapSeconds = 600;
 
 let _parallaxImageSetCurrent = 3;
 
