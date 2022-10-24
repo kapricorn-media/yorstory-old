@@ -1,5 +1,5 @@
 const m = @import("math.zig");
-const w = @import("wasm.zig");
+const w = @import("wasm_bindings.zig");
 
 fn floatPosToNdc(pos: f32, canvas: f32) f32
 {
@@ -391,23 +391,158 @@ const QuadTextureState = struct {
     }
 };
 
-// const QuadDraw = struct {
-//     posNdc: m.Vec2,
-//     scaleNdc: m.Vec2,
-//     color: m.Vec4,
-// };
+const RoundedFrameState = struct {
+    positionBuffer: c_uint,
 
-// const QuadTextureDraw = struct {
-//     posNdc: m.Vec2,
-//     scaleNdc: m.Vec2,
-//     uvOffset: m.Vec2,
-//     uvScale: m.Vec2,
-//     texture: c_uint,
-// };
+    programId: c_uint,
+
+    positionAttrLoc: c_int,
+
+    offsetPosUniLoc: c_int,
+    scalePosUniLoc: c_int,
+    framePosUniLoc: c_int,
+    frameSizeUniLoc: c_int,
+    borderRadiusUniLoc: c_int,
+    colorUniLoc: c_int,
+    screenSizeUniLoc: c_int,
+
+    const positions = [6]m.Vec2 {
+        m.Vec2.init(0.0, 0.0),
+        m.Vec2.init(0.0, 1.0),
+        m.Vec2.init(1.0, 1.0),
+        m.Vec2.init(1.0, 1.0),
+        m.Vec2.init(1.0, 0.0),
+        m.Vec2.init(0.0, 0.0),
+    };
+
+    const vert = @embedFile("shaders/roundedFrame.vert");
+    const frag = @embedFile("shaders/roundedFrame.frag");
+
+    const Self = @This();
+
+    pub fn init() !Self
+    {
+        // TODO error check all these
+        const vertQuadId = w.compileShader(&vert[0], vert.len, w.GL_VERTEX_SHADER);
+        const fragQuadId = w.compileShader(&frag[0], frag.len, w.GL_FRAGMENT_SHADER);
+
+        const positionBuffer = w.glCreateBuffer();
+        w.glBindBuffer(w.GL_ARRAY_BUFFER, positionBuffer);
+        w.glBufferData(w.GL_ARRAY_BUFFER, @alignCast(4, &positions[0].x), positions.len * 2, w.GL_STATIC_DRAW);
+
+        const programId = w.linkShaderProgram(vertQuadId, fragQuadId);
+
+        const a_position = "a_position";
+        const positionAttrLoc = w.glGetAttribLocation(programId, &a_position[0], a_position.len);
+        if (positionAttrLoc == -1) {
+            return error.MissingAttrLoc;
+        }
+
+        const u_offsetPos = "u_offsetPos";
+        const offsetPosUniLoc = w.glGetUniformLocation(programId, &u_offsetPos[0], u_offsetPos.len);
+        if (offsetPosUniLoc == -1) {
+            return error.MissingUniformLoc;
+        }
+        const u_scalePos = "u_scalePos";
+        const scalePosUniLoc = w.glGetUniformLocation(programId, &u_scalePos[0], u_scalePos.len);
+        if (scalePosUniLoc == -1) {
+            return error.MissingUniformLoc;
+        }
+        const u_framePos = "u_framePos";
+        const framePosUniLoc = w.glGetUniformLocation(programId, &u_framePos[0], u_framePos.len);
+        if (framePosUniLoc == -1) {
+            return error.MissingUniformLoc;
+        }
+        const u_frameSize = "u_frameSize";
+        const frameSizeUniLoc = w.glGetUniformLocation(programId, &u_frameSize[0], u_frameSize.len);
+        if (frameSizeUniLoc == -1) {
+            return error.MissingUniformLoc;
+        }
+        const u_borderRadius = "u_borderRadius";
+        const borderRadiusUniLoc = w.glGetUniformLocation(programId, &u_borderRadius[0], u_borderRadius.len);
+        if (borderRadiusUniLoc == -1) {
+            return error.MissingUniformLoc;
+        }
+        const u_color = "u_color";
+        const colorUniLoc = w.glGetUniformLocation(programId, &u_color[0], u_color.len);
+        if (colorUniLoc == -1) {
+            return error.MissingUniformLoc;
+        }
+        const u_screenSize = "u_screenSize";
+        const screenSizeUniLoc = w.glGetUniformLocation(programId, &u_screenSize[0], u_screenSize.len);
+        if (screenSizeUniLoc == -1) {
+            return error.MissingUniformLoc;
+        }
+
+        return Self {
+            .positionBuffer = positionBuffer,
+
+            .programId = programId,
+
+            .positionAttrLoc = positionAttrLoc,
+
+            .offsetPosUniLoc = offsetPosUniLoc,
+            .scalePosUniLoc = scalePosUniLoc,
+            .framePosUniLoc = framePosUniLoc,
+            .frameSizeUniLoc = frameSizeUniLoc,
+            .borderRadiusUniLoc = borderRadiusUniLoc,
+            .colorUniLoc = colorUniLoc,
+            .screenSizeUniLoc = screenSizeUniLoc,
+        };
+    }
+
+    pub fn drawFrameNdc(
+        self: Self,
+        posNdc: m.Vec2,
+        scaleNdc: m.Vec2,
+        depth: f32,
+        framePosPixels: m.Vec2,
+        frameSizePixels: m.Vec2,
+        borderRadius: f32,
+        color: m.Vec4,
+        screenSize: m.Vec2) void
+    {
+        w.glUseProgram(self.programId);
+
+        w.glEnableVertexAttribArray(@intCast(c_uint, self.positionAttrLoc));
+        w.glBindBuffer(w.GL_ARRAY_BUFFER, self.positionBuffer);
+        w.glVertexAttribPointer(@intCast(c_uint, self.positionAttrLoc), 2, w.GL_f32, 0, 0, 0);
+
+        w.glUniform3fv(self.offsetPosUniLoc, posNdc.x, posNdc.y, depth);
+        w.glUniform2fv(self.scalePosUniLoc, scaleNdc.x, scaleNdc.y);
+        w.glUniform2fv(self.framePosUniLoc, framePosPixels.x, framePosPixels.y);
+        w.glUniform2fv(self.frameSizeUniLoc, frameSizePixels.x, frameSizePixels.y);
+        w.glUniform1fv(self.borderRadiusUniLoc, borderRadius);
+        w.glUniform4fv(self.colorUniLoc, color.x, color.y, color.z, color.w);
+        w.glUniform2fv(self.screenSizeUniLoc, screenSize.x, screenSize.y);
+
+        w.glDrawArrays(w.GL_TRIANGLES, 0, positions.len);
+    }
+
+    pub fn drawFrame(
+        self: Self,
+        posPixels: m.Vec2,
+        scalePixels: m.Vec2,
+        depth: f32,
+        framePosPixels: m.Vec2,
+        frameSizePixels: m.Vec2,
+        borderRadius: f32,
+        color: m.Vec4,
+        screenSize: m.Vec2) void
+    {
+        const posNdc = posToNdc(m.Vec2, posPixels, screenSize);
+        const scaleNdc = sizeToNdc(m.Vec2, scalePixels, screenSize);
+        self.drawFrameNdc(
+            posNdc, scaleNdc, depth, framePosPixels, frameSizePixels, borderRadius,
+            color, screenSize
+        );
+    }
+};
 
 pub const RenderState = struct {
     quadState: QuadState,
     quadTexState: QuadTextureState,
+    roundedFrameState: RoundedFrameState,
 
     const Self = @This();
 
@@ -416,6 +551,7 @@ pub const RenderState = struct {
         return Self {
             .quadState = try QuadState.init(),
             .quadTexState = try QuadTextureState.init(),
+            .roundedFrameState = try RoundedFrameState.init(),
         };
     }
 
@@ -423,5 +559,6 @@ pub const RenderState = struct {
     {
         self.quadState.deinit();
         self.quadTexState.deinit();
+        self.roundedFrameState.deinit();
     }
 };

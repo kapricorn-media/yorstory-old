@@ -23,6 +23,17 @@ function readCharStr(ptr, len) {
     return new TextDecoder("utf-8").decode(bytes);
 };
 
+function writeCharStr(ptr, len, toWrite) {
+    if (toWrite.length > len) {
+        return 0;
+    }
+    const bytes = new Uint8Array(_wasmInstance.exports.memory.buffer, ptr, len);
+    for (let i = 0; i < toWrite.length; i++) {
+        bytes[i] = toWrite.charCodeAt(i);
+    }
+    return toWrite.length;
+};
+
 function clearAllText() {
     Array.from(document.getElementsByClassName("_wasmTextOuter")).forEach(function(el) {
         el.remove();
@@ -36,7 +47,7 @@ function getTextLeftGap(fontSize) {
 }
 
 function addTextLine(
-    textPtr, textLen, left, baselineFromTop, fontSize,
+    textPtr, textLen, left, baselineFromTop, fontSize, letterSpacing,
     hexColorPtr, hexColorLen, fontFamilyPtr, fontFamilyLen) {
     const text = readCharStr(textPtr, textLen);
     const hexColor = readCharStr(hexColorPtr, hexColorLen);
@@ -50,10 +61,11 @@ function addTextLine(
 
     const inner = document.createElement("div");
     inner.classList.add("_wasmTextInner");
+    inner.style.fontFamily = fontFamily;
     inner.style.color = hexColor;
     inner.style.fontSize = px(fontSize);
     inner.style.lineHeight = px(fontSize);
-    inner.style.fontFamily = fontFamily;
+    inner.style.letterSpacing = px(letterSpacing);
     inner.innerHTML = text;
     const strut = document.createElement("div");
     strut.classList.add("_wasmTextStrut");
@@ -65,7 +77,7 @@ function addTextLine(
 }
 
 function addTextBox(
-    textPtr, textLen, left, top, width, fontSize, lineHeight,
+    textPtr, textLen, left, top, width, fontSize, lineHeight, letterSpacing,
     hexColorPtr, hexColorLen, fontFamilyPtr, fontFamilyLen) {
     const text = readCharStr(textPtr, textLen);
     const hexColor = readCharStr(hexColorPtr, hexColorLen);
@@ -76,12 +88,27 @@ function addTextBox(
     div.style.left = px(left - getTextLeftGap(fontSize));
     div.style.top = px(top);
     div.style.width = px(width);
+    div.style.fontFamily = fontFamily;
     div.style.color = hexColor;
     div.style.fontSize = px(fontSize);
     div.style.lineHeight = px(lineHeight);
-    div.style.fontFamily = fontFamily;
+    div.style.letterSpacing = px(letterSpacing);
     div.innerHTML = text;
     document.getElementById("dummyBackground").appendChild(div);
+}
+
+function setCursor(cursorPtr, cursorLen) {
+    const cursor = readCharStr(cursorPtr, cursorLen);
+    document.body.style.cursor = cursor;
+}
+
+function getUri(outUriPtr, outUriLen) {
+    return writeCharStr(outUriPtr, outUriLen, window.location.pathname);
+}
+
+function setUri(uriPtr, uriLen) {
+    const uri = readCharStr(uriPtr, uriLen);
+    window.location.href = uri;
 }
 
 const glShaders = [];
@@ -186,6 +213,9 @@ const glGetUniformLocation = function(programId, namePtr, nameLen)  {
 const glUniform1i = function(locationId, value) {
     gl.uniform1i(glUniformLocations[locationId], value);
 };
+const glUniform1fv = function(locationId, x) {
+    gl.uniform1fv(glUniformLocations[locationId], [x]);
+};
 const glUniform2fv = function(locationId, x, y) {
     gl.uniform2fv(glUniformLocations[locationId], [x, y]);
 };
@@ -238,6 +268,9 @@ const env = {
     clearAllText,
     addTextLine,
     addTextBox,
+    setCursor,
+    getUri,
+    setUri,
 
     // GL functions
     compileShader,
@@ -256,6 +289,7 @@ const env = {
     glGetUniformLocation,
 
     glUniform1i,
+    glUniform1fv,
     glUniform2fv,
     glUniform3fv,
     glUniform4fv,
@@ -296,9 +330,14 @@ function wasmInit()
             _wasmInstance.exports.onMouseMove(event.clientX, window.innerHeight - event.clientY);
         }
     });
-    document.addEventListener("click", function(event) {
+    document.addEventListener("mousedown", function(event) {
         if (_wasmInstance !== null) {
-            _wasmInstance.exports.onClick(event.clientX, window.innerHeight - event.clientY);
+            _wasmInstance.exports.onMouseDown(event.button, event.clientX, window.innerHeight - event.clientY);
+        }
+    });
+    document.addEventListener("mouseup", function(event) {
+        if (_wasmInstance !== null) {
+            _wasmInstance.exports.onMouseUp(event.button, event.clientX, window.innerHeight - event.clientY);
         }
     });
     document.addEventListener("keydown", function(event) {

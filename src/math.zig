@@ -8,6 +8,12 @@ pub fn lerpVec(comptime T: type, v1: T, v2: T, t: f32) T
     return T.add(T.multScalar(v1, 1.0 - t), T.multScalar(v2, t));
 }
 
+pub fn isInsideRect(p: Vec2, rectOrigin: Vec2, rectSize: Vec2) bool
+{
+    return p.x >= rectOrigin.x and p.x <= rectOrigin.x + rectSize.x
+        and p.y >= rectOrigin.y and p.y <= rectOrigin.y + rectSize.y;
+}
+
 pub const Vec2i = packed struct {
     x: i32,
     y: i32,
