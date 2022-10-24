@@ -18,9 +18,9 @@ const Memory = struct {
         return @ptrCast(*State, @alignCast(8, &self.persistent[0]));
     }
 
-    fn getTransientAllocator(self: *Self) std.heap.ArenaAllocator
+    fn getTransientAllocator(self: *Self) std.heap.FixedBufferAllocator
     {
-        return std.heap.ArenaAllocator(std.heap.FixedBufferAllocator(&self.transient[0]));
+        return std.heap.FixedBufferAllocator.init(&self.transient);
     }
 };
 
@@ -109,22 +109,22 @@ const Assets = struct {
     {
         var self: Self = undefined;
         self.staticTextures[@enumToInt(Texture.DecalTopLeft)] = try TextureData.init(
-            "images/decal-topleft-white.png", w.GL_CLAMP_TO_EDGE
+            "/images/decal-topleft-white.png", w.GL_CLAMP_TO_EDGE
         );
         self.staticTextures[@enumToInt(Texture.IconContact)] = try TextureData.init(
-            "images/icon-contact.png", w.GL_CLAMP_TO_EDGE
+            "/images/icon-contact.png", w.GL_CLAMP_TO_EDGE
         );
         self.staticTextures[@enumToInt(Texture.IconHome)] = try TextureData.init(
-            "images/icon-home.png", w.GL_CLAMP_TO_EDGE
+            "/images/icon-home.png", w.GL_CLAMP_TO_EDGE
         );
         self.staticTextures[@enumToInt(Texture.IconPortfolio)] = try TextureData.init(
-            "images/icon-portfolio.png", w.GL_CLAMP_TO_EDGE
+            "/images/icon-portfolio.png", w.GL_CLAMP_TO_EDGE
         );
         self.staticTextures[@enumToInt(Texture.IconWork)] = try TextureData.init(
-            "images/icon-work.png", w.GL_CLAMP_TO_EDGE
+            "/images/icon-work.png", w.GL_CLAMP_TO_EDGE
         );
         self.staticTextures[@enumToInt(Texture.StickerBackgroundWithIcons)] = try TextureData.init(
-            "images/sticker-background-white.png", w.GL_CLAMP_TO_EDGE
+            "/images/sticker-background-white.png", w.GL_CLAMP_TO_EDGE
         );
         self.numDynamicTextures = 0;
         return self;
@@ -217,12 +217,12 @@ fn initParallaxSets(allocator: std.mem.Allocator) ![]ParallaxSet
                 .Color = try colorHexToVec4("#101010"),
             },
             .images = try allocator.dupe(ParallaxImage, &[_]ParallaxImage{
-                ParallaxImage.init("images/parallax/parallax1-1.png", 0.01),
-                ParallaxImage.init("images/parallax/parallax1-2.png", 0.05),
-                ParallaxImage.init("images/parallax/parallax1-3.png", 0.2),
-                ParallaxImage.init("images/parallax/parallax1-4.png", 0.5),
-                ParallaxImage.init("images/parallax/parallax1-5.png", 0.9),
-                ParallaxImage.init("images/parallax/parallax1-6.png", 1.2),
+                ParallaxImage.init("/images/parallax/parallax1-1.png", 0.01),
+                ParallaxImage.init("/images/parallax/parallax1-2.png", 0.05),
+                ParallaxImage.init("/images/parallax/parallax1-3.png", 0.2),
+                ParallaxImage.init("/images/parallax/parallax1-4.png", 0.5),
+                ParallaxImage.init("/images/parallax/parallax1-5.png", 0.9),
+                ParallaxImage.init("/images/parallax/parallax1-6.png", 1.2),
             }),
         },
         .{
@@ -230,10 +230,10 @@ fn initParallaxSets(allocator: std.mem.Allocator) ![]ParallaxSet
                 .Color = try colorHexToVec4("#000000"),
             },
             .images = try allocator.dupe(ParallaxImage, &[_]ParallaxImage{
-                ParallaxImage.init("images/parallax/parallax2-1.png", 0.05),
-                ParallaxImage.init("images/parallax/parallax2-2.png", 0.1),
-                ParallaxImage.init("images/parallax/parallax2-3.png", 0.25),
-                ParallaxImage.init("images/parallax/parallax2-4.png", 1.0),
+                ParallaxImage.init("/images/parallax/parallax2-1.png", 0.05),
+                ParallaxImage.init("/images/parallax/parallax2-2.png", 0.1),
+                ParallaxImage.init("/images/parallax/parallax2-3.png", 0.25),
+                ParallaxImage.init("/images/parallax/parallax2-4.png", 1.0),
             }),
         },
         .{
@@ -241,11 +241,11 @@ fn initParallaxSets(allocator: std.mem.Allocator) ![]ParallaxSet
                 .Color = try colorHexToVec4("#212121"),
             },
             .images = try allocator.dupe(ParallaxImage, &[_]ParallaxImage{
-                ParallaxImage.init("images/parallax/parallax3-1.png", 0.05),
-                ParallaxImage.init("images/parallax/parallax3-2.png", 0.2),
-                ParallaxImage.init("images/parallax/parallax3-3.png", 0.3),
-                ParallaxImage.init("images/parallax/parallax3-4.png", 0.8),
-                ParallaxImage.init("images/parallax/parallax3-5.png", 1.1),
+                ParallaxImage.init("/images/parallax/parallax3-1.png", 0.05),
+                ParallaxImage.init("/images/parallax/parallax3-2.png", 0.2),
+                ParallaxImage.init("/images/parallax/parallax3-3.png", 0.3),
+                ParallaxImage.init("/images/parallax/parallax3-4.png", 0.8),
+                ParallaxImage.init("/images/parallax/parallax3-5.png", 1.1),
             }),
         },
         .{
@@ -256,12 +256,12 @@ fn initParallaxSets(allocator: std.mem.Allocator) ![]ParallaxSet
                 },
             },
             .images = try allocator.dupe(ParallaxImage, &[_]ParallaxImage{
-                ParallaxImage.init("images/parallax/parallax4-1.png", 0.05),
-                ParallaxImage.init("images/parallax/parallax4-2.png", 0.1),
-                ParallaxImage.init("images/parallax/parallax4-3.png", 0.25),
-                ParallaxImage.init("images/parallax/parallax4-4.png", 0.6),
-                ParallaxImage.init("images/parallax/parallax4-5.png", 0.75),
-                ParallaxImage.init("images/parallax/parallax4-6.png", 1.2),
+                ParallaxImage.init("/images/parallax/parallax4-1.png", 0.05),
+                ParallaxImage.init("/images/parallax/parallax4-2.png", 0.1),
+                ParallaxImage.init("/images/parallax/parallax4-3.png", 0.25),
+                ParallaxImage.init("/images/parallax/parallax4-4.png", 0.6),
+                ParallaxImage.init("/images/parallax/parallax4-5.png", 0.75),
+                ParallaxImage.init("/images/parallax/parallax4-6.png", 1.2),
             }),
         },
         .{
@@ -269,13 +269,13 @@ fn initParallaxSets(allocator: std.mem.Allocator) ![]ParallaxSet
                 .Color = try colorHexToVec4("#111111"),
             },
             .images = try allocator.dupe(ParallaxImage, &[_]ParallaxImage{
-                ParallaxImage.init("images/parallax/parallax5-1.png", 0.0),
-                ParallaxImage.init("images/parallax/parallax5-2.png", 0.05),
-                ParallaxImage.init("images/parallax/parallax5-3.png", 0.1),
-                ParallaxImage.init("images/parallax/parallax5-4.png", 0.2),
-                ParallaxImage.init("images/parallax/parallax5-5.png", 0.4),
-                ParallaxImage.init("images/parallax/parallax5-6.png", 0.7),
-                ParallaxImage.init("images/parallax/parallax5-7.png", 1.2),
+                ParallaxImage.init("/images/parallax/parallax5-1.png", 0.0),
+                ParallaxImage.init("/images/parallax/parallax5-2.png", 0.05),
+                ParallaxImage.init("/images/parallax/parallax5-3.png", 0.1),
+                ParallaxImage.init("/images/parallax/parallax5-4.png", 0.2),
+                ParallaxImage.init("/images/parallax/parallax5-5.png", 0.4),
+                ParallaxImage.init("/images/parallax/parallax5-6.png", 0.7),
+                ParallaxImage.init("/images/parallax/parallax5-7.png", 1.2),
             }),
         },
         .{
@@ -283,11 +283,11 @@ fn initParallaxSets(allocator: std.mem.Allocator) ![]ParallaxSet
                 .Color = try colorHexToVec4("#111111"),
             },
             .images = try allocator.dupe(ParallaxImage, &[_]ParallaxImage{
-                ParallaxImage.init("images/parallax/parallax6-1.png", 0.05),
-                ParallaxImage.init("images/parallax/parallax6-2.png", 0.1),
-                ParallaxImage.init("images/parallax/parallax6-3.png", 0.4),
-                ParallaxImage.init("images/parallax/parallax6-4.png", 0.7),
-                ParallaxImage.init("images/parallax/parallax6-5.png", 1.5),
+                ParallaxImage.init("/images/parallax/parallax6-1.png", 0.05),
+                ParallaxImage.init("/images/parallax/parallax6-2.png", 0.1),
+                ParallaxImage.init("/images/parallax/parallax6-3.png", 0.4),
+                ParallaxImage.init("/images/parallax/parallax6-4.png", 0.7),
+                ParallaxImage.init("/images/parallax/parallax6-5.png", 1.5),
             }),
         },
     });
@@ -331,6 +331,9 @@ fn stringToPage(uri: []const u8) !Page
     if (std.mem.eql(u8, uri, "/new")) {
         return Page.Home;
     }
+    if (std.mem.eql(u8, uri, "/new/halo")) {
+        return Page.Entry;
+    }
 
     return error.UnknownPage;
 }
@@ -350,6 +353,7 @@ const State = struct {
     activeParallaxSetIndex: usize,
     parallaxImageSets: []ParallaxSet,
     parallaxTX: f32,
+    parallaxIdleTimeMs: c_int,
 
     debug: bool,
 
@@ -380,6 +384,7 @@ const State = struct {
             .activeParallaxSetIndex = PARALLAX_SET_INDEX_START,
             .parallaxImageSets = try initParallaxSets(fbAllocator.allocator()),
             .parallaxTX = 0,
+            .parallaxIdleTimeMs = 0,
 
             .debug = false,
         };
@@ -505,6 +510,39 @@ fn buttonToClickType(button: c_int) ClickType
     };
 }
 
+fn tryLoadAndGetParallaxSet(state: *State, index: usize) ?ParallaxSet
+{
+    if (index >= state.parallaxImageSets.len) {
+        return null;
+    }
+
+    const parallaxSet = state.parallaxImageSets[index];
+    var loaded = true;
+    for (parallaxSet.images) |*parallaxImage| {
+        if (parallaxImage.assetId) |id| {
+            if (state.assets.getDynamicTextureData(id)) |parallaxTexData| {
+                if (!parallaxTexData.loaded()) {
+                    loaded = false;
+                    break;
+                }
+            } else {
+                std.log.err("Bad asset ID {}", .{id});
+            }
+        } else {
+            std.log.info("register", .{});
+            parallaxImage.assetId = state.assets.registerDynamicTexture(
+                parallaxImage.url, w.GL_CLAMP_TO_EDGE
+            ) catch |err| {
+                std.log.err("register texture error {}", .{err});
+                loaded = false;
+                break;
+            };
+        }
+    }
+
+    return if (loaded) parallaxSet else null;
+}
+
 export fn onMouseDown(button: c_int, x: c_int, y: c_int) void
 {
     std.log.info("onMouseDown {} ({},{})", .{button, x, y});
@@ -541,6 +579,9 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
         state.mouseState.numClickEvents = 0;
     }
 
+    var tempAllocatorObj = _memory.getTransientAllocator();
+    const tempAllocator = tempAllocatorObj.allocator();
+
     const screenSizeI = m.Vec2i.init(@intCast(i32, width), @intCast(i32, height));
     const screenSizeF = m.Vec2.initFromVec2i(screenSizeI);
     const halfScreenSizeF = m.Vec2.divScalar(screenSizeF, 2.0);
@@ -553,7 +594,6 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
 
     const deltaMs = if (state.timestampMsPrev > 0) (timestampMs - state.timestampMsPrev) else 0;
     const deltaS = @intToFloat(f32, deltaMs) / 1000.0;
-    _ = deltaS;
 
     var drawText = false;
     if (!m.Vec2i.eql(state.screenSizePrev, screenSizeI)) {
@@ -564,28 +604,18 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
         drawText = true;
     }
 
+    state.parallaxIdleTimeMs += deltaMs;
+
     // Determine whether the active parallax set is loaded
-    var activeParallaxSet = state.parallaxImageSets[state.activeParallaxSetIndex];
-    var parallaxSetLoaded = true;
-    for (activeParallaxSet.images) |*parallaxImage| {
-        if (parallaxImage.assetId) |id| {
-            if (state.assets.getDynamicTextureData(id)) |parallaxTexData| {
-                if (!parallaxTexData.loaded()) {
-                    parallaxSetLoaded = false;
-                    break;
-                }
-            } else {
-                std.log.err("Bad asset ID {}", .{id});
-            }
-        } else {
-            std.log.info("register", .{});
-            parallaxImage.assetId = state.assets.registerDynamicTexture(
-                parallaxImage.url, w.GL_CLAMP_TO_EDGE
-            ) catch |err| {
-                std.log.err("register texture error {}", .{err});
-                parallaxSetLoaded = false;
-                break;
-            };
+    var activeParallaxSet = tryLoadAndGetParallaxSet(state, state.activeParallaxSetIndex);
+    const parallaxSetSwapSeconds = 3600;
+    if (activeParallaxSet) |_| {
+        const nextSetIndex = (state.activeParallaxSetIndex + 1) % state.parallaxImageSets.len;
+        var nextParallaxSet = tryLoadAndGetParallaxSet(state, nextSetIndex);
+        if (nextParallaxSet != null and state.parallaxIdleTimeMs >= parallaxSetSwapSeconds * 1000) {
+            state.parallaxIdleTimeMs = 0;
+            state.activeParallaxSetIndex = nextSetIndex;
+            activeParallaxSet = nextParallaxSet;
         }
     }
 
@@ -625,14 +655,23 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
 
     w.glClear(w.GL_COLOR_BUFFER_BIT | w.GL_DEPTH_BUFFER_BIT);
 
-    const colorUi = m.Vec4.init(234.0 / 255.0, 1.0, 0.0, 1.0);
+    const colorUi = switch (state.page) {
+        .Home => m.Vec4.init(234.0 / 255.0, 1.0, 0.0, 1.0),
+        .Entry => m.Vec4.init(0.0, 220.0 / 255.0, 164.0 / 255.0, 1.0),
+    };
     const parallaxMotionMax = screenSizeF.x / 8.0;
 
-    const parallaxTXLerpSpeed = 0.1;
-    const tX = mousePosF.x / screenSizeF.x * 2.0 - 1.0; // -1 to 1
-    state.parallaxTX = m.lerpFloat(f32, state.parallaxTX, tX, parallaxTXLerpSpeed);
+    const targetParallaxTX = mousePosF.x / screenSizeF.x * 2.0 - 1.0; // -1 to 1
+    const parallaxTXMaxSpeed = 10.0;
+    const parallaxTXMaxDelta = parallaxTXMaxSpeed * deltaS;
+    const parallaxTXDelta = targetParallaxTX - state.parallaxTX;
+    if (std.math.absFloat(parallaxTXDelta) > 0.01) {
+        state.parallaxTX += std.math.clamp(
+            parallaxTXDelta, -parallaxTXMaxDelta, parallaxTXMaxDelta
+        );
+    }
 
-    if (parallaxSetLoaded) {
+    if (activeParallaxSet) |parallaxSet| {
         const landingImagePos = m.Vec2.init(
             marginX + gridSize * 1,
             gridSize * 2 + scrollYF
@@ -642,7 +681,7 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
             screenSizeF.y - gridSize * 3
         );
 
-        switch (activeParallaxSet.bgColor) {
+        switch (parallaxSet.bgColor) {
             .Color => |color| {
                 state.renderState.quadState.drawQuad(
                     landingImagePos, landingImageSize, 1.0, color, screenSizeF
@@ -658,32 +697,22 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
             },
         }
 
-        for (activeParallaxSet.images) |parallaxImage| {
+        for (parallaxSet.images) |parallaxImage| {
             const assetId = parallaxImage.assetId orelse continue;
             const textureData = state.assets.getDynamicTextureData(assetId) orelse continue;
             if (!textureData.loaded()) continue;
 
             const textureSizeF = m.Vec2.initFromVec2i(textureData.size);
             const scaledWidth = landingImageSize.y * textureSizeF.x / textureSizeF.y;
-            if (scaledWidth < landingImageSize.x) {
-                // hmm, unexpected
-                continue;
-            }
-
-            const fracX = landingImageSize.x / scaledWidth;
-            const uvOffset = m.Vec2.init(
-                (1.0 - fracX) / 2.0,
-                0.0
-            );
-            const uvSize = m.Vec2.init(fracX, 1.0);
+            const parallaxOffsetX = state.parallaxTX * parallaxMotionMax * parallaxImage.factor;
 
             const imgPos = m.Vec2.init(
-                landingImagePos.x + state.parallaxTX * parallaxMotionMax * parallaxImage.factor,
+                screenSizeF.x / 2.0 - scaledWidth / 2.0 + parallaxOffsetX,
                 landingImagePos.y
             );
-            state.renderState.quadTexState.drawQuadUvOffset(
-                imgPos, landingImageSize, 0.5, uvOffset, uvSize,
-                textureData.id, m.Vec4.one, screenSizeF
+            const imgSize = m.Vec2.init(scaledWidth, landingImageSize.y);
+            state.renderState.quadTexState.drawQuad(
+                imgPos, imgSize, 0.5, textureData.id, m.Vec4.one, screenSizeF
             );
         }
     } else {
@@ -722,7 +751,7 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
             );
             if (updateButton(iconPos, iconSizeF, state.mouseState, &mouseHoverGlobal)) {
                 const uri = switch (iconTexture) {
-                    .IconHome => "/",
+                    .IconHome => "/new",
                     else => continue,
                 };
                 ww.setUri(uri);
@@ -823,14 +852,11 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
             .Home => 3,
             .Entry => 6,
         };
-        const spacing: f32 = switch (state.page) {
-            .Home => gridSize,
-            .Entry => gridSize * 0.25,
-        };
+        const spacing = gridSize * 0.25;
         for (portfolio.PORTFOLIO_LIST) |pf, i| {
             const row = i / itemsPerRow;
             const col = i % itemsPerRow;
-            const itemWidth = totalWidth / @intToFloat(f32, itemsPerRow);
+            const itemWidth = (totalWidth - spacing * (@intToFloat(f32, itemsPerRow) - 1)) / @intToFloat(f32, itemsPerRow);
             const itemSize = m.Vec2.init(itemWidth, itemWidth * 0.5);
             const itemPos = m.Vec2.init(
                 marginX + gridSize * 5.5 + @intToFloat(f32, col) * (itemSize.x + spacing),
@@ -840,7 +866,14 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
                 itemPos, itemSize, 0, m.Vec4.init(0.5, 0.5, 0.5, 1.0), screenSizeF
             );
 
-            _ = pf;
+            if (updateButton(itemPos, itemSize, state.mouseState, &mouseHoverGlobal)) {
+                // const uri = std.fmt.allocPrint(tempAllocator, "/new/{s}", .{pf.uri}) catch |err| {
+                //     std.log.err("uri allocPrint failed, err {}", .{err});
+                //     continue;
+                // };
+                const uri = "/new/halo"; _ = pf; _ = tempAllocator;
+                ww.setUri(uri);
+            }
         }
     }
 

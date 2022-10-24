@@ -38,6 +38,11 @@ fn serverCallback(
 
     switch (request.method) {
         .Get => {
+            if (std.mem.eql(u8, request.uri, "/new") or std.mem.eql(u8, request.uri, "/new/halo")) {
+                try server.writeFileResponse(writer, "static/new/index.html", allocator);
+                return;
+            }
+
             var isPortfolioUri = false;
             for (portfolio.PORTFOLIO_LIST) |pf| {
                 if (request.uri.len < 1) {

@@ -38,6 +38,9 @@ function clearAllText() {
     Array.from(document.getElementsByClassName("_wasmTextOuter")).forEach(function(el) {
         el.remove();
     });
+    Array.from(document.getElementsByClassName("_wasmTextBox")).forEach(function(el) {
+        el.remove();
+    });
 }
 
 // there is a margin on the left of text boxes for some reason - return an estimate of that "gap"
@@ -363,7 +366,7 @@ function wasmInit()
         env: env,
     };
 
-    WebAssembly.instantiateStreaming(fetch("yorstory.wasm"), importObject).then(function(obj) {
+    WebAssembly.instantiateStreaming(fetch("/yorstory.wasm"), importObject).then(function(obj) {
         _wasmInstance = obj.instance;
         const pages = Math.round(_wasmInstance.exports.memory.buffer.byteLength / WASM_PAGE_SIZE);
         if (pages < memoryPages) {
