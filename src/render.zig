@@ -1,3 +1,5 @@
+const std = @import("std");
+
 const m = @import("math.zig");
 const w = @import("wasm_bindings.zig");
 
@@ -402,7 +404,7 @@ const RoundedFrameState = struct {
     scalePosUniLoc: c_int,
     framePosUniLoc: c_int,
     frameSizeUniLoc: c_int,
-    borderRadiusUniLoc: c_int,
+    cornerRadiusUniLoc: c_int,
     colorUniLoc: c_int,
     screenSizeUniLoc: c_int,
 
@@ -458,9 +460,9 @@ const RoundedFrameState = struct {
         if (frameSizeUniLoc == -1) {
             return error.MissingUniformLoc;
         }
-        const u_borderRadius = "u_borderRadius";
-        const borderRadiusUniLoc = w.glGetUniformLocation(programId, &u_borderRadius[0], u_borderRadius.len);
-        if (borderRadiusUniLoc == -1) {
+        const u_cornerRadius = "u_cornerRadius";
+        const cornerRadiusUniLoc = w.glGetUniformLocation(programId, &u_cornerRadius[0], u_cornerRadius.len);
+        if (cornerRadiusUniLoc == -1) {
             return error.MissingUniformLoc;
         }
         const u_color = "u_color";
@@ -485,7 +487,7 @@ const RoundedFrameState = struct {
             .scalePosUniLoc = scalePosUniLoc,
             .framePosUniLoc = framePosUniLoc,
             .frameSizeUniLoc = frameSizeUniLoc,
-            .borderRadiusUniLoc = borderRadiusUniLoc,
+            .cornerRadiusUniLoc = cornerRadiusUniLoc,
             .colorUniLoc = colorUniLoc,
             .screenSizeUniLoc = screenSizeUniLoc,
         };
@@ -498,7 +500,7 @@ const RoundedFrameState = struct {
         depth: f32,
         framePosPixels: m.Vec2,
         frameSizePixels: m.Vec2,
-        borderRadius: f32,
+        cornerRadius: f32,
         color: m.Vec4,
         screenSize: m.Vec2) void
     {
@@ -512,7 +514,7 @@ const RoundedFrameState = struct {
         w.glUniform2fv(self.scalePosUniLoc, scaleNdc.x, scaleNdc.y);
         w.glUniform2fv(self.framePosUniLoc, framePosPixels.x, framePosPixels.y);
         w.glUniform2fv(self.frameSizeUniLoc, frameSizePixels.x, frameSizePixels.y);
-        w.glUniform1fv(self.borderRadiusUniLoc, borderRadius);
+        w.glUniform1fv(self.cornerRadiusUniLoc, cornerRadius);
         w.glUniform4fv(self.colorUniLoc, color.x, color.y, color.z, color.w);
         w.glUniform2fv(self.screenSizeUniLoc, screenSize.x, screenSize.y);
 
@@ -526,14 +528,14 @@ const RoundedFrameState = struct {
         depth: f32,
         framePosPixels: m.Vec2,
         frameSizePixels: m.Vec2,
-        borderRadius: f32,
+        cornerRadius: f32,
         color: m.Vec4,
         screenSize: m.Vec2) void
     {
         const posNdc = posToNdc(m.Vec2, posPixels, screenSize);
         const scaleNdc = sizeToNdc(m.Vec2, scalePixels, screenSize);
         self.drawFrameNdc(
-            posNdc, scaleNdc, depth, framePosPixels, frameSizePixels, borderRadius,
+            posNdc, scaleNdc, depth, framePosPixels, frameSizePixels, cornerRadius,
             color, screenSize
         );
     }
@@ -560,5 +562,223 @@ pub const RenderState = struct {
         self.quadState.deinit();
         self.quadTexState.deinit();
         self.roundedFrameState.deinit();
+    }
+};
+
+fn colorToHexString(buf: []u8, color: m.Vec4) ![]u8
+{
+    // TODO custom byte color type?
+    const r = @floatToInt(u8, std.math.round(color.x * 255.0));
+    const g = @floatToInt(u8, std.math.round(color.y * 255.0));
+    const b = @floatToInt(u8, std.math.round(color.z * 255.0));
+    const a = @floatToInt(u8, std.math.round(color.w * 255.0));
+
+    return std.fmt.bufPrint(buf, "#{x:0>2}{x:0>2}{x:0>2}{x:0>2}", .{r, g, b, a});
+}
+
+const RenderEntryQuad = struct {
+    topLeft: m.Vec2,
+    size: m.Vec2,
+    depth: f32,
+    colorTL: m.Vec4,
+    colorTR: m.Vec4,
+    colorBL: m.Vec4,
+    colorBR: m.Vec4,
+};
+
+const RenderEntryQuadTex = struct {
+    topLeft: m.Vec2,
+    size: m.Vec2,
+    depth: f32,
+    uvOffset: m.Vec2,
+    uvScale: m.Vec2,
+    textureId: c_uint,
+    color: m.Vec4,
+};
+
+const RenderEntryRoundedFrame = struct {
+    topLeft: m.Vec2,
+    size: m.Vec2,
+    depth: f32,
+    frameTopLeft: m.Vec2,
+    frameSize: m.Vec2,
+    cornerRadius: f32,
+    color: m.Vec4,
+};
+
+const RenderEntryTextLine = struct {
+    text: []const u8,
+    topLeft: m.Vec2,
+    fontSize: f32,
+    letterSpacing: f32,
+    color: m.Vec4,
+    fontFamily: []const u8
+};
+
+const RenderEntryTextBox = struct {
+    text: []const u8,
+    topLeft: m.Vec2,
+    width: f32,
+    fontSize: f32,
+    lineHeight: f32,
+    letterSpacing: f32,
+    color: m.Vec4,
+    fontFamily: []const u8
+};
+
+fn posTopLeftToBottomLeft(pos: m.Vec2, size: m.Vec2, screenSize: m.Vec2, scrollY: f32) m.Vec2
+{
+    return m.Vec2.init(
+        pos.x,
+        screenSize.y - pos.y - size.y + scrollY,
+    );
+}
+
+pub const RenderQueue = struct
+{
+    quads: std.ArrayList(RenderEntryQuad),
+    quadTexs: std.ArrayList(RenderEntryQuadTex),
+    roundedFrames: std.ArrayList(RenderEntryRoundedFrame),
+    textLines: std.ArrayList(RenderEntryTextLine),
+    textBoxes: std.ArrayList(RenderEntryTextBox),
+
+    const Self = @This();
+
+    pub fn init(allocator: std.mem.Allocator) Self
+    {
+        return Self {
+            .quads = std.ArrayList(RenderEntryQuad).init(allocator),
+            .quadTexs = std.ArrayList(RenderEntryQuadTex).init(allocator),
+            .roundedFrames = std.ArrayList(RenderEntryRoundedFrame).init(allocator),
+            .textLines = std.ArrayList(RenderEntryTextLine).init(allocator),
+            .textBoxes = std.ArrayList(RenderEntryTextBox).init(allocator),
+        };
+    }
+
+    pub fn deinit(self: Self) void
+    {
+        self.quads.deinit();
+        self.quadTexs.deinit();
+        self.roundedFrames.deinit();
+        self.textLines.deinit();
+        self.textBoxes.deinit();
+    }
+
+    pub fn quadGradient(self: *Self, topLeft: m.Vec2, size: m.Vec2, depth: f32, colorTL: m.Vec4, colorTR: m.Vec4, colorBL: m.Vec4, colorBR: m.Vec4) void
+    {
+        (self.quads.addOne() catch return).* = RenderEntryQuad {
+            .topLeft = topLeft,
+            .size = size,
+            .depth = depth,
+            .colorTL = colorTL,
+            .colorTR = colorTR,
+            .colorBL = colorBL,
+            .colorBR = colorBR,
+        };
+    }
+
+    pub fn quad(self: *Self, topLeft: m.Vec2, size: m.Vec2, depth: f32, color: m.Vec4) void
+    {
+        self.quadGradient(topLeft, size, depth, color, color, color, color);
+    }
+
+    pub fn quadTexUvOffset(self: *Self, topLeft: m.Vec2, size: m.Vec2, depth: f32, uvOffset: m.Vec2, uvScale: m.Vec2, textureId: c_uint, color: m.Vec4) void
+    {
+        (self.quadTexs.addOne() catch return).* = RenderEntryQuadTex {
+            .topLeft = topLeft,
+            .size = size,
+            .depth = depth,
+            .uvOffset = uvOffset,
+            .uvScale = uvScale,
+            .textureId = textureId,
+            .color = color,
+        };
+    }
+
+    pub fn quadTex(self: *Self, topLeft: m.Vec2, size: m.Vec2, depth: f32, textureId: c_uint, color: m.Vec4) void
+    {
+        self.quadTexUvOffset(topLeft, size, depth, m.Vec2.zero, m.Vec2.one, textureId, color);
+    }
+
+    pub fn roundedFrame(self: *Self, topLeft: m.Vec2, size: m.Vec2, depth: f32, frameTopLeft: m.Vec2, frameSize: m.Vec2, cornerRadius: f32, color: m.Vec4) void
+    {
+        (self.roundedFrames.addOne() catch return).* = RenderEntryRoundedFrame {
+            .topLeft = topLeft,
+            .size = size,
+            .depth = depth,
+            .frameTopLeft = frameTopLeft,
+            .frameSize = frameSize,
+            .cornerRadius = cornerRadius,
+            .color = color,
+        };
+    }
+
+    pub fn textLine(self: *Self, text: []const u8, topLeft: m.Vec2, fontSize: f32, letterSpacing: f32, color: m.Vec4, fontFamily: []const u8) void
+    {
+        (self.textLines.addOne() catch return).* = RenderEntryTextLine {
+            .text = text,
+            .topLeft = topLeft,
+            .fontSize = fontSize,
+            .letterSpacing = letterSpacing,
+            .color = color,
+            .fontFamily = fontFamily,
+        };
+    }
+
+    pub fn textBox(self: *Self, text: []const u8, topLeft: m.Vec2, width: f32, fontSize: f32, lineHeight: f32, letterSpacing: f32, color: m.Vec4, fontFamily: []const u8) void
+    {
+        (self.textBoxes.addOne() catch return).* = RenderEntryTextBox {
+            .text = text,
+            .topLeft = topLeft,
+            .width = width,
+            .fontSize = fontSize,
+            .lineHeight = lineHeight,
+            .letterSpacing = letterSpacing,
+            .color = color,
+            .fontFamily = fontFamily,
+        };
+    }
+
+    pub fn renderShapes(self: Self, renderState: RenderState, screenSize: m.Vec2, scrollY: f32) void
+    {
+        for (self.quads.items) |e| {
+            const posBottomLeft = posTopLeftToBottomLeft(e.topLeft, e.size, screenSize, scrollY);
+            renderState.quadState.drawQuadGradient(posBottomLeft, e.size, e.depth, e.colorTL, e.colorTR, e.colorBL, e.colorBR, screenSize);
+        }
+        for (self.quadTexs.items) |e| {
+            const posBottomLeft = posTopLeftToBottomLeft(e.topLeft, e.size, screenSize, scrollY);
+            renderState.quadTexState.drawQuadUvOffset(posBottomLeft, e.size, e.depth, e.uvOffset, e.uvScale, e.textureId, e.color, screenSize);
+        }
+        for (self.roundedFrames.items) |e| {
+            const posBottomLeft = posTopLeftToBottomLeft(e.topLeft, e.size, screenSize, scrollY);
+            const frameBottomLeft = posTopLeftToBottomLeft(e.frameTopLeft, e.frameSize, screenSize, scrollY);
+            renderState.roundedFrameState.drawFrame(
+                posBottomLeft, e.size, e.depth, frameBottomLeft, e.frameSize, e.cornerRadius, e.color, screenSize
+            );
+        }
+    }
+
+    pub fn renderText(self: Self) void
+    {
+        var buf: [32]u8 = undefined;
+        for (self.textLines.items) |e| {
+            const hexColor = colorToHexString(&buf, e.color) catch continue;
+            w.addTextLine(
+                &e.text[0], e.text.len,
+                @floatToInt(c_int, e.topLeft.x), @floatToInt(c_int, e.topLeft.y),
+                @floatToInt(c_int, e.fontSize), e.letterSpacing,
+                &hexColor[0], hexColor.len, &e.fontFamily[0], e.fontFamily.len
+            );
+        }
+        for (self.textBoxes.items) |e| {
+            const hexColor = colorToHexString(&buf, e.color) catch continue;
+            w.addTextBox(
+                &e.text[0], e.text.len,
+                @floatToInt(c_int, e.topLeft.x), @floatToInt(c_int, e.topLeft.y),
+                @floatToInt(c_int, e.width),
+                @floatToInt(c_int, e.fontSize), @floatToInt(c_int, e.lineHeight), e.letterSpacing,
+                &hexColor[0], hexColor.len, &e.fontFamily[0], e.fontFamily.len
+            );
+        }
     }
 };

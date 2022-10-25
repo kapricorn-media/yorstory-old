@@ -156,15 +156,16 @@ const Assets = struct {
 };
 
 // return true when pressed
-fn updateButton(pos: m.Vec2, size: m.Vec2, mouseState: MouseState, mouseHoverGlobal: *bool) bool
+fn updateButton(topLeft: m.Vec2, size: m.Vec2, mouseState: MouseState, scrollY: f32, mouseHoverGlobal: *bool) bool
 {
     const mousePosF = m.Vec2.initFromVec2i(mouseState.pos);
-    if (m.isInsideRect(mousePosF, pos, size)) {
+    const topLeftScroll = m.Vec2.init(topLeft.x, topLeft.y - scrollY);
+    if (m.isInsideRect(mousePosF, topLeftScroll, size)) {
         mouseHoverGlobal.* = true;
         for (mouseState.clickEvents[0..mouseState.numClickEvents]) |clickEvent| {
             std.log.info("{}", .{clickEvent});
             const clickPosF = m.Vec2.initFromVec2i(clickEvent.pos);
-            if (!clickEvent.down and clickEvent.clickType == ClickType.Left and m.isInsideRect(clickPosF, pos, size)) {
+            if (!clickEvent.down and clickEvent.clickType == ClickType.Left and m.isInsideRect(clickPosF, topLeftScroll, size)) {
                 return true;
             }
         }
@@ -328,10 +329,10 @@ const Page = enum {
 
 fn stringToPage(uri: []const u8) !Page
 {
-    if (std.mem.eql(u8, uri, "/new")) {
+    if (std.mem.eql(u8, uri, "/")) {
         return Page.Home;
     }
-    if (std.mem.eql(u8, uri, "/new/halo")) {
+    if (std.mem.eql(u8, uri, "/halo")) {
         return Page.Entry;
     }
 
@@ -400,50 +401,6 @@ const State = struct {
         return self.fbAllocator.allocator();
     }
 };
-
-pub fn createTextLine(text: []const u8, topLeft: m.Vec2i, fontSize: i32, letterSpacing: f32,
-                      color: m.Vec4, fontFamily: []const u8) void
-{
-    // TODO custom byte color type?
-    const r = @floatToInt(u8, std.math.round(color.x * 255.0));
-    const g = @floatToInt(u8, std.math.round(color.y * 255.0));
-    const b = @floatToInt(u8, std.math.round(color.z * 255.0));
-    const a = @floatToInt(u8, std.math.round(color.w * 255.0));
-
-    var buf: [16]u8 = undefined;
-    const hexColor = std.fmt.bufPrint(
-        &buf, "#{x:0>2}{x:0>2}{x:0>2}{x:0>2}", .{r, g, b, a}
-    ) catch return;
-
-    w.addTextLine(
-        &text[0], text.len,
-        topLeft.x, topLeft.y, fontSize, letterSpacing,
-        &hexColor[0], hexColor.len,
-        &fontFamily[0], fontFamily.len
-    );
-}
-
-pub fn createTextBox(text: []const u8, topLeft: m.Vec2i, width: i32, fontSize: i32, lineHeight: i32,
-                     letterSpacing: f32, color: m.Vec4, fontFamily: []const u8) void
-{
-    // TODO custom byte color type?
-    const r = @floatToInt(u8, std.math.round(color.x * 255.0));
-    const g = @floatToInt(u8, std.math.round(color.y * 255.0));
-    const b = @floatToInt(u8, std.math.round(color.z * 255.0));
-    const a = @floatToInt(u8, std.math.round(color.w * 255.0));
-
-    var buf: [16]u8 = undefined;
-    const hexColor = std.fmt.bufPrint(
-        &buf, "#{x:0>2}{x:0>2}{x:0>2}{x:0>2}", .{r, g, b, a}
-    ) catch return;
-
-    w.addTextBox(
-        &text[0], text.len,
-        topLeft.x, topLeft.y, width, fontSize, lineHeight, letterSpacing,
-        &hexColor[0], hexColor.len,
-        &fontFamily[0], fontFamily.len
-    );
-}
 
 export fn onInit() void
 {
@@ -572,20 +529,21 @@ export fn onKeyDown(keyCode: c_int) void
 
 export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestampMs: c_int) c_int
 {
+    const screenSizeI = m.Vec2i.init(@intCast(i32, width), @intCast(i32, height));
+    const screenSizeF = m.Vec2.initFromVec2i(screenSizeI);
+
     var state = _memory.getState();
     defer {
         state.timestampMsPrev = timestampMs;
         state.scrollYPrev = scrollY;
+        state.screenSizePrev = screenSizeI;
         state.mouseState.numClickEvents = 0;
     }
 
     var tempAllocatorObj = _memory.getTransientAllocator();
     const tempAllocator = tempAllocatorObj.allocator();
 
-    const screenSizeI = m.Vec2i.init(@intCast(i32, width), @intCast(i32, height));
-    const screenSizeF = m.Vec2.initFromVec2i(screenSizeI);
-    const halfScreenSizeF = m.Vec2.divScalar(screenSizeF, 2.0);
-    _ = halfScreenSizeF;
+    var renderQueue = render.RenderQueue.init(tempAllocator);
 
     const scrollYF = @intToFloat(f32, scrollY);
 
@@ -597,8 +555,6 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
 
     var drawText = false;
     if (!m.Vec2i.eql(state.screenSizePrev, screenSizeI)) {
-        state.screenSizePrev = screenSizeI;
-
         std.log.info("resize, clearing text", .{});
         w.clearAllText();
         drawText = true;
@@ -608,7 +564,7 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
 
     // Determine whether the active parallax set is loaded
     var activeParallaxSet = tryLoadAndGetParallaxSet(state, state.activeParallaxSetIndex);
-    const parallaxSetSwapSeconds = 3600;
+    const parallaxSetSwapSeconds = 8;
     if (activeParallaxSet) |_| {
         const nextSetIndex = (state.activeParallaxSetIndex + 1) % state.parallaxImageSets.len;
         var nextParallaxSet = tryLoadAndGetParallaxSet(state, nextSetIndex);
@@ -632,15 +588,9 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
     const fontStickerSmallRefSize = 26;
     const fontTextRefSize = 30;
 
-    const fontStickerSize = @floatToInt(
-        i32, fontStickerRefSize / @intToFloat(f32, refSize.y) * screenSizeF.y
-    );
-    const fontStickerSmallSize = @floatToInt(
-        i32, fontStickerSmallRefSize / @intToFloat(f32, refSize.y) * screenSizeF.y
-    );
-    const fontTextSize = @floatToInt(
-        i32, fontTextRefSize / @intToFloat(f32, refSize.y) * screenSizeF.y
-    );
+    const fontStickerSize = fontStickerRefSize / @intToFloat(f32, refSize.y) * screenSizeF.y;
+    const fontStickerSmallSize = fontStickerSmallRefSize / @intToFloat(f32, refSize.y) * screenSizeF.y;
+    const fontTextSize = fontTextRefSize / @intToFloat(f32, refSize.y) * screenSizeF.y;
     const gridSize = std.math.round(
         @intToFloat(f32, gridRefSize) / @intToFloat(f32, refSize.y) * screenSizeF.y
     );
@@ -674,7 +624,7 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
     if (activeParallaxSet) |parallaxSet| {
         const landingImagePos = m.Vec2.init(
             marginX + gridSize * 1,
-            gridSize * 2 + scrollYF
+            gridSize * 1
         );
         const landingImageSize = m.Vec2.init(
             screenSizeF.x - marginX * 2 - gridSize * 2,
@@ -683,17 +633,13 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
 
         switch (parallaxSet.bgColor) {
             .Color => |color| {
-                state.renderState.quadState.drawQuad(
-                    landingImagePos, landingImageSize, 1.0, color, screenSizeF
-                );
+                renderQueue.quad(landingImagePos, landingImageSize, 1.0, color);
             },
             .Gradient => |gradient| {
-                state.renderState.quadState.drawQuadGradient(
+                renderQueue.quadGradient(
                     landingImagePos, landingImageSize, 1.0,
                     gradient.colorTop, gradient.colorTop,
-                    gradient.colorBottom, gradient.colorBottom,
-                    screenSizeF
-                );
+                    gradient.colorBottom, gradient.colorBottom);
             },
         }
 
@@ -711,9 +657,7 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
                 landingImagePos.y
             );
             const imgSize = m.Vec2.init(scaledWidth, landingImageSize.y);
-            state.renderState.quadTexState.drawQuad(
-                imgPos, imgSize, 0.5, textureData.id, m.Vec4.one, screenSizeF
-            );
+            renderQueue.quadTex(imgPos, imgSize, 0.5, textureData.id, m.Vec4.one);
         }
     } else {
         // render temp thingy
@@ -744,14 +688,14 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
             );
             const iconPos = m.Vec2.init(
                 marginX + gridSize * 5 + gridSize * 2.5 * iF,
-                screenSizeF.y - gridSize * 5 - iconSizeF.y + scrollYF,
+                gridSize * 5,
             );
-            state.renderState.quadTexState.drawQuad(
-                iconPos, iconSizeF, 0.0, textureData.id, m.Vec4.one, screenSizeF
+            renderQueue.quadTex(
+                iconPos, iconSizeF, 0.0, textureData.id, m.Vec4.one
             );
-            if (updateButton(iconPos, iconSizeF, state.mouseState, &mouseHoverGlobal)) {
+            if (updateButton(iconPos, iconSizeF, state.mouseState, scrollYF, &mouseHoverGlobal)) {
                 const uri = switch (iconTexture) {
-                    .IconHome => "/new",
+                    .IconHome => "/",
                     else => continue,
                 };
                 ww.setUri(uri);
@@ -767,114 +711,119 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
 
         const posTL = m.Vec2.init(
             marginX + decalMargin,
-            screenSizeF.y - decalMargin - decalSize.y + scrollYF,
+            decalMargin,
         );
         const uvOriginTL = m.Vec2.init(0, 0);
         const uvSizeTL = m.Vec2.init(1, 1);
-        state.renderState.quadTexState.drawQuadUvOffset(
-            posTL, decalSize, 0, uvOriginTL, uvSizeTL, decalTopLeft.id, colorUi, screenSizeF
+        renderQueue.quadTexUvOffset(
+            posTL, decalSize, 0, uvOriginTL, uvSizeTL, decalTopLeft.id, colorUi
         );
 
         const posBL = m.Vec2.init(
             marginX + decalMargin,
-            decalMargin + gridSize + scrollYF,
+            screenSizeF.y - decalMargin - decalSize.y,
         );
         const uvOriginBL = m.Vec2.init(0, 1);
         const uvSizeBL = m.Vec2.init(1, -1);
-        state.renderState.quadTexState.drawQuadUvOffset(
-            posBL, decalSize, 0, uvOriginBL, uvSizeBL, decalTopLeft.id, colorUi, screenSizeF
+        renderQueue.quadTexUvOffset(
+            posBL, decalSize, 0, uvOriginBL, uvSizeBL, decalTopLeft.id, colorUi
         );
 
         const posTR = m.Vec2.init(
             screenSizeF.x - marginX - decalMargin - decalSize.x,
-            screenSizeF.y - decalMargin - decalSize.y + scrollYF,
+            decalMargin,
         );
         const uvOriginTR = m.Vec2.init(1, 0);
         const uvSizeTR = m.Vec2.init(-1, 1);
-        state.renderState.quadTexState.drawQuadUvOffset(
-            posTR, decalSize, 0, uvOriginTR, uvSizeTR, decalTopLeft.id, colorUi, screenSizeF
+        renderQueue.quadTexUvOffset(
+            posTR, decalSize, 0, uvOriginTR, uvSizeTR, decalTopLeft.id, colorUi
         );
 
         const posBR = m.Vec2.init(
             screenSizeF.x - marginX - decalMargin - decalSize.x,
-            decalMargin + gridSize + scrollYF,
+            screenSizeF.y - decalMargin - decalSize.y,
         );
         const uvOriginBR = m.Vec2.init(1, 1);
         const uvSizeBR = m.Vec2.init(-1, -1);
-        state.renderState.quadTexState.drawQuadUvOffset(
-            posBR, decalSize, 0, uvOriginBR, uvSizeBR, decalTopLeft.id, colorUi, screenSizeF
+        renderQueue.quadTexUvOffset(
+            posBR, decalSize, 0, uvOriginBR, uvSizeBR, decalTopLeft.id, colorUi
         );
 
         // content page, 2 start
         const posContentTL = m.Vec2.init(
             marginX + decalMargin,
-            -gridSize * 3 - decalSize.y + scrollYF,
+            screenSizeF.y + gridSize * 3,
         );
-        state.renderState.quadTexState.drawQuadUvOffset(
-            posContentTL, decalSize, 0, uvOriginTL, uvSizeTL, decalTopLeft.id, colorUi, screenSizeF
+        renderQueue.quadTexUvOffset(
+            posContentTL, decalSize, 0, uvOriginTL, uvSizeTL, decalTopLeft.id, colorUi
         );
         const posContentTR = m.Vec2.init(
             screenSizeF.x - marginX - decalMargin - decalSize.x,
-            -gridSize * 3 - decalSize.y + scrollYF,
+            screenSizeF.y + gridSize * 3,
         );
-        state.renderState.quadTexState.drawQuadUvOffset(
-            posContentTR, decalSize, 0, uvOriginTR, uvSizeTR, decalTopLeft.id, colorUi, screenSizeF
+        renderQueue.quadTexUvOffset(
+            posContentTR, decalSize, 0, uvOriginTR, uvSizeTR, decalTopLeft.id, colorUi
         );
     }
 
     const stickerBackground = state.assets.getStaticTextureData(Texture.StickerBackgroundWithIcons);
     if (stickerBackground.loaded()) {
+        const stickerSize = m.Vec2.init(gridSize * 14.5, gridSize * 3);
         const stickerPos = m.Vec2.init(
             marginX + gridSize * 4.5,
-            gridSize * 6 + scrollYF
+            screenSizeF.y - gridSize * 6 - stickerSize.y
         );
-        const stickerSize = m.Vec2.init(gridSize * 14.5, gridSize * 3);
-        state.renderState.quadTexState.drawQuad(
-            stickerPos, stickerSize, 0, stickerBackground.id, colorUi, screenSizeF
+        renderQueue.quadTex(
+            stickerPos, stickerSize, 0, stickerBackground.id, colorUi
         );
     }
 
     // const colorWhite = m.Vec4.init(1.0, 1.0, 1.0, 1.0);
     const colorBlack = m.Vec4.init(0.0, 0.0, 0.0, 1.0);
 
-    const framePos = m.Vec2.init(marginX + gridSize, gridSize * 2);
+    const framePos = m.Vec2.init(marginX + gridSize * 1, gridSize * 1);
     const frameSize = m.Vec2.init(
         screenSizeF.x - marginX * 2 - gridSize * 2,
         screenSizeF.y - gridSize * 3 + scrollYF,
     );
-    state.renderState.roundedFrameState.drawFrame(
-        m.Vec2.zero, screenSizeF, 0, framePos, frameSize, 0.0, colorBlack, screenSizeF
-    );
+    renderQueue.roundedFrame(m.Vec2.zero, screenSizeF, 0, framePos, frameSize, 0.0, colorBlack);
 
-    { // grid
-        const totalWidth = screenSizeF.x - marginX * 2 - gridSize * 5.5 * 2;
-        const itemsPerRow: usize = switch (state.page) {
-            .Home => 3,
-            .Entry => 6,
-        };
-        const spacing = gridSize * 0.25;
-        for (portfolio.PORTFOLIO_LIST) |pf, i| {
-            const row = i / itemsPerRow;
-            const col = i % itemsPerRow;
-            const itemWidth = (totalWidth - spacing * (@intToFloat(f32, itemsPerRow) - 1)) / @intToFloat(f32, itemsPerRow);
-            const itemSize = m.Vec2.init(itemWidth, itemWidth * 0.5);
-            const itemPos = m.Vec2.init(
-                marginX + gridSize * 5.5 + @intToFloat(f32, col) * (itemSize.x + spacing),
-                -gridSize * 11 - itemSize.y - @intToFloat(f32, row) * (itemSize.y + spacing) + scrollYF,
-            );
-            state.renderState.quadState.drawQuad(
-                itemPos, itemSize, 0, m.Vec4.init(0.5, 0.5, 0.5, 1.0), screenSizeF
-            );
+    switch (state.page) {
+        .Home => {
+            const totalWidth = screenSizeF.x - marginX * 2 - gridSize * 5.5 * 2;
+            const itemsPerRow: usize = switch (state.page) {
+                .Home => 3,
+                .Entry => 6,
+            };
+            const spacing = gridSize * 0.25;
+            for (portfolio.PORTFOLIO_LIST) |pf, i| {
+                const row = i / itemsPerRow;
+                const col = i % itemsPerRow;
+                const itemWidth = (totalWidth - spacing * (@intToFloat(f32, itemsPerRow) - 1)) / @intToFloat(f32, itemsPerRow);
+                const itemSize = m.Vec2.init(itemWidth, itemWidth * 0.5);
+                const itemPos = m.Vec2.init(
+                    marginX + gridSize * 5.5 + @intToFloat(f32, col) * (itemSize.x + spacing),
+                    screenSizeF.y + gridSize * 12 + @intToFloat(f32, row) * (itemSize.y + spacing + gridSize * 2)
+                );
+                renderQueue.quad(
+                    itemPos, itemSize, 0, m.Vec4.init(0.5, 0.5, 0.5, 1.0)
+                );
 
-            if (updateButton(itemPos, itemSize, state.mouseState, &mouseHoverGlobal)) {
-                // const uri = std.fmt.allocPrint(tempAllocator, "/new/{s}", .{pf.uri}) catch |err| {
-                //     std.log.err("uri allocPrint failed, err {}", .{err});
-                //     continue;
-                // };
-                const uri = "/new/halo"; _ = pf; _ = tempAllocator;
-                ww.setUri(uri);
+                const textPos = m.Vec2.init(
+                    itemPos.x,
+                    itemPos.y + itemSize.y + gridSize * 1
+                );
+                renderQueue.textLine(
+                    pf.title, textPos, fontTextSize, 0.0, colorUi, "HelveticaBold"
+                );
+
+                if (updateButton(itemPos, itemSize, state.mouseState, scrollYF, &mouseHoverGlobal)) {
+                    ww.setUri(pf.uri);
+                }
             }
-        }
+        },
+        .Entry => {
+        },
     }
 
     if (drawText) {
@@ -883,80 +832,96 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
             .Home => "yorstory",
             .Entry => "HALO IV",
         };
-        const textStickerPos1 = m.Vec2i.init(
-            @floatToInt(i32, marginX + gridSize * 5.5),
-            screenSizeI.y - @floatToInt(i32, gridSize * 7.4)
+        const textStickerPos1 = m.Vec2.init(
+            marginX + gridSize * 5.5,
+            screenSizeF.y - gridSize * 7.4
         );
-        createTextLine(
+        renderQueue.textLine(
             stickerText,
             textStickerPos1, fontStickerSize, gridSize * -0.05,
-            colorBlack, "HelveticaBold",
+            colorBlack, "HelveticaBold"
         );
 
-        const textStickerPos2 = m.Vec2i.init(
-            @floatToInt(i32, marginX + gridSize * 5.5),
-            screenSizeI.y - @floatToInt(i32, gridSize * 6.5)
+        const textStickerPos2 = m.Vec2.init(
+            marginX + gridSize * 5.5,
+            screenSizeF.y - gridSize * 6.5
         );
-        createTextLine(
+        renderQueue.textLine(
             "A YORSTORY company © 2018-2022.",
             textStickerPos2, fontStickerSmallSize, 0.0,
             colorBlack, "HelveticaBold",
         );
 
-        const textStickerPos3 = m.Vec2i.init(
-            @floatToInt(i32, marginX + gridSize * 12),
-            screenSizeI.y - @floatToInt(i32, gridSize * 8.55)
+        const textStickerPos3 = m.Vec2.init(
+            marginX + gridSize * 12,
+            screenSizeF.y - gridSize * 8.55
         );
-        createTextBox(
+        renderQueue.textBox(
             "At Yorstory, alchemists and wizards fashion your story with style, light, and shadow.",
-            textStickerPos3, @floatToInt(i32, gridSize * 6),
+            textStickerPos3, gridSize * 6,
             fontStickerSmallSize, fontStickerSmallSize, 0.0,
             colorBlack, "HelveticaBold",
         );
 
         // sub-landing text
-        const lineHeight = @floatToInt(i32, @intToFloat(f32, fontTextSize) * 1.5);
-        const textSubLeftPos = m.Vec2i.init(
-            @floatToInt(i32, marginX + gridSize * 5.5),
-            screenSizeI.y
+        const lineHeight = fontTextSize * 1.5;
+        const textSubLeftPos = m.Vec2.init(
+            marginX + gridSize * 5.5,
+            screenSizeF.y
         );
-        createTextBox(
+        renderQueue.textBox(
             "Yorstory is a creative development studio specializing in sequential art. We are storytellers with over 20 years of experience in the Television, Film, and Video Game industries.",
-            textSubLeftPos, @floatToInt(i32, gridSize * 13),
+            textSubLeftPos, gridSize * 13,
             fontTextSize, lineHeight, 0.0,
             colorUi, "HelveticaMedium"
         );
-        const textSubRightPos = m.Vec2i.init(
-            @floatToInt(i32, marginX + gridSize * 19.5),
-            screenSizeI.y
+        const textSubRightPos = m.Vec2.init(
+            marginX + gridSize * 19.5,
+            screenSizeF.y
         );
-        createTextBox(
+        renderQueue.textBox(
             "Our diverse experience has given us an unparalleled understanding of multiple mediums, giving us the tools to create a cohesive, story-centric vision, along with the visuals needed to create a shared understanding between multiple deparments or disciplines.",
-            textSubRightPos, @floatToInt(i32, gridSize * 13),
+            textSubRightPos, gridSize * 13,
             fontTextSize, lineHeight, 0.0,
             colorUi, "HelveticaMedium"
         );
 
         // content section
-        const contentHeaderPos = m.Vec2i.init(
-            @floatToInt(i32, marginX + gridSize * 5.5),
-            @floatToInt(i32, screenSizeF.y + gridSize * 7.75),
+        const headerText = switch (state.page) {
+            .Home => "projects",
+            .Entry => "boarding the mechanics ***",
+        };
+        const subText = switch (state.page) {
+            .Home => "In alchemy, the term chrysopoeia (from Greek χρυσοποιία, khrusopoiia, \"gold-making\") refers to the artificial production of gold, most commonly by the alleged transmutation of base metals such as lead. A related term is argyropoeia (ἀργυροποιία, arguropoiia, \"silver-making\"), referring to the artificial production...",
+            .Entry => "In 2010, Yorstory partnered with Microsoft/343 Studios to join one of the video game industry's most iconic franchises - Halo. Working with the team's weapons and mission designers, we were tasked with helping visualize some of the game's weapons and idealized gameplay scenarios. The result was an exciting blend of enthusiasm sci-fi mayhem, starring the infamous Master Chief.",
+        };
+
+        const contentHeaderPos = m.Vec2.init(
+            marginX + gridSize * 5.5,
+            screenSizeF.y + gridSize * 7.75,
         );
-        createTextLine(
-            "projects", contentHeaderPos, fontStickerSize, 0.0, colorUi, "HelveticaBold"
+        renderQueue.textLine(
+            headerText,
+            contentHeaderPos, fontStickerSize, 0.0,
+            colorUi, "HelveticaBold"
         );
 
-        const contentSubPos = m.Vec2i.init(
-            @floatToInt(i32, marginX + gridSize * 5.5),
-            @floatToInt(i32, screenSizeF.y + gridSize * 9),
+        const contentSubPos = m.Vec2.init(
+            marginX + gridSize * 5.5,
+            screenSizeF.y + gridSize * 9,
         );
-        const contentSubWidth = @floatToInt(i32, screenSizeF.x - marginX * 2 - gridSize * 5.5 * 2);
-        createTextBox(
-            "In alchemy, the term chrysopoeia (from Greek χρυσοποιία, khrusopoiia, \"gold-making\") refers to the artificial production of gold, most commonly by the alleged transmutation of base metals such as lead. A related term is argyropoeia (ἀργυροποιία, arguropoiia, \"silver-making\"), referring to the artificial production...",
+        const contentSubWidth = screenSizeF.x - marginX * 2 - gridSize * 5.5 * 2;
+        renderQueue.textBox(
+            subText,
             contentSubPos, contentSubWidth,
             fontTextSize, lineHeight, 0.0,
             colorUi, "HelveticaMedium"
         );
+    }
+
+    renderQueue.renderShapes(state.renderState, screenSizeF, scrollYF);
+    if (drawText) {
+        renderQueue.renderText();
     }
 
     // TODO don't do all the time

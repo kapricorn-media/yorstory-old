@@ -322,7 +322,7 @@ function updateCanvasSize()
     console.log(`canvas resize: ${_canvas.width} x ${_canvas.height}`);
 }
 
-function wasmInit(wasmUri, memoryBytes)
+function wasmInit()
 {
     _canvas = document.getElementById("canvas");
     gl = _canvas.getContext("webgl") || _canvas.getContext("experimental-webgl");
@@ -330,17 +330,17 @@ function wasmInit(wasmUri, memoryBytes)
 
     document.addEventListener("mousemove", function(event) {
         if (_wasmInstance !== null) {
-            _wasmInstance.exports.onMouseMove(event.clientX, event.clientY);
+            _wasmInstance.exports.onMouseMove(event.clientX, window.innerHeight - event.clientY);
         }
     });
     document.addEventListener("mousedown", function(event) {
         if (_wasmInstance !== null) {
-            _wasmInstance.exports.onMouseDown(event.button, event.clientX, event.clientY);
+            _wasmInstance.exports.onMouseDown(event.button, event.clientX, window.innerHeight - event.clientY);
         }
     });
     document.addEventListener("mouseup", function(event) {
         if (_wasmInstance !== null) {
-            _wasmInstance.exports.onMouseUp(event.button, event.clientX, event.clientY);
+            _wasmInstance.exports.onMouseUp(event.button, event.clientX, window.innerHeight - event.clientY);
         }
     });
     document.addEventListener("keydown", function(event) {
@@ -354,6 +354,7 @@ function wasmInit(wasmUri, memoryBytes)
     });
 
     const WASM_PAGE_SIZE = 64 * 1024;
+    const memoryBytes = 512 * 1024;
     const memoryPages = Math.ceil(memoryBytes / WASM_PAGE_SIZE);
     // _memory = new WebAssembly.Memory({
     //     initial: memoryPages,
@@ -365,7 +366,7 @@ function wasmInit(wasmUri, memoryBytes)
         env: env,
     };
 
-    WebAssembly.instantiateStreaming(fetch(wasmUri), importObject).then(function(obj) {
+    WebAssembly.instantiateStreaming(fetch("/yorstory.wasm"), importObject).then(function(obj) {
         _wasmInstance = obj.instance;
         const pages = Math.round(_wasmInstance.exports.memory.buffer.byteLength / WASM_PAGE_SIZE);
         if (pages < memoryPages) {

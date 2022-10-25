@@ -5,7 +5,7 @@ varying highp vec2 v_size;
 
 uniform vec2 u_framePos;
 uniform vec2 u_frameSize;
-uniform float u_borderRadius;
+uniform float u_cornerRadius;
 uniform vec4 u_color;
 uniform vec2 u_screenSize;
 

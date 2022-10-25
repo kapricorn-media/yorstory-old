@@ -38,8 +38,8 @@ fn serverCallback(
 
     switch (request.method) {
         .Get => {
-            if (std.mem.eql(u8, request.uri, "/new") or std.mem.eql(u8, request.uri, "/new/halo")) {
-                try server.writeFileResponse(writer, "static/new/index.html", allocator);
+            if (std.mem.eql(u8, request.uri, "/") or std.mem.eql(u8, request.uri, "/halo")) {
+                try server.writeFileResponse(writer, "static/wasm.html", allocator);
                 return;
             }
 
