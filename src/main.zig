@@ -68,6 +68,7 @@ const Texture = enum(usize) {
     IconPortfolio,
     IconWork,
     StickerBackgroundWithIcons,
+    StickerNumber,
 };
 
 const TextureData = struct {
@@ -102,10 +103,11 @@ const Assets = struct {
     staticTextures: [numStaticTextures]TextureData,
     numDynamicTextures: usize,
     dynamicTextures: [maxDynamicTextures]TextureData,
+    idMap: std.StringHashMap(usize),
 
     const Self = @This();
 
-    fn init() !Self
+    fn init(allocator: std.mem.Allocator) !Self
     {
         var self: Self = undefined;
         self.staticTextures[@enumToInt(Texture.DecalTopLeft)] = try TextureData.init(
@@ -126,7 +128,11 @@ const Assets = struct {
         self.staticTextures[@enumToInt(Texture.StickerBackgroundWithIcons)] = try TextureData.init(
             "/images/sticker-background-white.png", w.GL_CLAMP_TO_EDGE
         );
+        self.staticTextures[@enumToInt(Texture.StickerNumber)] = try TextureData.init(
+            "/images/sticker-number.png", w.GL_CLAMP_TO_EDGE
+        );
         self.numDynamicTextures = 0;
+        self.idMap = std.StringHashMap(usize).init(allocator);
         return self;
     }
 
@@ -143,13 +149,23 @@ const Assets = struct {
         return self.dynamicTextures[id];
     }
 
+    fn getDynamicTextureDataUri(self: Self, uri: []const u8) ?TextureData
+    {
+        const id = self.idMap.get(uri) orelse return null;
+        return self.getDynamicTextureData(id);
+    }
+
     fn registerDynamicTexture(self: *Self, url: []const u8, wrapMode: c_uint) !usize
     {
         if (self.numDynamicTextures >= self.dynamicTextures.len) {
             return error.FullDynamicTextures;
         }
+
         const id = self.numDynamicTextures;
         self.dynamicTextures[id] = try TextureData.init(url, wrapMode);
+
+        try self.idMap.put(url, id);
+
         self.numDynamicTextures += 1;
         return id;
     }
@@ -322,20 +338,34 @@ const MouseState = struct {
     }
 };
 
-const Page = enum {
+const PageType = enum {
     Home,
     Entry,
 };
 
-fn stringToPage(uri: []const u8) !Page
+const PageData = union(PageType) {
+    Home: void,
+    Entry: struct {
+        portfolioIndex: usize,
+    },
+};
+
+fn uriToPageData(uri: []const u8) !PageData
 {
     if (std.mem.eql(u8, uri, "/")) {
-        return Page.Home;
+        return PageData {
+            .Home = {},
+        };
     }
-    if (std.mem.eql(u8, uri, "/halo")) {
-        return Page.Entry;
+    for (portfolio.PORTFOLIO_LIST) |pf, i| {
+        if (std.mem.eql(u8, uri, pf.uri)) {
+            return PageData {
+                .Entry = .{
+                    .portfolioIndex = i,
+                }
+            };
+        }
     }
-
     return error.UnknownPage;
 }
 
@@ -346,7 +376,7 @@ const State = struct {
 
     assets: Assets,
 
-    page: Page,
+    pageData: PageData,
     screenSizePrev: m.Vec2i,
     scrollYPrev: c_int,
     timestampMsPrev: c_int,
@@ -366,7 +396,7 @@ const State = struct {
         }
     }
 
-    pub fn init(buf: []u8, page: Page) !Self
+    pub fn init(buf: []u8, uri: []const u8) !Self
     {
         var fbAllocator = std.heap.FixedBufferAllocator.init(buf);
 
@@ -375,9 +405,9 @@ const State = struct {
 
             .renderState = try render.RenderState.init(),
 
-            .assets = try Assets.init(),
+            .assets = try Assets.init(fbAllocator.allocator()),
 
-            .page = page,
+            .pageData = try uriToPageData(uri),
             .screenSizePrev = m.Vec2i.zero,
             .scrollYPrev = -1,
             .timestampMsPrev = 0,
@@ -413,15 +443,11 @@ export fn onInit() void
 
     var buf: [64]u8 = undefined;
     const uriLen = ww.getUri(&buf);
-    const pageString = buf[0..uriLen];
-    const page = stringToPage(pageString) catch |err| {
-        std.log.err("Failed to get site page from string {s}, err {}", .{pageString, err});
-        return;
-    };
+    const uri = buf[0..uriLen];
 
     var state = _memory.getState();
     var remaining = _memory.persistent[@sizeOf(State)..];
-    state.* = State.init(remaining, page) catch |err| {
+    state.* = State.init(remaining, uri) catch |err| {
         std.log.err("State init failed, err {}", .{err});
         return;
     };
@@ -486,7 +512,6 @@ fn tryLoadAndGetParallaxSet(state: *State, index: usize) ?ParallaxSet
                 std.log.err("Bad asset ID {}", .{id});
             }
         } else {
-            std.log.info("register", .{});
             parallaxImage.assetId = state.assets.registerDynamicTexture(
                 parallaxImage.url, w.GL_CLAMP_TO_EDGE
             ) catch |err| {
@@ -498,6 +523,58 @@ fn tryLoadAndGetParallaxSet(state: *State, index: usize) ?ParallaxSet
     }
 
     return if (loaded) parallaxSet else null;
+}
+
+const GridImage = struct {
+    uri: []const u8,
+    title: ?[]const u8,
+    goToUri: ?[]const u8,
+};
+
+fn drawImageGrid(images: []const GridImage, itemsPerRow: usize, topLeft: m.Vec2, width: f32, spacing: f32, fontSize: f32, fontColor: m.Vec4, mouseState: MouseState, scrollY: f32, mouseHoverGlobal: *bool, assets: *Assets, renderQueue: *render.RenderQueue, callback: fn(GridImage) void) f32
+{
+    const itemWidth = (width - spacing * (@intToFloat(f32, itemsPerRow) - 1)) / @intToFloat(f32, itemsPerRow);
+    const itemSize = m.Vec2.init(itemWidth, itemWidth * 0.5);
+
+    for (images) |img, i| {
+        const rowF = @intToFloat(f32, i / itemsPerRow);
+        const colF = @intToFloat(f32, i % itemsPerRow);
+        const spacingY = if (img.title) |_| spacing * 4 else spacing;
+        const itemPos = m.Vec2.init(
+            topLeft.x + colF * (itemSize.x + spacing),
+            topLeft.y + rowF * (itemSize.y + spacingY)
+        );
+        if (assets.getDynamicTextureDataUri(img.uri)) |tex| {
+            if (tex.loaded()) {
+                renderQueue.quadTex(
+                    itemPos, itemSize, 0, tex.id, m.Vec4.one
+                );
+            }
+        } else {
+            _ = assets.registerDynamicTexture(img.uri, w.GL_CLAMP_TO_EDGE) catch |err| {
+                std.log.err("failed to register {s}, err {}", .{img.uri, err});
+                return 0;
+            };
+        }
+
+        if (img.title) |title| {
+            const textPos = m.Vec2.init(
+                itemPos.x,
+                itemPos.y + itemSize.y + spacing * 2
+            );
+            renderQueue.textLine(
+                title, textPos, fontSize, 0.0, fontColor, "HelveticaBold"
+            );
+        }
+
+        if (updateButton(itemPos, itemSize, mouseState, scrollY, mouseHoverGlobal)) {
+            callback(img);
+            // ww.setUri(img.uri);
+        }
+    }
+
+    // TODO doesn't work with titles
+    return @intToFloat(f32, ((images.len - 1) / itemsPerRow) + 1) * (itemSize.y + spacing);
 }
 
 export fn onMouseDown(button: c_int, x: c_int, y: c_int) void
@@ -553,27 +630,8 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
     const deltaMs = if (state.timestampMsPrev > 0) (timestampMs - state.timestampMsPrev) else 0;
     const deltaS = @intToFloat(f32, deltaMs) / 1000.0;
 
-    var drawText = false;
-    if (!m.Vec2i.eql(state.screenSizePrev, screenSizeI)) {
-        std.log.info("resize, clearing text", .{});
-        w.clearAllText();
-        drawText = true;
-    }
 
     state.parallaxIdleTimeMs += deltaMs;
-
-    // Determine whether the active parallax set is loaded
-    var activeParallaxSet = tryLoadAndGetParallaxSet(state, state.activeParallaxSetIndex);
-    const parallaxSetSwapSeconds = 8;
-    if (activeParallaxSet) |_| {
-        const nextSetIndex = (state.activeParallaxSetIndex + 1) % state.parallaxImageSets.len;
-        var nextParallaxSet = tryLoadAndGetParallaxSet(state, nextSetIndex);
-        if (nextParallaxSet != null and state.parallaxIdleTimeMs >= parallaxSetSwapSeconds * 1000) {
-            state.parallaxIdleTimeMs = 0;
-            state.activeParallaxSetIndex = nextSetIndex;
-            activeParallaxSet = nextParallaxSet;
-        }
-    }
 
     if (state.scrollYPrev != scrollY) {
     }
@@ -584,13 +642,11 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
 
     const refSize = m.Vec2i.init(3840, 2000);
     const gridRefSize = 80;
-    const fontStickerRefSize = 124;
-    const fontStickerSmallRefSize = 26;
-    const fontTextRefSize = 30;
 
-    const fontStickerSize = fontStickerRefSize / @intToFloat(f32, refSize.y) * screenSizeF.y;
-    const fontStickerSmallSize = fontStickerSmallRefSize / @intToFloat(f32, refSize.y) * screenSizeF.y;
-    const fontTextSize = fontTextRefSize / @intToFloat(f32, refSize.y) * screenSizeF.y;
+    const fontStickerSize = 124 / @intToFloat(f32, refSize.y) * screenSizeF.y;
+    const fontStickerSmallSize = 26 / @intToFloat(f32, refSize.y) * screenSizeF.y;
+    const fontSubtitleSize = 84 / @intToFloat(f32, refSize.y) * screenSizeF.y;
+    const fontTextSize = 30 / @intToFloat(f32, refSize.y) * screenSizeF.y;
     const gridSize = std.math.round(
         @intToFloat(f32, gridRefSize) / @intToFloat(f32, refSize.y) * screenSizeF.y
     );
@@ -605,62 +661,92 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
 
     w.glClear(w.GL_COLOR_BUFFER_BIT | w.GL_DEPTH_BUFFER_BIT);
 
-    const colorUi = switch (state.page) {
+    // const colorWhite = m.Vec4.init(1.0, 1.0, 1.0, 1.0);
+    const colorBlack = m.Vec4.init(0.0, 0.0, 0.0, 1.0);
+    const colorUi = switch (state.pageData) {
         .Home => m.Vec4.init(234.0 / 255.0, 1.0, 0.0, 1.0),
         .Entry => m.Vec4.init(0.0, 220.0 / 255.0, 164.0 / 255.0, 1.0),
     };
     const parallaxMotionMax = screenSizeF.x / 8.0;
 
-    const targetParallaxTX = mousePosF.x / screenSizeF.x * 2.0 - 1.0; // -1 to 1
-    const parallaxTXMaxSpeed = 10.0;
-    const parallaxTXMaxDelta = parallaxTXMaxSpeed * deltaS;
-    const parallaxTXDelta = targetParallaxTX - state.parallaxTX;
-    if (std.math.absFloat(parallaxTXDelta) > 0.01) {
-        state.parallaxTX += std.math.clamp(
-            parallaxTXDelta, -parallaxTXMaxDelta, parallaxTXMaxDelta
-        );
-    }
+    const landingImagePos = m.Vec2.init(
+        marginX + gridSize * 1,
+        gridSize * 1
+    );
+    const landingImageSize = m.Vec2.init(
+        screenSizeF.x - marginX * 2 - gridSize * 2,
+        screenSizeF.y - gridSize * 3
+    );
+    switch (state.pageData) {
+        .Home => {
+            // Determine whether the active parallax set is loaded
+            var activeParallaxSet = tryLoadAndGetParallaxSet(state, state.activeParallaxSetIndex);
+            const parallaxSetSwapSeconds = 8;
+            if (activeParallaxSet) |_| {
+                const nextSetIndex = (state.activeParallaxSetIndex + 1) % state.parallaxImageSets.len;
+                var nextParallaxSet = tryLoadAndGetParallaxSet(state, nextSetIndex);
+                if (nextParallaxSet != null and state.parallaxIdleTimeMs >= parallaxSetSwapSeconds * 1000) {
+                    state.parallaxIdleTimeMs = 0;
+                    state.activeParallaxSetIndex = nextSetIndex;
+                    activeParallaxSet = nextParallaxSet;
+                }
+            }
 
-    if (activeParallaxSet) |parallaxSet| {
-        const landingImagePos = m.Vec2.init(
-            marginX + gridSize * 1,
-            gridSize * 1
-        );
-        const landingImageSize = m.Vec2.init(
-            screenSizeF.x - marginX * 2 - gridSize * 2,
-            screenSizeF.y - gridSize * 3
-        );
+            const targetParallaxTX = mousePosF.x / screenSizeF.x * 2.0 - 1.0; // -1 to 1
+            const parallaxTXMaxSpeed = 10.0;
+            const parallaxTXMaxDelta = parallaxTXMaxSpeed * deltaS;
+            const parallaxTXDelta = targetParallaxTX - state.parallaxTX;
+            if (std.math.absFloat(parallaxTXDelta) > 0.01) {
+                state.parallaxTX += std.math.clamp(
+                    parallaxTXDelta, -parallaxTXMaxDelta, parallaxTXMaxDelta
+                );
+            }
 
-        switch (parallaxSet.bgColor) {
-            .Color => |color| {
-                renderQueue.quad(landingImagePos, landingImageSize, 1.0, color);
-            },
-            .Gradient => |gradient| {
-                renderQueue.quadGradient(
-                    landingImagePos, landingImageSize, 1.0,
-                    gradient.colorTop, gradient.colorTop,
-                    gradient.colorBottom, gradient.colorBottom);
-            },
-        }
+            if (activeParallaxSet) |parallaxSet| {
+                switch (parallaxSet.bgColor) {
+                    .Color => |color| {
+                        renderQueue.quad(landingImagePos, landingImageSize, 1.0, color);
+                    },
+                    .Gradient => |gradient| {
+                        renderQueue.quadGradient(
+                            landingImagePos, landingImageSize, 1.0,
+                            gradient.colorTop, gradient.colorTop,
+                            gradient.colorBottom, gradient.colorBottom);
+                    },
+                }
 
-        for (parallaxSet.images) |parallaxImage| {
-            const assetId = parallaxImage.assetId orelse continue;
-            const textureData = state.assets.getDynamicTextureData(assetId) orelse continue;
-            if (!textureData.loaded()) continue;
+                for (parallaxSet.images) |parallaxImage| {
+                    const assetId = parallaxImage.assetId orelse continue;
+                    const textureData = state.assets.getDynamicTextureData(assetId) orelse continue;
+                    if (!textureData.loaded()) continue;
 
-            const textureSizeF = m.Vec2.initFromVec2i(textureData.size);
-            const scaledWidth = landingImageSize.y * textureSizeF.x / textureSizeF.y;
-            const parallaxOffsetX = state.parallaxTX * parallaxMotionMax * parallaxImage.factor;
+                    const textureSizeF = m.Vec2.initFromVec2i(textureData.size);
+                    const scaledWidth = landingImageSize.y * textureSizeF.x / textureSizeF.y;
+                    const parallaxOffsetX = state.parallaxTX * parallaxMotionMax * parallaxImage.factor;
 
-            const imgPos = m.Vec2.init(
-                screenSizeF.x / 2.0 - scaledWidth / 2.0 + parallaxOffsetX,
-                landingImagePos.y
-            );
-            const imgSize = m.Vec2.init(scaledWidth, landingImageSize.y);
-            renderQueue.quadTex(imgPos, imgSize, 0.5, textureData.id, m.Vec4.one);
-        }
-    } else {
-        // render temp thingy
+                    const imgPos = m.Vec2.init(
+                        screenSizeF.x / 2.0 - scaledWidth / 2.0 + parallaxOffsetX,
+                        landingImagePos.y
+                    );
+                    const imgSize = m.Vec2.init(scaledWidth, landingImageSize.y);
+                    renderQueue.quadTex(imgPos, imgSize, 0.5, textureData.id, m.Vec4.one);
+                }
+            } else {
+                // render temp thingy
+            }
+        },
+        .Entry => |entryData| {
+            const pf = portfolio.PORTFOLIO_LIST[entryData.portfolioIndex];
+            if (state.assets.getDynamicTextureDataUri(pf.landing)) |landingTex| {
+                if (landingTex.loaded()) {
+                    renderQueue.quadTex(landingImagePos, landingImageSize, 1.0, landingTex.id, m.Vec4.one);
+                }
+            } else {
+                _ = state.assets.registerDynamicTexture(pf.landing, w.GL_CLAMP_TO_EDGE) catch |err| {
+                    std.log.err("register failed for {s} error {}", .{pf.landing, err});
+                };
+            }
+        },
     }
 
     const iconTextures = [_]Texture {
@@ -766,6 +852,7 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
         );
     }
 
+    // sticker
     const stickerBackground = state.assets.getStaticTextureData(Texture.StickerBackgroundWithIcons);
     if (stickerBackground.loaded()) {
         const stickerSize = m.Vec2.init(gridSize * 14.5, gridSize * 3);
@@ -778,8 +865,40 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
         );
     }
 
-    // const colorWhite = m.Vec4.init(1.0, 1.0, 1.0, 1.0);
-    const colorBlack = m.Vec4.init(0.0, 0.0, 0.0, 1.0);
+    const stickerText = switch (state.pageData) {
+        .Home => "yorstory",
+        .Entry => "HALO IV",
+    };
+    const textStickerPos1 = m.Vec2.init(
+        marginX + gridSize * 5.5,
+        screenSizeF.y - gridSize * 7.4
+    );
+    renderQueue.textLine(
+        stickerText,
+        textStickerPos1, fontStickerSize, gridSize * -0.05,
+        colorBlack, "HelveticaBold"
+    );
+
+    const textStickerPos2 = m.Vec2.init(
+        marginX + gridSize * 5.5,
+        screenSizeF.y - gridSize * 6.5
+    );
+    renderQueue.textLine(
+        "A YORSTORY company © 2018-2022.",
+        textStickerPos2, fontStickerSmallSize, 0.0,
+        colorBlack, "HelveticaBold",
+    );
+
+    const textStickerPos3 = m.Vec2.init(
+        marginX + gridSize * 12,
+        screenSizeF.y - gridSize * 8.55
+    );
+    renderQueue.textBox(
+        "At Yorstory, alchemists and wizards fashion your story with style, light, and shadow.",
+        textStickerPos3, gridSize * 6,
+        fontStickerSmallSize, fontStickerSmallSize, 0.0,
+        colorBlack, "HelveticaBold",
+    );
 
     const framePos = m.Vec2.init(marginX + gridSize * 1, gridSize * 1);
     const frameSize = m.Vec2.init(
@@ -788,139 +907,162 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
     );
     renderQueue.roundedFrame(m.Vec2.zero, screenSizeF, 0, framePos, frameSize, 0.0, colorBlack);
 
-    switch (state.page) {
-        .Home => {
-            const totalWidth = screenSizeF.x - marginX * 2 - gridSize * 5.5 * 2;
-            const itemsPerRow: usize = switch (state.page) {
-                .Home => 3,
-                .Entry => 6,
-            };
-            const spacing = gridSize * 0.25;
-            for (portfolio.PORTFOLIO_LIST) |pf, i| {
-                const row = i / itemsPerRow;
-                const col = i % itemsPerRow;
-                const itemWidth = (totalWidth - spacing * (@intToFloat(f32, itemsPerRow) - 1)) / @intToFloat(f32, itemsPerRow);
-                const itemSize = m.Vec2.init(itemWidth, itemWidth * 0.5);
-                const itemPos = m.Vec2.init(
-                    marginX + gridSize * 5.5 + @intToFloat(f32, col) * (itemSize.x + spacing),
-                    screenSizeF.y + gridSize * 12 + @intToFloat(f32, row) * (itemSize.y + spacing + gridSize * 2)
-                );
-                renderQueue.quad(
-                    itemPos, itemSize, 0, m.Vec4.init(0.5, 0.5, 0.5, 1.0)
-                );
+    // sub-landing text
+    const lineHeight = fontTextSize * 1.5;
+    const textSubLeftPos = m.Vec2.init(
+        marginX + gridSize * 5.5,
+        screenSizeF.y
+    );
+    renderQueue.textBox(
+        "Yorstory is a creative development studio specializing in sequential art. We are storytellers with over 20 years of experience in the Television, Film, and Video Game industries.",
+        textSubLeftPos, gridSize * 13,
+        fontTextSize, lineHeight, 0.0,
+        colorUi, "HelveticaMedium"
+    );
+    const textSubRightPos = m.Vec2.init(
+        marginX + gridSize * 19.5,
+        screenSizeF.y
+    );
+    renderQueue.textBox(
+        "Our diverse experience has given us an unparalleled understanding of multiple mediums, giving us the tools to create a cohesive, story-centric vision, along with the visuals needed to create a shared understanding between multiple deparments or disciplines.",
+        textSubRightPos, gridSize * 13,
+        fontTextSize, lineHeight, 0.0,
+        colorUi, "HelveticaMedium"
+    );
 
-                const textPos = m.Vec2.init(
-                    itemPos.x,
-                    itemPos.y + itemSize.y + gridSize * 1
+    // content section
+    const headerText = switch (state.pageData) {
+        .Home => "projects",
+        .Entry => "boarding the mechanics ***",
+    };
+    const subText = switch (state.pageData) {
+        .Home => "In alchemy, the term chrysopoeia (from Greek χρυσοποιία, khrusopoiia, \"gold-making\") refers to the artificial production of gold, most commonly by the alleged transmutation of base metals such as lead. A related term is argyropoeia (ἀργυροποιία, arguropoiia, \"silver-making\"), referring to the artificial production...",
+        .Entry => "In 2010, Yorstory partnered with Microsoft/343 Studios to join one of the video game industry's most iconic franchises - Halo. Working with the team's weapons and mission designers, we were tasked with helping visualize some of the game's weapons and idealized gameplay scenarios. The result was an exciting blend of enthusiasm sci-fi mayhem, starring the infamous Master Chief.",
+    };
+
+    const contentHeaderPos = m.Vec2.init(
+        marginX + gridSize * 5.5,
+        screenSizeF.y + gridSize * 7.75,
+    );
+    renderQueue.textLine(
+        headerText,
+        contentHeaderPos, fontStickerSize, 0.0,
+        colorUi, "HelveticaBold"
+    );
+
+    const contentSubPos = m.Vec2.init(
+        marginX + gridSize * 5.5,
+        screenSizeF.y + gridSize * 9,
+    );
+    const contentSubWidth = screenSizeF.x - marginX * 2 - gridSize * 5.5 * 2;
+    renderQueue.textBox(
+        subText,
+        contentSubPos, contentSubWidth,
+        fontTextSize, lineHeight, 0.0,
+        colorUi, "HelveticaMedium"
+    );
+
+    const CB = struct {
+        fn home(image: GridImage) void
+        {
+            if (image.goToUri) |uri| {
+                ww.setUri(uri);
+            }
+        }
+
+        fn entry(image: GridImage) void
+        {
+            _ = image;
+        }
+    };
+
+    var yMax: f32 = 0;
+    switch (state.pageData) {
+        .Home => {
+            var images = std.ArrayList(GridImage).init(tempAllocator);
+            for (portfolio.PORTFOLIO_LIST) |pf| {
+                images.append(GridImage {
+                    .uri = pf.cover,
+                    .title = pf.title,
+                    .goToUri = pf.uri,
+                }) catch |err| {
+                    std.log.err("image append failed {}", .{err});
+                };
+            }
+
+            const itemsPerRow = 3;
+            const topLeft = m.Vec2.init(
+                marginX + gridSize * 5.5,
+                screenSizeF.y + gridSize * 12,
+            );
+            const spacing = gridSize * 0.25;
+            const y = drawImageGrid(images.items, itemsPerRow, topLeft, contentSubWidth, spacing, fontTextSize, colorUi, state.mouseState, scrollYF, &mouseHoverGlobal, &state.assets, &renderQueue, CB.home);
+
+            yMax = topLeft.y + y + gridSize * 3;
+        },
+        .Entry => |entryData| {
+            const texNumber = state.assets.getStaticTextureData(Texture.StickerNumber);
+            const pf = portfolio.PORTFOLIO_LIST[entryData.portfolioIndex];
+            var images = std.ArrayList(GridImage).init(tempAllocator);
+
+            const x = marginX + gridSize * 5.5;
+            var y = screenSizeF.y + gridSize * 13;
+            for (pf.subprojects) |sub, i| {
+                const numberPos = m.Vec2.init(
+                    marginX + gridSize * 2.5,
+                    y - gridSize * 2.25,
+                );
+                const numberSize = m.Vec2.init(gridSize * 2, gridSize * 2);
+                if (texNumber.loaded()) {
+                    renderQueue.quadTex(
+                        numberPos, numberSize, 0, texNumber.id, m.Vec4.one
+                    );
+                }
+                const numStr = std.fmt.allocPrint(tempAllocator, "{}", .{i + 1}) catch unreachable;
+                const numberTextPos = m.Vec2.init(
+                    numberPos.x + numberSize.x * 0.3,
+                    numberPos.y + numberSize.y * 0.76
                 );
                 renderQueue.textLine(
-                    pf.title, textPos, fontTextSize, 0.0, colorUi, "HelveticaBold"
+                    numStr, numberTextPos, fontStickerSize, 0.0, colorBlack, "HelveticaBold"
                 );
 
-                if (updateButton(itemPos, itemSize, state.mouseState, scrollYF, &mouseHoverGlobal)) {
-                    ww.setUri(pf.uri);
+                renderQueue.textLine(
+                    sub.name, m.Vec2.init(x, y), fontSubtitleSize, 0.0, colorUi, "HelveticaLight"
+                );
+                y += gridSize * 1;
+
+                renderQueue.textBox(
+                    sub.description, m.Vec2.init(x, y), contentSubWidth, fontTextSize, lineHeight, 0.0, colorUi, "HelveticaMedium"
+                );
+                y += gridSize * 2;
+
+                images.clearRetainingCapacity();
+                for (sub.images) |img| {
+                    images.append(GridImage {
+                        .uri = img,
+                        .title = null,
+                        .goToUri = null,
+                    }) catch |err| {
+                        std.log.err("image append failed {}", .{err});
+                    };
                 }
+
+                const itemsPerRow = 6;
+                const topLeft = m.Vec2.init(x, y);
+                const spacing = gridSize * 0.25;
+                y += drawImageGrid(images.items, itemsPerRow, topLeft, contentSubWidth, spacing, fontTextSize, colorUi, state.mouseState, scrollYF, &mouseHoverGlobal, &state.assets, &renderQueue, CB.entry);
+                y += gridSize * 3;
             }
+
+            yMax = y + gridSize * 2;
         },
-        .Entry => {
-        },
-    }
-
-    if (drawText) {
-        // sticker
-        const stickerText = switch (state.page) {
-            .Home => "yorstory",
-            .Entry => "HALO IV",
-        };
-        const textStickerPos1 = m.Vec2.init(
-            marginX + gridSize * 5.5,
-            screenSizeF.y - gridSize * 7.4
-        );
-        renderQueue.textLine(
-            stickerText,
-            textStickerPos1, fontStickerSize, gridSize * -0.05,
-            colorBlack, "HelveticaBold"
-        );
-
-        const textStickerPos2 = m.Vec2.init(
-            marginX + gridSize * 5.5,
-            screenSizeF.y - gridSize * 6.5
-        );
-        renderQueue.textLine(
-            "A YORSTORY company © 2018-2022.",
-            textStickerPos2, fontStickerSmallSize, 0.0,
-            colorBlack, "HelveticaBold",
-        );
-
-        const textStickerPos3 = m.Vec2.init(
-            marginX + gridSize * 12,
-            screenSizeF.y - gridSize * 8.55
-        );
-        renderQueue.textBox(
-            "At Yorstory, alchemists and wizards fashion your story with style, light, and shadow.",
-            textStickerPos3, gridSize * 6,
-            fontStickerSmallSize, fontStickerSmallSize, 0.0,
-            colorBlack, "HelveticaBold",
-        );
-
-        // sub-landing text
-        const lineHeight = fontTextSize * 1.5;
-        const textSubLeftPos = m.Vec2.init(
-            marginX + gridSize * 5.5,
-            screenSizeF.y
-        );
-        renderQueue.textBox(
-            "Yorstory is a creative development studio specializing in sequential art. We are storytellers with over 20 years of experience in the Television, Film, and Video Game industries.",
-            textSubLeftPos, gridSize * 13,
-            fontTextSize, lineHeight, 0.0,
-            colorUi, "HelveticaMedium"
-        );
-        const textSubRightPos = m.Vec2.init(
-            marginX + gridSize * 19.5,
-            screenSizeF.y
-        );
-        renderQueue.textBox(
-            "Our diverse experience has given us an unparalleled understanding of multiple mediums, giving us the tools to create a cohesive, story-centric vision, along with the visuals needed to create a shared understanding between multiple deparments or disciplines.",
-            textSubRightPos, gridSize * 13,
-            fontTextSize, lineHeight, 0.0,
-            colorUi, "HelveticaMedium"
-        );
-
-        // content section
-        const headerText = switch (state.page) {
-            .Home => "projects",
-            .Entry => "boarding the mechanics ***",
-        };
-        const subText = switch (state.page) {
-            .Home => "In alchemy, the term chrysopoeia (from Greek χρυσοποιία, khrusopoiia, \"gold-making\") refers to the artificial production of gold, most commonly by the alleged transmutation of base metals such as lead. A related term is argyropoeia (ἀργυροποιία, arguropoiia, \"silver-making\"), referring to the artificial production...",
-            .Entry => "In 2010, Yorstory partnered with Microsoft/343 Studios to join one of the video game industry's most iconic franchises - Halo. Working with the team's weapons and mission designers, we were tasked with helping visualize some of the game's weapons and idealized gameplay scenarios. The result was an exciting blend of enthusiasm sci-fi mayhem, starring the infamous Master Chief.",
-        };
-
-        const contentHeaderPos = m.Vec2.init(
-            marginX + gridSize * 5.5,
-            screenSizeF.y + gridSize * 7.75,
-        );
-        renderQueue.textLine(
-            headerText,
-            contentHeaderPos, fontStickerSize, 0.0,
-            colorUi, "HelveticaBold"
-        );
-
-        const contentSubPos = m.Vec2.init(
-            marginX + gridSize * 5.5,
-            screenSizeF.y + gridSize * 9,
-        );
-        const contentSubWidth = screenSizeF.x - marginX * 2 - gridSize * 5.5 * 2;
-        renderQueue.textBox(
-            subText,
-            contentSubPos, contentSubWidth,
-            fontTextSize, lineHeight, 0.0,
-            colorUi, "HelveticaMedium"
-        );
     }
 
     renderQueue.renderShapes(state.renderState, screenSizeF, scrollYF);
-    if (drawText) {
+    if (!m.Vec2i.eql(state.screenSizePrev, screenSizeI)) {
+        std.log.info("resize, clearing text", .{});
+        w.clearAllText();
         renderQueue.renderText();
     }
 
@@ -963,7 +1105,7 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
         }
     }
 
-    return @floatToInt(c_int, screenSizeF.y * 2.5);
+    return @floatToInt(c_int, yMax); //@floatToInt(c_int, screenSizeF.y * 2.5);
 }
 
 export fn onTextureLoaded(textureId: c_uint, width: c_int, height: c_int) void
