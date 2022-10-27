@@ -24,6 +24,12 @@ pub fn build(b: *std.build.Builder) void
     zig_http_build.addLibClient(server, target, "deps/zig-http");
     zig_http_build.addLibCommon(server, target, "deps/zig-http");
     zig_http_build.addLibServer(server, target, "deps/zig-http");
+    server.addIncludeDir("deps/stb");
+    server.addCSourceFiles(&[_][]const u8{
+        "deps/stb/stb_image_impl.c",
+        "deps/stb/stb_image_write_impl.c"
+    }, &[_][]const u8{"-std=c99"});
+    server.linkLibC();
     server.linkLibC();
     server.override_dest_dir = installDirRoot;
     server.install();
@@ -34,9 +40,6 @@ pub fn build(b: *std.build.Builder) void
         .cpu_arch = .wasm32,
         .os_tag = .freestanding,
     });
-    wasm.addIncludeDir("deps/stb");
-    wasm.addCSourceFile("deps/stb/stb_image_impl.c", &[_][]const u8{"-std=c99"});
-    wasm.linkLibC();
     // TODO broken in 0.9.1, might not need anyway. not sure I understand how this works...
     // wasm.import_memory = true;
     // wasm.initial_memory = 4 * 1024 * 1024;

@@ -328,17 +328,74 @@ function updateCanvasSize()
 
 function stressTestOne(textureUrl)
 {
-    httpGet(textureUrl, function(status, data) {
-        if (status !== 200) {
-            console.log("texture load failed");
-            return;
-        }
+    // const CHUNK_SIZE_ISH = 512 * 1024;
 
-        _wasmInstance.exports.onTex();
-        console.log(data);
-    });
+    // httpGet("/webgl_png?path=" + textureUrl, function(status, data) {
+    //     if (status !== 200) {
+    //         console.log("webgl_png failed");
+    //         return;
+    //     }
 
-    return;
+    //     const metadata = JSON.parse(data);
+
+    //     const texture = gl.createTexture();
+    //     gl.bindTexture(gl.TEXTURE_2D, texture);
+    //     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+
+    //     const level = 0;
+    //     const internalFormat = gl.RGBA;
+    //     const border = 0;
+    //     const srcFormat = gl.RGBA;
+    //     const srcType = gl.UNSIGNED_BYTE;
+    //     gl.texImage2D(gl.TEXTURE_2D, level, internalFormat, metadata.width, metadata.height, border, srcFormat, srcType);
+
+    //     const chunkSize = Math.round(CHUNK_SIZE_ISH / metadata.width) * metadata.width;
+    //     console.log(metadata);
+    //     console.log(chunkSize);
+
+    //     const n = (metadata.width * metadata.height) / chunkSize;
+    //     for (let i = 0; i < n; i++) {
+    //         const uri = `/webgl_png_chunk?path=${textureUrl}&chunkSize=${chunkSize}&index=${i}`;
+
+    //         const image = new Image();
+    //         image.onload = function() {
+    //             // const tempCanvas = document.createElement("canvas");
+    //             // tempCanvas.width = image.width;
+    //             // tempCanvas.height = image.height;
+    //             // const tempCtx = tempCanvas.getContext("2d");
+    //             // tempCtx.drawImage(image, 0, 0, image.width, image.height);
+    //             // const imgData = tempCtx.getImageData(0, 0, image.width, image.height);
+    //             gl.bindTexture(gl.TEXTURE_2D, texture);
+    //             gl.texImage2D(gl.TEXTURE_2D, level, internalFormat, srcFormat, srcType, image);
+    //             // gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrap);
+    //             // gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, wrap);
+    //             // gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    //             // gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    //             // if (isPowerOfTwo(image.width) && isPowerOfTwo(image.height)) {
+    //             //     gl.generateMipmap(gl.TEXTURE_2D);
+    //             // }
+
+    //             // _wasmInstance.exports.onTextureLoaded(index, image.width, image.height);
+    //         };
+    //         image.src = uri;
+    //         // httpGet(uri, function(status, data) {
+    //         //     if (status !== 200) {
+    //         //         console.log("webgl_png_tile failed");
+    //         //         return;
+    //         //     }
+
+    //         //     gl.bindTexture(gl.TEXTURE_2D, texture);
+    //         //     // gl.texSubImage2D();
+
+    //         //     // console.log(data);
+    //         // });
+    //     }
+
+    //     // _wasmInstance.exports.onTex();
+    //     // console.log(data);
+    // });
+
+    // return;
     const texture = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, texture);
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
@@ -379,12 +436,12 @@ function stressTestOne(textureUrl)
 function stressTest()
 {
     let images = [
-        "/images/parallax/parallax4-1.png",
-        "/images/parallax/parallax4-2.png",
-        "/images/parallax/parallax4-3.png",
-        "/images/parallax/parallax4-4.png",
-        "/images/parallax/parallax4-5.png",
-        "/images/parallax/parallax4-6.png",
+        "/images/parallax/parallax4-1.bmp",
+        "/images/parallax/parallax4-2.bmp",
+        "/images/parallax/parallax4-3.bmp",
+        "/images/parallax/parallax4-4.bmp",
+        "/images/parallax/parallax4-5.bmp",
+        "/images/parallax/parallax4-6.bmp",
     ];
     for (let i = 0; i < images.length; i++) {
         stressTestOne(images[i]);
@@ -444,8 +501,8 @@ function wasmInit(wasmUri, memoryBytes)
         }
         _wasmInstance.exports.onInit();
 
-        stressTest();
-        return;
+        // stressTest();
+        // return;
 
         const onAnimationFrame = _wasmInstance.exports.onAnimationFrame;
         const dummyBackground = document.getElementById("dummyBackground");

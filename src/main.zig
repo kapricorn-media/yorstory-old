@@ -1,9 +1,5 @@
 const std = @import("std");
 
-const stb = @cImport(
-    @cInclude("stb_image.h")
-);
-
 const m = @import("math.zig");
 const parallax = @import("parallax.zig");
 const portfolio = @import("portfolio.zig");
@@ -689,10 +685,20 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
             if (activeParallaxSet) |_| {
                 const nextSetIndex = (state.activeParallaxSetIndex + 1) % state.parallaxImageSets.len;
                 var nextParallaxSet = tryLoadAndGetParallaxSet(state, nextSetIndex);
-                if (nextParallaxSet != null and state.parallaxIdleTimeMs >= parallaxSetSwapSeconds * 1000) {
-                    state.parallaxIdleTimeMs = 0;
-                    state.activeParallaxSetIndex = nextSetIndex;
-                    activeParallaxSet = nextParallaxSet;
+                if (nextParallaxSet) |_| {
+                    if (state.parallaxIdleTimeMs >= parallaxSetSwapSeconds * 1000) {
+                        state.parallaxIdleTimeMs = 0;
+                        state.activeParallaxSetIndex = nextSetIndex;
+                        activeParallaxSet = nextParallaxSet;
+                    } else {
+                        var i = nextSetIndex;
+                        while (i != state.activeParallaxSetIndex) {
+                            if (tryLoadAndGetParallaxSet(state, i) == null) {
+                                break;
+                            }
+                            i = (i + 1) % state.parallaxImageSets.len;
+                        }
+                    }
                 }
             }
 
