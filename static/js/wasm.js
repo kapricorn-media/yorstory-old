@@ -433,6 +433,8 @@ function wasmInit(wasmUri, memoryBytes)
     let importObject = {
         env: env,
     };
+    // importObject.env.memcpy = function(){console.log("hi")};
+    // importObject.env.memset = function(){console.log("hi")};
 
     WebAssembly.instantiateStreaming(fetch(wasmUri), importObject).then(function(obj) {
         _wasmInstance = obj.instance;
@@ -442,8 +444,8 @@ function wasmInit(wasmUri, memoryBytes)
         }
         _wasmInstance.exports.onInit();
 
-        // stressTest();
-        // return;
+        stressTest();
+        return;
 
         const onAnimationFrame = _wasmInstance.exports.onAnimationFrame;
         const dummyBackground = document.getElementById("dummyBackground");
