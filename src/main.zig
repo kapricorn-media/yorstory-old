@@ -986,88 +986,100 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
         }
     };
 
-    var yMax: f32 = 0;
-    switch (state.pageData) {
-        .Home => {
-            var images = std.ArrayList(GridImage).init(tempAllocator);
-            for (portfolio.PORTFOLIO_LIST) |pf| {
+    var yMax: f32 = screenSizeF.y + gridSize * 12;
+    if (state.pageData == .Entry) {
+        const entryData = state.pageData.Entry;
+
+        const texNumber = state.assets.getStaticTextureData(Texture.StickerNumber);
+        const pf = portfolio.PORTFOLIO_LIST[entryData.portfolioIndex];
+        var images = std.ArrayList(GridImage).init(tempAllocator);
+
+        const x = marginX + gridSize * 5.5;
+        var y = screenSizeF.y + gridSize * 13;
+        for (pf.subprojects) |sub, i| {
+            const numberPos = m.Vec2.init(
+                marginX + gridSize * 2.5,
+                y - gridSize * 2.25,
+            );
+            const numberSize = m.Vec2.init(gridSize * 2, gridSize * 2);
+            if (texNumber.loaded()) {
+                renderQueue.quadTex(
+                    numberPos, numberSize, 0, texNumber.id, m.Vec4.one
+                );
+            }
+            const numStr = std.fmt.allocPrint(tempAllocator, "{}", .{i + 1}) catch unreachable;
+            const numberTextPos = m.Vec2.init(
+                numberPos.x + numberSize.x * 0.3,
+                numberPos.y + numberSize.y * 0.76
+            );
+            renderQueue.textLine(
+                numStr, numberTextPos, fontStickerSize, 0.0, colorBlack, "HelveticaBold"
+            );
+
+            renderQueue.textLine(
+                sub.name, m.Vec2.init(x, y), fontSubtitleSize, 0.0, colorUi, "HelveticaLight"
+            );
+            y += gridSize * 1;
+
+            renderQueue.textBox(
+                sub.description, m.Vec2.init(x, y), contentSubWidth, fontTextSize, lineHeight, 0.0, colorUi, "HelveticaMedium"
+            );
+            y += gridSize * 2;
+
+            images.clearRetainingCapacity();
+            for (sub.images) |img| {
                 images.append(GridImage {
-                    .uri = pf.cover,
-                    .title = pf.title,
-                    .goToUri = pf.uri,
+                    .uri = img,
+                    .title = null,
+                    .goToUri = null,
                 }) catch |err| {
                     std.log.err("image append failed {}", .{err});
                 };
             }
 
-            const itemsPerRow = 3;
-            const topLeft = m.Vec2.init(
-                marginX + gridSize * 5.5,
-                screenSizeF.y + gridSize * 12,
-            );
+            const itemsPerRow = 6;
+            const topLeft = m.Vec2.init(x, y);
             const spacing = gridSize * 0.25;
-            const y = drawImageGrid(images.items, itemsPerRow, topLeft, contentSubWidth, spacing, fontTextSize, colorUi, state.mouseState, scrollYF, &mouseHoverGlobal, &state.assets, &renderQueue, CB.home);
+            y += drawImageGrid(images.items, itemsPerRow, topLeft, contentSubWidth, spacing, fontTextSize, colorUi, state.mouseState, scrollYF, &mouseHoverGlobal, &state.assets, &renderQueue, CB.entry);
+            y += gridSize * 3;
+        }
 
-            yMax = topLeft.y + y + gridSize * 3;
-        },
-        .Entry => |entryData| {
-            const texNumber = state.assets.getStaticTextureData(Texture.StickerNumber);
-            const pf = portfolio.PORTFOLIO_LIST[entryData.portfolioIndex];
-            var images = std.ArrayList(GridImage).init(tempAllocator);
+        yMax = y + gridSize * 1;
 
-            const x = marginX + gridSize * 5.5;
-            var y = screenSizeF.y + gridSize * 13;
-            for (pf.subprojects) |sub, i| {
-                const numberPos = m.Vec2.init(
-                    marginX + gridSize * 2.5,
-                    y - gridSize * 2.25,
-                );
-                const numberSize = m.Vec2.init(gridSize * 2, gridSize * 2);
-                if (texNumber.loaded()) {
-                    renderQueue.quadTex(
-                        numberPos, numberSize, 0, texNumber.id, m.Vec4.one
-                    );
-                }
-                const numStr = std.fmt.allocPrint(tempAllocator, "{}", .{i + 1}) catch unreachable;
-                const numberTextPos = m.Vec2.init(
-                    numberPos.x + numberSize.x * 0.3,
-                    numberPos.y + numberSize.y * 0.76
-                );
-                renderQueue.textLine(
-                    numStr, numberTextPos, fontStickerSize, 0.0, colorBlack, "HelveticaBold"
-                );
+        const opos = m.Vec2.init(
+            marginX + gridSize * 5.5,
+            yMax,
+        );
+        renderQueue.textLine(
+            "other projects",
+            opos, fontStickerSize, 0.0,
+            colorUi, "HelveticaBold"
+        );
 
-                renderQueue.textLine(
-                    sub.name, m.Vec2.init(x, y), fontSubtitleSize, 0.0, colorUi, "HelveticaLight"
-                );
-                y += gridSize * 1;
-
-                renderQueue.textBox(
-                    sub.description, m.Vec2.init(x, y), contentSubWidth, fontTextSize, lineHeight, 0.0, colorUi, "HelveticaMedium"
-                );
-                y += gridSize * 2;
-
-                images.clearRetainingCapacity();
-                for (sub.images) |img| {
-                    images.append(GridImage {
-                        .uri = img,
-                        .title = null,
-                        .goToUri = null,
-                    }) catch |err| {
-                        std.log.err("image append failed {}", .{err});
-                    };
-                }
-
-                const itemsPerRow = 6;
-                const topLeft = m.Vec2.init(x, y);
-                const spacing = gridSize * 0.25;
-                y += drawImageGrid(images.items, itemsPerRow, topLeft, contentSubWidth, spacing, fontTextSize, colorUi, state.mouseState, scrollYF, &mouseHoverGlobal, &state.assets, &renderQueue, CB.entry);
-                y += gridSize * 3;
-            }
-
-            yMax = y + gridSize * 2;
-        },
+        yMax += gridSize * 2;
     }
+
+    // projects
+    var images = std.ArrayList(GridImage).init(tempAllocator);
+    for (portfolio.PORTFOLIO_LIST) |pf| {
+        images.append(GridImage {
+            .uri = pf.cover,
+            .title = pf.title,
+            .goToUri = pf.uri,
+        }) catch |err| {
+            std.log.err("image append failed {}", .{err});
+        };
+    }
+
+    const itemsPerRow = 3;
+    const topLeft = m.Vec2.init(
+        marginX + gridSize * 5.5,
+        yMax,
+    );
+    const spacing = gridSize * 0.25;
+    const y = drawImageGrid(images.items, itemsPerRow, topLeft, contentSubWidth, spacing, fontTextSize, colorUi, state.mouseState, scrollYF, &mouseHoverGlobal, &state.assets, &renderQueue, CB.home);
+
+    yMax += y + gridSize * 3;
 
     renderQueue.renderShapes(state.renderState, screenSizeF, scrollYF);
     if (!m.Vec2i.eql(state.screenSizePrev, screenSizeI)) {
