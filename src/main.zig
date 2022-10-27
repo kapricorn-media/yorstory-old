@@ -630,8 +630,6 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
     const deltaMs = if (state.timestampMsPrev > 0) (timestampMs - state.timestampMsPrev) else 0;
     const deltaS = @intToFloat(f32, deltaMs) / 1000.0;
 
-    state.parallaxIdleTimeMs += deltaMs;
-
     if (state.scrollYPrev != scrollY) {
     }
     // TODO
@@ -681,8 +679,9 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
         .Home => {
             // Determine whether the active parallax set is loaded
             var activeParallaxSet = tryLoadAndGetParallaxSet(state, state.activeParallaxSetIndex);
-            const parallaxSetSwapSeconds = 8;
+            const parallaxSetSwapSeconds = 6;
             if (activeParallaxSet) |_| {
+                state.parallaxIdleTimeMs += deltaMs;
                 const nextSetIndex = (state.activeParallaxSetIndex + 1) % state.parallaxImageSets.len;
                 var nextParallaxSet = tryLoadAndGetParallaxSet(state, nextSetIndex);
                 if (nextParallaxSet) |_| {
@@ -691,12 +690,10 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
                         state.activeParallaxSetIndex = nextSetIndex;
                         activeParallaxSet = nextParallaxSet;
                     } else {
-                        var i = nextSetIndex;
-                        while (i != state.activeParallaxSetIndex) {
+                        for (state.parallaxImageSets) |_, i| {
                             if (tryLoadAndGetParallaxSet(state, i) == null) {
                                 break;
                             }
-                            i = (i + 1) % state.parallaxImageSets.len;
                         }
                     }
                 }
@@ -1061,7 +1058,11 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
 
     // projects
     var images = std.ArrayList(GridImage).init(tempAllocator);
-    for (portfolio.PORTFOLIO_LIST) |pf| {
+    for (portfolio.PORTFOLIO_LIST) |pf, i| {
+        if (state.pageData == .Entry and state.pageData.Entry.portfolioIndex == i) {
+            continue;
+        }
+
         images.append(GridImage {
             .uri = pf.cover,
             .title = pf.title,

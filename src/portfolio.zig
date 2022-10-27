@@ -171,13 +171,6 @@ pub const PORTFOLIO_LIST = [_]Portfolio {
         .subprojects = &[_]Subproject {},
     },
     .{
-        .title = "Cerulea",
-        .uri = "/cerulea",
-        .cover = "/images/404.png",
-        .landing = "/images/404.png",
-        .subprojects = &[_]Subproject {},
-    },
-    .{
         .title = "The Project",
         .uri = "/the-project",
         .cover = "/images/404.png",
