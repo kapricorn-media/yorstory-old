@@ -1,5 +1,9 @@
 const std = @import("std");
 
+const stb = @cImport(
+    @cInclude("stb_image.h")
+);
+
 const m = @import("math.zig");
 const parallax = @import("parallax.zig");
 const portfolio = @import("portfolio.zig");
@@ -630,7 +634,6 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
     const deltaMs = if (state.timestampMsPrev > 0) (timestampMs - state.timestampMsPrev) else 0;
     const deltaS = @intToFloat(f32, deltaMs) / 1000.0;
 
-
     state.parallaxIdleTimeMs += deltaMs;
 
     if (state.scrollYPrev != scrollY) {
@@ -641,7 +644,8 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
     // }
 
     const refSize = m.Vec2i.init(3840, 2000);
-    const gridRefSize = 80;
+    // const refImageSize = m.Vec2i.init(3692, 1778);
+    const gridRefSize = 74;
 
     const fontStickerSize = 124 / @intToFloat(f32, refSize.y) * screenSizeF.y;
     const fontStickerSmallSize = 26 / @intToFloat(f32, refSize.y) * screenSizeF.y;
@@ -805,16 +809,6 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
             posTL, decalSize, 0, uvOriginTL, uvSizeTL, decalTopLeft.id, colorUi
         );
 
-        const posBL = m.Vec2.init(
-            marginX + decalMargin,
-            screenSizeF.y - decalMargin - decalSize.y,
-        );
-        const uvOriginBL = m.Vec2.init(0, 1);
-        const uvSizeBL = m.Vec2.init(1, -1);
-        renderQueue.quadTexUvOffset(
-            posBL, decalSize, 0, uvOriginBL, uvSizeBL, decalTopLeft.id, colorUi
-        );
-
         const posTR = m.Vec2.init(
             screenSizeF.x - marginX - decalMargin - decalSize.x,
             decalMargin,
@@ -825,9 +819,19 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
             posTR, decalSize, 0, uvOriginTR, uvSizeTR, decalTopLeft.id, colorUi
         );
 
+        const posBL = m.Vec2.init(
+            marginX + decalMargin,
+            screenSizeF.y - decalMargin - gridSize - decalSize.y,
+        );
+        const uvOriginBL = m.Vec2.init(0, 1);
+        const uvSizeBL = m.Vec2.init(1, -1);
+        renderQueue.quadTexUvOffset(
+            posBL, decalSize, 0, uvOriginBL, uvSizeBL, decalTopLeft.id, colorUi
+        );
+
         const posBR = m.Vec2.init(
             screenSizeF.x - marginX - decalMargin - decalSize.x,
-            screenSizeF.y - decalMargin - decalSize.y,
+            screenSizeF.y - decalMargin - gridSize - decalSize.y,
         );
         const uvOriginBR = m.Vec2.init(1, 1);
         const uvSizeBR = m.Vec2.init(-1, -1);
@@ -1133,4 +1137,8 @@ export fn onTextureLoaded(textureId: c_uint, width: c_int, height: c_int) void
     if (!found) {
         std.log.err("onTextureLoaded not found!", .{});
     }
+}
+
+export fn onTex() void
+{
 }

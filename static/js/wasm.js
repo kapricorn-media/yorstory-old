@@ -167,6 +167,12 @@ const createTexture = function(imgUrlPtr, imgUrlLen, wrap) {
 
     const image = new Image();
     image.onload = function() {
+        // const tempCanvas = document.createElement("canvas");
+        // tempCanvas.width = image.width;
+        // tempCanvas.height = image.height;
+        // const tempCtx = tempCanvas.getContext("2d");
+        // tempCtx.drawImage(image, 0, 0, image.width, image.height);
+        // const imgData = tempCtx.getImageData(0, 0, image.width, image.height);
         gl.bindTexture(gl.TEXTURE_2D, texture);
         gl.texImage2D(gl.TEXTURE_2D, level, internalFormat, srcFormat, srcType, image);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrap);
@@ -320,6 +326,71 @@ function updateCanvasSize()
     console.log(`canvas resize: ${_canvas.width} x ${_canvas.height}`);
 }
 
+function stressTestOne(textureUrl)
+{
+    httpGet(textureUrl, function(status, data) {
+        if (status !== 200) {
+            console.log("texture load failed");
+            return;
+        }
+
+        _wasmInstance.exports.onTex();
+        console.log(data);
+    });
+
+    return;
+    const texture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+
+    const level = 0;
+    const internalFormat = gl.RGBA;
+    const width = 1;
+    const height = 1;
+    const border = 0;
+    const srcFormat = gl.RGBA;
+    const srcType = gl.UNSIGNED_BYTE;
+    const pixel = new Uint8Array([255, 255, 255, 255]);
+    gl.texImage2D(gl.TEXTURE_2D, level, internalFormat, width, height, border, srcFormat, srcType, pixel);
+
+    const image = new Image();
+    image.onload = function() {
+        // const tempCanvas = document.createElement("canvas");
+        // tempCanvas.width = image.width;
+        // tempCanvas.height = image.height;
+        // const tempCtx = tempCanvas.getContext("2d");
+        // tempCtx.drawImage(image, 0, 0, image.width, image.height);
+        // const imgData = tempCtx.getImageData(0, 0, image.width, image.height);
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.texImage2D(gl.TEXTURE_2D, level, internalFormat, srcFormat, srcType, image);
+        // gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrap);
+        // gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, wrap);
+        // gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        // gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        // if (isPowerOfTwo(image.width) && isPowerOfTwo(image.height)) {
+        //     gl.generateMipmap(gl.TEXTURE_2D);
+        // }
+
+        // _wasmInstance.exports.onTextureLoaded(index, image.width, image.height);
+    };
+    image.src = textureUrl;
+}
+
+function stressTest()
+{
+    let images = [
+        "/images/parallax/parallax4-1.png",
+        "/images/parallax/parallax4-2.png",
+        "/images/parallax/parallax4-3.png",
+        "/images/parallax/parallax4-4.png",
+        "/images/parallax/parallax4-5.png",
+        "/images/parallax/parallax4-6.png",
+    ];
+    for (let i = 0; i < images.length; i++) {
+        stressTestOne(images[i]);
+    }
+}
+
 function wasmInit(wasmUri, memoryBytes)
 {
     _canvas = document.getElementById("canvas");
@@ -370,6 +441,9 @@ function wasmInit(wasmUri, memoryBytes)
             _wasmInstance.exports.memory.grow(memoryPages - pages);
         }
         _wasmInstance.exports.onInit();
+
+        // stressTest();
+        // return;
 
         const onAnimationFrame = _wasmInstance.exports.onAnimationFrame;
         const dummyBackground = document.getElementById("dummyBackground");

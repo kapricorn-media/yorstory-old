@@ -34,6 +34,9 @@ pub fn build(b: *std.build.Builder) void
         .cpu_arch = .wasm32,
         .os_tag = .freestanding,
     });
+    // wasm.addIncludeDir("deps/stb");
+    // wasm.addCSourceFile("deps/stb/stb_image_impl.c", &[_][]const u8{"-std=c99"});
+    // wasm.linkLibC();
     // TODO broken in 0.9.1, might not need anyway. not sure I understand how this works...
     // wasm.import_memory = true;
     // wasm.initial_memory = 4 * 1024 * 1024;

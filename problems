@@ -1,21 +1,14 @@
-- parallax background clipping
-- click on a project's individual images, blow up, gallery, you can scroll through
-- GUI scale????
+CRITICAL
+- image loading scroll
+- move sticker one grid size down
 
-- sticker background weirdness
-
-- figure out font size & leading conversions from Photoshop to web
-
-
-- parallax background clipping
+MEDIUM
+- gallery
+- alpha blending of borders
 - logos of brands we've worked with
-
 - mobile
 
-- make color changes nicer (multiply?)
-
-- fix the label
-- loading of page (images shouldn't show until all ready for parallax, show "..." until ready)
-
+LOW
+- rounded corners
 - film grain
 - finish sticker customization (emojis)
