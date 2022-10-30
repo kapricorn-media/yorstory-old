@@ -1157,7 +1157,3 @@ export fn onTextureLoaded(textureId: c_uint, width: c_int, height: c_int) void
         std.log.err("onTextureLoaded not found!", .{});
     }
 }
-
-export fn onTex() void
-{
-}

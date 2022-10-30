@@ -120,7 +120,7 @@ const glBuffers = [];
 const glUniformLocations = [];
 const glTextures = [];
 
-const compileShader = function(sourcePtr, sourceLen, type) {
+function compileShader(sourcePtr, sourceLen, type) {
     const source = readCharStr(sourcePtr, sourceLen);
     const shader = gl.createShader(type);
     gl.shaderSource(shader, source);
@@ -133,7 +133,7 @@ const compileShader = function(sourcePtr, sourceLen, type) {
     return glShaders.length - 1;
 };
 
-const linkShaderProgram = function(vertexShaderId, fragmentShaderId) {
+function linkShaderProgram(vertexShaderId, fragmentShaderId) {
     const program = gl.createProgram();
     gl.attachShader(program, glShaders[vertexShaderId]);
     gl.attachShader(program, glShaders[fragmentShaderId]);
@@ -145,8 +145,67 @@ const linkShaderProgram = function(vertexShaderId, fragmentShaderId) {
     return glPrograms.length - 1;
 };
 
-const createTexture = function(imgUrlPtr, imgUrlLen, wrap) {
-    const imgUrl = readCharStr(imgUrlPtr, imgUrlLen);
+function queueTextureLoadDirect(url, textureId, width, height)
+{
+    const image = new Image();
+    image.onload = function() {
+        if (width != image.width || height != image.height) {
+            console.error("mismatched image dimensions");
+        }
+
+        const texture = glTextures[textureId];
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        const level = 0;
+        const xOffset = 0;
+        const yOffset = 0;
+        const srcFormat = gl.RGBA;
+        const srcType = gl.UNSIGNED_BYTE;
+        gl.texSubImage2D(gl.TEXTURE_2D, level, xOffset, yOffset, srcFormat, srcType, image);
+
+        _wasmInstance.exports.onTextureLoaded(textureId, width, height);
+    };
+    image.src = url;
+}
+
+function queueTextureLoadChunked(url, textureId, width, height, chunkSize)
+{
+    if (chunkSize % width !== 0) {
+        console.error("chunk size is not a multiple of image width");
+        return;
+    }
+
+    const chunkSizeRows = Math.round(chunkSize / width);
+    const n = Math.ceil((width * height) / chunkSize);
+    const loaded = new Array(n).fill(false);
+
+    for (let i = 0; i < n; i++) {
+        const uri = `/webgl_png_chunk?path=${url}&index=${i}`;
+
+        const image = new Image();
+        image.onload = function() {
+            const level = 0;
+            const xOffset = 0;
+            const yOffset = height - chunkSizeRows * i - image.height;
+            const srcFormat = gl.RGBA;
+            const srcType = gl.UNSIGNED_BYTE;
+
+            const texture = glTextures[textureId];
+            gl.bindTexture(gl.TEXTURE_2D, texture);
+            gl.texSubImage2D(gl.TEXTURE_2D, level, xOffset, yOffset, srcFormat, srcType, image);
+
+            loaded[i] = true;
+            const allLoaded = loaded.every(function(el) { return el; });
+            if (allLoaded) {
+                _wasmInstance.exports.onTextureLoaded(textureId, width, height);
+            }
+        };
+        image.src = uri;
+    }
+}
+
+function createTexturePng(url, wrap)
+{
+    const chunkSizeMax = 512 * 1024;
 
     const texture = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, texture);
@@ -154,40 +213,92 @@ const createTexture = function(imgUrlPtr, imgUrlLen, wrap) {
 
     const level = 0;
     const internalFormat = gl.RGBA;
-    const width = 1;
-    const height = 1;
+    const tempWidth = 1;
+    const tempHeight = 1;
     const border = 0;
     const srcFormat = gl.RGBA;
     const srcType = gl.UNSIGNED_BYTE;
-    const pixel = new Uint8Array([255, 255, 255, 255]);
-    gl.texImage2D(gl.TEXTURE_2D, level, internalFormat, width, height, border, srcFormat, srcType, pixel);
+    const tempPixels = new Uint8Array([255, 255, 255, 255]);
+    gl.texImage2D(gl.TEXTURE_2D, level, internalFormat, tempWidth, tempHeight, border, srcFormat, srcType, tempPixels);
 
     glTextures.push(texture);
-    const index = glTextures.length - 1;
+    const textureId = glTextures.length - 1;
 
-    const image = new Image();
-    image.onload = function() {
-        // const tempCanvas = document.createElement("canvas");
-        // tempCanvas.width = image.width;
-        // tempCanvas.height = image.height;
-        // const tempCtx = tempCanvas.getContext("2d");
-        // tempCtx.drawImage(image, 0, 0, image.width, image.height);
-        // const imgData = tempCtx.getImageData(0, 0, image.width, image.height);
+    const uri = `/webgl_png?path=${url}&chunkSizeMax=${chunkSizeMax}`;
+    httpGet(uri, function(status, data) {
+        if (status !== 200) {
+            console.log("webgl_png failed");
+            return;
+        }
+
+        const metadata = JSON.parse(data);
+        const width = metadata.width;
+        const height = metadata.height;
+        const chunkSize = metadata.chunkSize;
+
+        const pixels = new Uint8Array(width * height * 4);
         gl.bindTexture(gl.TEXTURE_2D, texture);
-        gl.texImage2D(gl.TEXTURE_2D, level, internalFormat, srcFormat, srcType, image);
+        gl.texImage2D(gl.TEXTURE_2D, level, internalFormat, width, height, border, srcFormat, srcType, pixels);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrap);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, wrap);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-        // if (isPowerOfTwo(image.width) && isPowerOfTwo(image.height)) {
-        //     gl.generateMipmap(gl.TEXTURE_2D);
-        // }
 
-        _wasmInstance.exports.onTextureLoaded(index, image.width, image.height);
-    };
-    image.src = imgUrl;
+        if (chunkSize === 0) {
+            queueTextureLoadDirect(url, textureId, width, height);
+        } else {
+            queueTextureLoadChunked(url, textureId, width, height, chunkSize);
+        }
+    });
 
-    return index;
+    return textureId;
+}
+
+function createTexture(imgUrlPtr, imgUrlLen, wrap) {
+    const imgUrl = readCharStr(imgUrlPtr, imgUrlLen);
+
+    return createTexturePng(imgUrl, wrap);
+
+    // const texture = gl.createTexture();
+    // gl.bindTexture(gl.TEXTURE_2D, texture);
+    // gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+
+    // const level = 0;
+    // const internalFormat = gl.RGBA;
+    // const width = 1;
+    // const height = 1;
+    // const border = 0;
+    // const srcFormat = gl.RGBA;
+    // const srcType = gl.UNSIGNED_BYTE;
+    // const pixel = new Uint8Array([255, 255, 255, 255]);
+    // gl.texImage2D(gl.TEXTURE_2D, level, internalFormat, width, height, border, srcFormat, srcType, pixel);
+
+    // glTextures.push(texture);
+    // const index = glTextures.length - 1;
+
+    // const image = new Image();
+    // image.onload = function() {
+    //     // const tempCanvas = document.createElement("canvas");
+    //     // tempCanvas.width = image.width;
+    //     // tempCanvas.height = image.height;
+    //     // const tempCtx = tempCanvas.getContext("2d");
+    //     // tempCtx.drawImage(image, 0, 0, image.width, image.height);
+    //     // const imgData = tempCtx.getImageData(0, 0, image.width, image.height);
+    //     gl.bindTexture(gl.TEXTURE_2D, texture);
+    //     gl.texImage2D(gl.TEXTURE_2D, level, internalFormat, srcFormat, srcType, image);
+    //     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrap);
+    //     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, wrap);
+    //     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    //     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    //     // if (isPowerOfTwo(image.width) && isPowerOfTwo(image.height)) {
+    //     //     gl.generateMipmap(gl.TEXTURE_2D);
+    //     // }
+
+    //     _wasmInstance.exports.onTextureLoaded(index, image.width, image.height);
+    // };
+    // image.src = imgUrl;
+
+    // return index;
 };
 
 const glClear = function(x) {
@@ -326,128 +437,6 @@ function updateCanvasSize()
     console.log(`canvas resize: ${_canvas.width} x ${_canvas.height}`);
 }
 
-function stressTestOne(textureUrl)
-{
-    // const CHUNK_SIZE_ISH = 512 * 1024;
-
-    // httpGet("/webgl_png?path=" + textureUrl, function(status, data) {
-    //     if (status !== 200) {
-    //         console.log("webgl_png failed");
-    //         return;
-    //     }
-
-    //     const metadata = JSON.parse(data);
-
-    //     const texture = gl.createTexture();
-    //     gl.bindTexture(gl.TEXTURE_2D, texture);
-    //     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
-
-    //     const level = 0;
-    //     const internalFormat = gl.RGBA;
-    //     const border = 0;
-    //     const srcFormat = gl.RGBA;
-    //     const srcType = gl.UNSIGNED_BYTE;
-    //     gl.texImage2D(gl.TEXTURE_2D, level, internalFormat, metadata.width, metadata.height, border, srcFormat, srcType);
-
-    //     const chunkSize = Math.round(CHUNK_SIZE_ISH / metadata.width) * metadata.width;
-    //     console.log(metadata);
-    //     console.log(chunkSize);
-
-    //     const n = (metadata.width * metadata.height) / chunkSize;
-    //     for (let i = 0; i < n; i++) {
-    //         const uri = `/webgl_png_chunk?path=${textureUrl}&chunkSize=${chunkSize}&index=${i}`;
-
-    //         const image = new Image();
-    //         image.onload = function() {
-    //             // const tempCanvas = document.createElement("canvas");
-    //             // tempCanvas.width = image.width;
-    //             // tempCanvas.height = image.height;
-    //             // const tempCtx = tempCanvas.getContext("2d");
-    //             // tempCtx.drawImage(image, 0, 0, image.width, image.height);
-    //             // const imgData = tempCtx.getImageData(0, 0, image.width, image.height);
-    //             gl.bindTexture(gl.TEXTURE_2D, texture);
-    //             gl.texImage2D(gl.TEXTURE_2D, level, internalFormat, srcFormat, srcType, image);
-    //             // gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrap);
-    //             // gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, wrap);
-    //             // gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    //             // gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-    //             // if (isPowerOfTwo(image.width) && isPowerOfTwo(image.height)) {
-    //             //     gl.generateMipmap(gl.TEXTURE_2D);
-    //             // }
-
-    //             // _wasmInstance.exports.onTextureLoaded(index, image.width, image.height);
-    //         };
-    //         image.src = uri;
-    //         // httpGet(uri, function(status, data) {
-    //         //     if (status !== 200) {
-    //         //         console.log("webgl_png_tile failed");
-    //         //         return;
-    //         //     }
-
-    //         //     gl.bindTexture(gl.TEXTURE_2D, texture);
-    //         //     // gl.texSubImage2D();
-
-    //         //     // console.log(data);
-    //         // });
-    //     }
-
-    //     // _wasmInstance.exports.onTex();
-    //     // console.log(data);
-    // });
-
-    // return;
-    const texture = gl.createTexture();
-    gl.bindTexture(gl.TEXTURE_2D, texture);
-    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
-
-    const level = 0;
-    const internalFormat = gl.RGBA;
-    const width = 1;
-    const height = 1;
-    const border = 0;
-    const srcFormat = gl.RGBA;
-    const srcType = gl.UNSIGNED_BYTE;
-    const pixel = new Uint8Array([255, 255, 255, 255]);
-    gl.texImage2D(gl.TEXTURE_2D, level, internalFormat, width, height, border, srcFormat, srcType, pixel);
-
-    const image = new Image();
-    image.onload = function() {
-        // const tempCanvas = document.createElement("canvas");
-        // tempCanvas.width = image.width;
-        // tempCanvas.height = image.height;
-        // const tempCtx = tempCanvas.getContext("2d");
-        // tempCtx.drawImage(image, 0, 0, image.width, image.height);
-        // const imgData = tempCtx.getImageData(0, 0, image.width, image.height);
-        gl.bindTexture(gl.TEXTURE_2D, texture);
-        gl.texImage2D(gl.TEXTURE_2D, level, internalFormat, srcFormat, srcType, image);
-        // gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrap);
-        // gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, wrap);
-        // gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-        // gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-        // if (isPowerOfTwo(image.width) && isPowerOfTwo(image.height)) {
-        //     gl.generateMipmap(gl.TEXTURE_2D);
-        // }
-
-        // _wasmInstance.exports.onTextureLoaded(index, image.width, image.height);
-    };
-    image.src = textureUrl;
-}
-
-function stressTest()
-{
-    let images = [
-        "/images/parallax/parallax4-1.bmp",
-        "/images/parallax/parallax4-2.bmp",
-        "/images/parallax/parallax4-3.bmp",
-        "/images/parallax/parallax4-4.bmp",
-        "/images/parallax/parallax4-5.bmp",
-        "/images/parallax/parallax4-6.bmp",
-    ];
-    for (let i = 0; i < images.length; i++) {
-        stressTestOne(images[i]);
-    }
-}
-
 function wasmInit(wasmUri, memoryBytes)
 {
     _canvas = document.getElementById("canvas");
@@ -490,8 +479,6 @@ function wasmInit(wasmUri, memoryBytes)
     let importObject = {
         env: env,
     };
-    // importObject.env.memcpy = function(){console.log("hi")};
-    // importObject.env.memset = function(){console.log("hi")};
 
     WebAssembly.instantiateStreaming(fetch(wasmUri), importObject).then(function(obj) {
         _wasmInstance = obj.instance;
@@ -500,9 +487,6 @@ function wasmInit(wasmUri, memoryBytes)
             _wasmInstance.exports.memory.grow(memoryPages - pages);
         }
         _wasmInstance.exports.onInit();
-
-        // stressTest();
-        // return;
 
         const onAnimationFrame = _wasmInstance.exports.onAnimationFrame;
         const dummyBackground = document.getElementById("dummyBackground");
