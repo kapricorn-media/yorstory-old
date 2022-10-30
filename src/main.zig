@@ -347,6 +347,7 @@ const PageData = union(PageType) {
     Home: void,
     Entry: struct {
         portfolioIndex: usize,
+        galleryImageIndex: ?usize,
     },
 };
 
@@ -362,6 +363,7 @@ fn uriToPageData(uri: []const u8) !PageData
             return PageData {
                 .Entry = .{
                     .portfolioIndex = i,
+                    .galleryImageIndex = null,
                 }
             };
         }
@@ -531,7 +533,7 @@ const GridImage = struct {
     goToUri: ?[]const u8,
 };
 
-fn drawImageGrid(images: []const GridImage, itemsPerRow: usize, topLeft: m.Vec2, width: f32, spacing: f32, fontSize: f32, fontColor: m.Vec4, mouseState: MouseState, scrollY: f32, mouseHoverGlobal: *bool, assets: *Assets, renderQueue: *render.RenderQueue, callback: fn(GridImage) void) f32
+fn drawImageGrid(images: []const GridImage, itemsPerRow: usize, topLeft: m.Vec2, width: f32, spacing: f32, fontSize: f32, fontColor: m.Vec4, state: *State, scrollY: f32, mouseHoverGlobal: *bool,renderQueue: *render.RenderQueue, callback: fn(*State, GridImage) void) f32
 {
     const itemWidth = (width - spacing * (@intToFloat(f32, itemsPerRow) - 1)) / @intToFloat(f32, itemsPerRow);
     const itemSize = m.Vec2.init(itemWidth, itemWidth * 0.5);
@@ -544,14 +546,14 @@ fn drawImageGrid(images: []const GridImage, itemsPerRow: usize, topLeft: m.Vec2,
             topLeft.x + colF * (itemSize.x + spacing),
             topLeft.y + rowF * (itemSize.y + spacingY)
         );
-        if (assets.getDynamicTextureDataUri(img.uri)) |tex| {
+        if (state.assets.getDynamicTextureDataUri(img.uri)) |tex| {
             if (tex.loaded()) {
                 renderQueue.quadTex(
                     itemPos, itemSize, 0, tex.id, m.Vec4.one
                 );
             }
         } else {
-            _ = assets.registerDynamicTexture(img.uri, w.GL_CLAMP_TO_EDGE) catch |err| {
+            _ = state.assets.registerDynamicTexture(img.uri, w.GL_CLAMP_TO_EDGE) catch |err| {
                 std.log.err("failed to register {s}, err {}", .{img.uri, err});
                 return 0;
             };
@@ -567,9 +569,8 @@ fn drawImageGrid(images: []const GridImage, itemsPerRow: usize, topLeft: m.Vec2,
             );
         }
 
-        if (updateButton(itemPos, itemSize, mouseState, scrollY, mouseHoverGlobal)) {
-            callback(img);
-            // ww.setUri(img.uri);
+        if (updateButton(itemPos, itemSize, state.mouseState, scrollY, mouseHoverGlobal)) {
+            callback(state, img);
         }
     }
 
@@ -970,16 +971,26 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
     );
 
     const CB = struct {
-        fn home(image: GridImage) void
+        fn home(theState: *State, image: GridImage) void
         {
+            _ = theState;
+
             if (image.goToUri) |uri| {
                 ww.setUri(uri);
             }
         }
 
-        fn entry(image: GridImage) void
+        fn entry(theState: *State, image: GridImage) void
         {
             _ = image;
+
+            if (theState.pageData != .Entry) {
+                std.log.err("entry callback, but not an Entry page", .{});
+                return;
+            }
+            if (theState.pageData.Entry.galleryImageIndex == null) {
+                // theState.pageData.Entry.galleryImageIndex = 0;
+            }
         }
     };
 
@@ -1037,7 +1048,7 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
             const itemsPerRow = 6;
             const topLeft = m.Vec2.init(x, y);
             const spacing = gridSize * 0.25;
-            y += drawImageGrid(images.items, itemsPerRow, topLeft, contentSubWidth, spacing, fontTextSize, colorUi, state.mouseState, scrollYF, &mouseHoverGlobal, &state.assets, &renderQueue, CB.entry);
+            y += drawImageGrid(images.items, itemsPerRow, topLeft, contentSubWidth, spacing, fontTextSize, colorUi, state, scrollYF, &mouseHoverGlobal, &renderQueue, CB.entry);
             y += gridSize * 3;
         }
 
@@ -1078,9 +1089,18 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
         yMax,
     );
     const spacing = gridSize * 0.25;
-    const y = drawImageGrid(images.items, itemsPerRow, topLeft, contentSubWidth, spacing, fontTextSize, colorUi, state.mouseState, scrollYF, &mouseHoverGlobal, &state.assets, &renderQueue, CB.home);
+    const y = drawImageGrid(images.items, itemsPerRow, topLeft, contentSubWidth, spacing, fontTextSize, colorUi, state, scrollYF, &mouseHoverGlobal, &renderQueue, CB.home);
 
     yMax += y + gridSize * 3;
+
+    if (state.pageData == .Entry) {
+        const entryData = state.pageData.Entry;
+        if (entryData.galleryImageIndex) |ind| {
+            _ = ind;
+            const pos = m.Vec2.init(0.0, scrollYF);
+            renderQueue.quad(pos, screenSizeF, 0.0, m.Vec4.init(0.0, 0.0, 0.0, 0.5));
+        }
+    }
 
     renderQueue.renderShapes(state.renderState, screenSizeF, scrollYF);
     if (!m.Vec2i.eql(state.screenSizePrev, screenSizeI)) {
