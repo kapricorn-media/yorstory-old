@@ -4,6 +4,47 @@ let _canvas = null;
 let gl = null;
 
 let _currentHeight = null;
+let _loadTextureJobs = [];
+
+function queueLoadTextureJob(width, height, chunkSize, textureId, image, i, loaded) {
+    _loadTextureJobs.push({
+        width: width,
+        height: height,
+        chunkSize: chunkSize,
+        textureId: textureId,
+        image: image,
+        i: i,
+        loaded: loaded,
+    });
+}
+
+function doLoadTextureJob(width, height, chunkSize, textureId, image, i, loaded) {
+    const chunkSizeRows = Math.round(chunkSize / width);
+
+    const level = 0;
+    const xOffset = 0;
+    const yOffset = height - chunkSizeRows * i - image.height;
+    const srcFormat = gl.RGBA;
+    const srcType = gl.UNSIGNED_BYTE;
+
+    const texture = glTextures[textureId];
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.texSubImage2D(gl.TEXTURE_2D, level, xOffset, yOffset, srcFormat, srcType, image);
+
+    loaded[i] = true;
+    const allLoaded = loaded.every(function(el) { return el; });
+    if (allLoaded) {
+        _wasmInstance.exports.onTextureLoaded(textureId, width, height);
+    }
+}
+
+function doNextLoadTextureJob() {
+    const job = _loadTextureJobs.shift();
+    if (!job) {
+        return;
+    }
+    doLoadTextureJob(job.width, job.height, job.chunkSize, job.textureId, job.image, job.i, job.loaded);
+}
 
 function consoleMessage(isError, messagePtr, messageLen) {
     const message = readCharStr(messagePtr, messageLen);
@@ -174,7 +215,6 @@ function queueTextureLoadChunked(url, textureId, width, height, chunkSize)
         return;
     }
 
-    const chunkSizeRows = Math.round(chunkSize / width);
     const n = Math.ceil((width * height) / chunkSize);
     const loaded = new Array(n).fill(false);
 
@@ -183,28 +223,14 @@ function queueTextureLoadChunked(url, textureId, width, height, chunkSize)
 
         const image = new Image();
         image.onload = function() {
-            const level = 0;
-            const xOffset = 0;
-            const yOffset = height - chunkSizeRows * i - image.height;
-            const srcFormat = gl.RGBA;
-            const srcType = gl.UNSIGNED_BYTE;
-
-            const texture = glTextures[textureId];
-            gl.bindTexture(gl.TEXTURE_2D, texture);
-            gl.texSubImage2D(gl.TEXTURE_2D, level, xOffset, yOffset, srcFormat, srcType, image);
-
-            loaded[i] = true;
-            const allLoaded = loaded.every(function(el) { return el; });
-            if (allLoaded) {
-                _wasmInstance.exports.onTextureLoaded(textureId, width, height);
-            }
+            queueLoadTextureJob(width, height, chunkSize, textureId, image, i, loaded);
         };
         image.src = uri;
     }
 }
 
-function createTexturePng(url, wrap)
-{
+function createTexture(imgUrlPtr, imgUrlLen, wrap) {
+    const imgUrl = readCharStr(imgUrlPtr, imgUrlLen);
     const chunkSizeMax = 512 * 1024;
 
     const texture = gl.createTexture();
@@ -224,7 +250,7 @@ function createTexturePng(url, wrap)
     glTextures.push(texture);
     const textureId = glTextures.length - 1;
 
-    const uri = `/webgl_png?path=${url}&chunkSizeMax=${chunkSizeMax}`;
+    const uri = `/webgl_png?path=${imgUrl}&chunkSizeMax=${chunkSizeMax}`;
     httpGet(uri, function(status, data) {
         if (status !== 200) {
             console.log("webgl_png failed");
@@ -245,60 +271,13 @@ function createTexturePng(url, wrap)
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
 
         if (chunkSize === 0) {
-            queueTextureLoadDirect(url, textureId, width, height);
+            queueTextureLoadDirect(imgUrl, textureId, width, height);
         } else {
-            queueTextureLoadChunked(url, textureId, width, height, chunkSize);
+            queueTextureLoadChunked(imgUrl, textureId, width, height, chunkSize);
         }
     });
 
     return textureId;
-}
-
-function createTexture(imgUrlPtr, imgUrlLen, wrap) {
-    const imgUrl = readCharStr(imgUrlPtr, imgUrlLen);
-
-    return createTexturePng(imgUrl, wrap);
-
-    // const texture = gl.createTexture();
-    // gl.bindTexture(gl.TEXTURE_2D, texture);
-    // gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
-
-    // const level = 0;
-    // const internalFormat = gl.RGBA;
-    // const width = 1;
-    // const height = 1;
-    // const border = 0;
-    // const srcFormat = gl.RGBA;
-    // const srcType = gl.UNSIGNED_BYTE;
-    // const pixel = new Uint8Array([255, 255, 255, 255]);
-    // gl.texImage2D(gl.TEXTURE_2D, level, internalFormat, width, height, border, srcFormat, srcType, pixel);
-
-    // glTextures.push(texture);
-    // const index = glTextures.length - 1;
-
-    // const image = new Image();
-    // image.onload = function() {
-    //     // const tempCanvas = document.createElement("canvas");
-    //     // tempCanvas.width = image.width;
-    //     // tempCanvas.height = image.height;
-    //     // const tempCtx = tempCanvas.getContext("2d");
-    //     // tempCtx.drawImage(image, 0, 0, image.width, image.height);
-    //     // const imgData = tempCtx.getImageData(0, 0, image.width, image.height);
-    //     gl.bindTexture(gl.TEXTURE_2D, texture);
-    //     gl.texImage2D(gl.TEXTURE_2D, level, internalFormat, srcFormat, srcType, image);
-    //     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrap);
-    //     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, wrap);
-    //     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    //     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-    //     // if (isPowerOfTwo(image.width) && isPowerOfTwo(image.height)) {
-    //     //     gl.generateMipmap(gl.TEXTURE_2D);
-    //     // }
-
-    //     _wasmInstance.exports.onTextureLoaded(index, image.width, image.height);
-    // };
-    // image.src = imgUrl;
-
-    // return index;
 };
 
 const glClear = function(x) {
@@ -492,6 +471,8 @@ function wasmInit(wasmUri, memoryBytes)
         const dummyBackground = document.getElementById("dummyBackground");
 
         function step(timestamp) {
+            doNextLoadTextureJob();
+
             const scrollY = document.documentElement.scrollTop || document.body.scrollTop;
             const totalHeight = onAnimationFrame(_canvas.width, _canvas.height, scrollY, timestamp);
             if (totalHeight !== 0 && _currentHeight !== totalHeight) {

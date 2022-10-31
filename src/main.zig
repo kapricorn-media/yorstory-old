@@ -511,14 +511,15 @@ fn tryLoadAndGetParallaxSet(state: *State, index: usize) ?ParallaxSet
                     break;
                 }
             } else {
+                loaded = false;
                 std.log.err("Bad asset ID {}", .{id});
             }
         } else {
+            loaded = false;
             parallaxImage.assetId = state.assets.registerDynamicTexture(
                 parallaxImage.url, w.GL_CLAMP_TO_EDGE
             ) catch |err| {
                 std.log.err("register texture error {}", .{err});
-                loaded = false;
                 break;
             };
         }
