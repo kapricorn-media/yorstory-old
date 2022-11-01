@@ -182,6 +182,7 @@ function linkShaderProgram(vertexShaderId, fragmentShaderId) {
     if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
         throw ("Error linking program:" + gl.getProgramInfoLog (program));
     }
+
     glPrograms.push(program);
     return glPrograms.length - 1;
 };
@@ -229,7 +230,7 @@ function queueTextureLoadChunked(url, textureId, width, height, chunkSize)
     }
 }
 
-function createTexture(imgUrlPtr, imgUrlLen, wrap) {
+function createTexture(imgUrlPtr, imgUrlLen, wrap, filter) {
     const imgUrl = readCharStr(imgUrlPtr, imgUrlLen);
     const chunkSizeMax = 512 * 1024;
 
@@ -267,8 +268,8 @@ function createTexture(imgUrlPtr, imgUrlLen, wrap) {
         gl.texImage2D(gl.TEXTURE_2D, level, internalFormat, width, height, border, srcFormat, srcType, pixels);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrap);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, wrap);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, filter);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, filter);
 
         if (chunkSize === 0) {
             queueTextureLoadDirect(imgUrl, textureId, width, height);
@@ -374,37 +375,71 @@ const env = {
     linkShaderProgram,
     createTexture,
 
-    glClear,
-    glClearColor,
+    // glClear,
+    // glClearColor,
 
-    glEnable,
+    // glEnable,
 
-    glBlendFunc,
-    glDepthFunc,
+    // glBlendFunc,
+    // glDepthFunc,
 
-    glGetAttribLocation,
-    glGetUniformLocation,
+    // glGetAttribLocation,
+    // glGetUniformLocation,
 
-    glUniform1i,
-    glUniform1fv,
-    glUniform2fv,
-    glUniform3fv,
-    glUniform4fv,
+    // glUniform1i,
+    // glUniform1fv,
+    // glUniform2fv,
+    // glUniform3fv,
+    // glUniform4fv,
 
-    glCreateBuffer,
-    glBindBuffer,
-    glBufferData,
+    // glCreateBuffer,
+    // glBindBuffer,
+    // glBufferData,
 
-    glUseProgram,
+    // glUseProgram,
 
-    glEnableVertexAttribArray,
-    glVertexAttribPointer,
+    // glEnableVertexAttribArray,
+    // glVertexAttribPointer,
 
-    glActiveTexture,
-    glBindTexture,
+    // glActiveTexture,
+    // glBindTexture,
 
-    glDrawArrays,
+    // glDrawArrays,
 };
+
+function fillGlFunctions(env)
+{
+    if (gl === null) {
+        console.error("gl is null");
+        return;
+    }
+
+    for (let k in gl) {
+        const type = typeof gl[k];
+        if (type === "function") {
+            const prefixed = "gl" + k[0].toUpperCase() + k.substring(1);
+            env[prefixed] = function() {
+                return gl[k].apply(gl, arguments);
+            };
+        }
+    }
+
+    env.glCreateBuffer = function() {
+        glBuffers.push(gl.createBuffer());
+        return glBuffers.length - 1;
+    };
+    env.glBindBuffer = function(type, bufferId) {
+        gl.bindBuffer(type, glBuffers[bufferId]);
+    };
+    env.glBufferData = function(type, dataPtr, count, drawType) {
+        const floats = new Float32Array(_wasmInstance.exports.memory.buffer, dataPtr, count);
+        gl.bufferData(type, floats, drawType);
+    };
+
+    env.glBindTexture = function(textureType, textureId) {
+        gl.bindTexture(textureType, glTextures[textureId]);
+    };
+}
 
 function updateCanvasSize()
 {
@@ -458,6 +493,7 @@ function wasmInit(wasmUri, memoryBytes)
     let importObject = {
         env: env,
     };
+    fillGlFunctions(importObject.env, gl);
 
     WebAssembly.instantiateStreaming(fetch(wasmUri), importObject).then(function(obj) {
         _wasmInstance = obj.instance;

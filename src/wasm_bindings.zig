@@ -22,7 +22,7 @@ pub extern fn setUri(uriPtr: *const u8, uriLen: c_uint) void;
 // GL
 pub extern fn compileShader(source: *const u8 , len: c_uint, type: c_uint) c_uint;
 pub extern fn linkShaderProgram(vertexShaderId: c_uint, fragmentShaderId: c_uint) c_uint;
-pub extern fn createTexture(imgUrlPtr: *const u8, imgUrlLen: c_uint, wrapMode: c_uint) c_uint;
+pub extern fn createTexture(imgUrlPtr: *const u8, imgUrlLen: c_uint, wrapMode: c_uint, filter: c_uint) c_uint;
 
 pub extern fn glClear(_: c_uint) void;
 pub extern fn glClearColor(_: f32, _: f32, _: f32, _: f32) void;
@@ -79,6 +79,9 @@ pub const GL_TEXTURE0: c_uint = 33984;
 
 pub const GL_REPEAT: c_uint = 10497;
 pub const GL_CLAMP_TO_EDGE: c_uint = 33071;
+
+pub const GL_NEAREST: c_uint = 9728;
+pub const GL_LINEAR: c_uint = 9729;
 
 pub fn log(
     comptime message_level: std.log.Level,
