@@ -1,7 +1,7 @@
+let gl = null;
 let _wasmInstance = null;
 let _memory = null;
 let _canvas = null;
-let gl = null;
 
 let _currentHeight = null;
 let _loadTextureJobs = [];
@@ -27,7 +27,7 @@ function doLoadTextureJob(width, height, chunkSize, textureId, image, i, loaded)
     const srcFormat = gl.RGBA;
     const srcType = gl.UNSIGNED_BYTE;
 
-    const texture = glTextures[textureId];
+    const texture = _glTextures[textureId];
     gl.bindTexture(gl.TEXTURE_2D, texture);
     gl.texSubImage2D(gl.TEXTURE_2D, level, xOffset, yOffset, srcFormat, srcType, image);
 
@@ -155,11 +155,12 @@ function setUri(uriPtr, uriLen) {
     window.location.href = uri;
 }
 
-const glShaders = [];
-const glPrograms = [];
-const glBuffers = [];
-const glUniformLocations = [];
-const glTextures = [];
+const _glBuffers = [];
+const _glFramebuffers = [];
+const _glPrograms = [];
+const _glShaders = [];
+const _glTextures = [];
+const _glUniformLocations = [];
 
 function compileShader(sourcePtr, sourceLen, type) {
     const source = readCharStr(sourcePtr, sourceLen);
@@ -170,21 +171,21 @@ function compileShader(sourcePtr, sourceLen, type) {
         throw "Error compiling shader:" + gl.getShaderInfoLog(shader);
     }
 
-    glShaders.push(shader);
-    return glShaders.length - 1;
+    _glShaders.push(shader);
+    return _glShaders.length - 1;
 };
 
 function linkShaderProgram(vertexShaderId, fragmentShaderId) {
     const program = gl.createProgram();
-    gl.attachShader(program, glShaders[vertexShaderId]);
-    gl.attachShader(program, glShaders[fragmentShaderId]);
+    gl.attachShader(program, _glShaders[vertexShaderId]);
+    gl.attachShader(program, _glShaders[fragmentShaderId]);
     gl.linkProgram(program);
     if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
         throw ("Error linking program:" + gl.getProgramInfoLog (program));
     }
 
-    glPrograms.push(program);
-    return glPrograms.length - 1;
+    _glPrograms.push(program);
+    return _glPrograms.length - 1;
 };
 
 function queueTextureLoadDirect(url, textureId, width, height)
@@ -195,7 +196,7 @@ function queueTextureLoadDirect(url, textureId, width, height)
             console.error("mismatched image dimensions");
         }
 
-        const texture = glTextures[textureId];
+        const texture = _glTextures[textureId];
         gl.bindTexture(gl.TEXTURE_2D, texture);
         const level = 0;
         const xOffset = 0;
@@ -230,11 +231,28 @@ function queueTextureLoadChunked(url, textureId, width, height, chunkSize)
     }
 }
 
-function createTexture(imgUrlPtr, imgUrlLen, wrap, filter) {
+function createTexture(width, height, wrap, filter) {
+    const textureId = env.glCreateTexture();
+    const texture = _glTextures[textureId];
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+
+    const level = 0;
+    const internalFormat = gl.RGBA;
+    const border = 0;
+    const srcFormat = gl.RGBA;
+    const srcType = gl.UNSIGNED_BYTE;
+    const pixels = new Uint8Array(width * height * 4);
+    gl.texImage2D(gl.TEXTURE_2D, level, internalFormat, width, height, border, srcFormat, srcType, pixels);
+
+    return textureId;
+};
+
+function loadTexture(imgUrlPtr, imgUrlLen, wrap, filter) {
     const imgUrl = readCharStr(imgUrlPtr, imgUrlLen);
     const chunkSizeMax = 512 * 1024;
 
-    const texture = gl.createTexture();
+    const textureId = env.glCreateTexture();
+    const texture = _glTextures[textureId];
     gl.bindTexture(gl.TEXTURE_2D, texture);
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
 
@@ -247,9 +265,6 @@ function createTexture(imgUrlPtr, imgUrlLen, wrap, filter) {
     const srcType = gl.UNSIGNED_BYTE;
     const tempPixels = new Uint8Array([255, 255, 255, 255]);
     gl.texImage2D(gl.TEXTURE_2D, level, internalFormat, tempWidth, tempHeight, border, srcFormat, srcType, tempPixels);
-
-    glTextures.push(texture);
-    const textureId = glTextures.length - 1;
 
     const uri = `/webgl_png?path=${imgUrl}&chunkSizeMax=${chunkSizeMax}`;
     httpGet(uri, function(status, data) {
@@ -281,82 +296,9 @@ function createTexture(imgUrlPtr, imgUrlLen, wrap, filter) {
     return textureId;
 };
 
-const glClear = function(x) {
-    gl.clear(x);
-};
-const glClearColor = function(r, g, b, a) {
-    gl.clearColor(r, g, b, a);
-};
-
-const glEnable = function(x) {
-    gl.enable(x);
-};
-
-const glBlendFunc = function(x, y) {
-    gl.blendFunc(x, y);
-};
-const glDepthFunc = function(x) {
-    gl.depthFunc(x);
-};
-
-const glGetAttribLocation = function(programId, namePtr, nameLen) {
-    const name = readCharStr(namePtr, nameLen);
-    return  gl.getAttribLocation(glPrograms[programId], name);
-};
-const glGetUniformLocation = function(programId, namePtr, nameLen)  {
-    glUniformLocations.push(gl.getUniformLocation(glPrograms[programId], readCharStr(namePtr, nameLen)));
-    return glUniformLocations.length - 1;
-};
-
-const glUniform1i = function(locationId, value) {
-    gl.uniform1i(glUniformLocations[locationId], value);
-};
-const glUniform1fv = function(locationId, x) {
-    gl.uniform1fv(glUniformLocations[locationId], [x]);
-};
-const glUniform2fv = function(locationId, x, y) {
-    gl.uniform2fv(glUniformLocations[locationId], [x, y]);
-};
-const glUniform3fv = function(locationId, x, y, z) {
-    gl.uniform3fv(glUniformLocations[locationId], [x, y, z]);
-};
-const glUniform4fv = function(locationId, x, y, z, w) {
-    gl.uniform4fv(glUniformLocations[locationId], [x, y, z, w]);
-};
-
-const glCreateBuffer = function() {
-    glBuffers.push(gl.createBuffer());
-    return glBuffers.length - 1;
-};
-const glBindBuffer = function(type, bufferId) {
-    gl.bindBuffer(type, glBuffers[bufferId]);
-};
-const glBufferData = function(type, dataPtr, count, drawType) {
-    const floats = new Float32Array(_wasmInstance.exports.memory.buffer, dataPtr, count);
-    gl.bufferData(type, floats, drawType);
-};
-
-const glUseProgram = function(programId) {
-    gl.useProgram(glPrograms[programId]);
-};
-
-const glEnableVertexAttribArray = function(x) {
-    gl.enableVertexAttribArray(x);
-};
-const glVertexAttribPointer = function(attribLocation, size, type, normalize, stride, offset) {
-    gl.vertexAttribPointer(attribLocation, size, type, normalize, stride, offset);
-};
-
-const glActiveTexture = function(texture) {
-    gl.activeTexture(texture);
-};
-const glBindTexture = function(textureType, textureId) {
-    gl.bindTexture(textureType, glTextures[textureId]);
-};
-
-const glDrawArrays = function(type, offset, count) {
-    gl.drawArrays(type, offset, count);
-};
+function bindNullFramebuffer() {
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+}
 
 const env = {
     // Debug functions
@@ -370,41 +312,12 @@ const env = {
     getUri,
     setUri,
 
-    // GL functions
+    // GL derived functions
     compileShader,
     linkShaderProgram,
     createTexture,
-
-    // glClear,
-    // glClearColor,
-
-    // glEnable,
-
-    // glBlendFunc,
-    // glDepthFunc,
-
-    // glGetAttribLocation,
-    // glGetUniformLocation,
-
-    // glUniform1i,
-    // glUniform1fv,
-    // glUniform2fv,
-    // glUniform3fv,
-    // glUniform4fv,
-
-    // glCreateBuffer,
-    // glBindBuffer,
-    // glBufferData,
-
-    // glUseProgram,
-
-    // glEnableVertexAttribArray,
-    // glVertexAttribPointer,
-
-    // glActiveTexture,
-    // glBindTexture,
-
-    // glDrawArrays,
+    loadTexture,
+    bindNullFramebuffer
 };
 
 function fillGlFunctions(env)
@@ -425,19 +338,63 @@ function fillGlFunctions(env)
     }
 
     env.glCreateBuffer = function() {
-        glBuffers.push(gl.createBuffer());
-        return glBuffers.length - 1;
+        _glBuffers.push(gl.createBuffer());
+        return _glBuffers.length - 1;
     };
     env.glBindBuffer = function(type, bufferId) {
-        gl.bindBuffer(type, glBuffers[bufferId]);
+        gl.bindBuffer(type, _glBuffers[bufferId]);
     };
     env.glBufferData = function(type, dataPtr, count, drawType) {
         const floats = new Float32Array(_wasmInstance.exports.memory.buffer, dataPtr, count);
         gl.bufferData(type, floats, drawType);
     };
 
+    env.glCreateFramebuffer = function() {
+        _glFramebuffers.push(gl.createFramebuffer());
+        return _glFramebuffers.length - 1;
+    };
+    env.glBindFramebuffer = function(framebufferType, framebufferId) {
+        gl.bindFramebuffer(framebufferType, _glFramebuffers[framebufferId]);
+    };
+    env.glFramebufferTexture2D = function(framebufferType, attachmentPoint, textureType, textureId, level) {
+        gl.framebufferTexture2D(framebufferType, attachmentPoint, textureType, _glTextures[textureId], level);
+    };
+
+    env.glCreateTexture = function() {
+        _glTextures.push(gl.createTexture());
+        return _glTextures.length - 1;
+    };
     env.glBindTexture = function(textureType, textureId) {
-        gl.bindTexture(textureType, glTextures[textureId]);
+        gl.bindTexture(textureType, _glTextures[textureId]);
+    };
+
+    env.glUseProgram = function(programId) {
+        gl.useProgram(_glPrograms[programId]);
+    };
+    env.glGetAttribLocation = function(programId, namePtr, nameLen) {
+        const name = readCharStr(namePtr, nameLen);
+        return  gl.getAttribLocation(_glPrograms[programId], name);
+    };
+    env.glGetUniformLocation = function(programId, namePtr, nameLen)  {
+        const name = readCharStr(namePtr, nameLen);
+        const uniformLocation = gl.getUniformLocation(_glPrograms[programId], name);
+        _glUniformLocations.push(uniformLocation);
+        return _glUniformLocations.length - 1;
+    };
+    env.glUniform1i = function(locationId, value) {
+        gl.uniform1i(_glUniformLocations[locationId], value);
+    };
+    env.glUniform1fv = function(locationId, x) {
+        gl.uniform1fv(_glUniformLocations[locationId], [x]);
+    };
+    env.glUniform2fv = function(locationId, x, y) {
+        gl.uniform2fv(_glUniformLocations[locationId], [x, y]);
+    };
+    env.glUniform3fv = function(locationId, x, y, z) {
+        gl.uniform3fv(_glUniformLocations[locationId], [x, y, z]);
+    };
+    env.glUniform4fv = function(locationId, x, y, z, w) {
+        gl.uniform4fv(_glUniformLocations[locationId], [x, y, z, w]);
     };
 }
 

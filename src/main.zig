@@ -79,7 +79,7 @@ const TextureData = struct {
 
     fn init(url: []const u8, wrapMode: c_uint, filter: c_uint) !Self
     {
-        const texture = w.createTexture(&url[0], url.len, wrapMode, filter);
+        const texture = w.loadTexture(&url[0], url.len, wrapMode, filter);
         if (texture == -1) {
             return error.createTextureFailed;
         }
@@ -375,6 +375,8 @@ const State = struct {
     fbAllocator: std.heap.FixedBufferAllocator,
 
     renderState: render.RenderState,
+    fbTexture: c_uint,
+    fb: c_uint,
 
     assets: Assets,
 
@@ -402,10 +404,21 @@ const State = struct {
     {
         var fbAllocator = std.heap.FixedBufferAllocator.init(buf);
 
+        w.glClearColor(0.0, 0.0, 0.0, 1.0);
+        w.glEnable(w.GL_DEPTH_TEST);
+        w.glDepthFunc(w.GL_LEQUAL);
+
+        w.glEnable(w.GL_BLEND);
+        w.glBlendFunc(w.GL_SRC_ALPHA, w.GL_ONE_MINUS_SRC_ALPHA);
+
+        ww.setCursor("auto");
+
         return Self {
             .fbAllocator = fbAllocator,
 
             .renderState = try render.RenderState.init(),
+            .fbTexture = 0,
+            .fb = 0,
 
             .assets = try Assets.init(fbAllocator.allocator()),
 
@@ -453,15 +466,6 @@ export fn onInit() void
         std.log.err("State init failed, err {}", .{err});
         return;
     };
-
-    w.glClearColor(0.0, 0.0, 0.0, 1.0);
-    w.glEnable(w.GL_DEPTH_TEST);
-    w.glDepthFunc(w.GL_LEQUAL);
-
-    w.glEnable(w.GL_BLEND);
-    w.glBlendFunc(w.GL_SRC_ALPHA, w.GL_ONE_MINUS_SRC_ALPHA);
-
-    ww.setCursor("auto");
 }
 
 export fn onMouseMove(x: c_int, y: c_int) void
@@ -632,6 +636,14 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
     const deltaMs = if (state.timestampMsPrev > 0) (timestampMs - state.timestampMsPrev) else 0;
     const deltaS = @intToFloat(f32, deltaMs) / 1000.0;
 
+    if (!m.Vec2i.eql(state.screenSizePrev, screenSizeI)) {
+        std.log.info("resetting screen framebuffer", .{});
+        state.fbTexture = w.createTexture(screenSizeI.x, screenSizeI.y, w.GL_CLAMP_TO_EDGE, w.GL_NEAREST);
+        state.fb = w.glCreateFramebuffer();
+        w.glBindFramebuffer(w.GL_FRAMEBUFFER, state.fb);
+        w.glFramebufferTexture2D(w.GL_FRAMEBUFFER, w.GL_COLOR_ATTACHMENT0, w.GL_TEXTURE_2D, state.fbTexture, 0);
+    }
+
     if (state.scrollYPrev != scrollY) {
     }
     // TODO
@@ -658,6 +670,8 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
         targetWidth = screenSizeF.y * maxAspect;
     }
     const marginX = (screenSizeF.x - targetWidth) / 2.0;
+
+    w.glBindFramebuffer(w.GL_FRAMEBUFFER, state.fb);
 
     w.glClear(w.GL_COLOR_BUFFER_BIT | w.GL_DEPTH_BUFFER_BIT);
 
@@ -1116,6 +1130,10 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
     } else {
         ww.setCursor("auto");
     }
+
+    w.bindNullFramebuffer();
+    w.glClear(w.GL_COLOR_BUFFER_BIT | w.GL_DEPTH_BUFFER_BIT);
+    state.renderState.quadTexState.drawQuad(m.Vec2.zero, screenSizeF, 0.0, state.fbTexture, m.Vec4.one, screenSizeF);
 
     // debug grid
     if (state.debug) {
