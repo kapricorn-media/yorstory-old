@@ -541,10 +541,111 @@ const RoundedFrameState = struct {
     }
 };
 
+const PostProcessState = struct {
+    positionBuffer: c_uint,
+    uvBuffer: c_uint,
+
+    programId: c_uint,
+
+    positionAttrLoc: c_int,
+    uvAttrLoc: c_int,
+
+    samplerUniLoc: c_int,
+    screenSizeUniLoc: c_int,
+
+    const positions = [6]m.Vec2 {
+        m.Vec2.init(0.0, 0.0),
+        m.Vec2.init(0.0, 1.0),
+        m.Vec2.init(1.0, 1.0),
+        m.Vec2.init(1.0, 1.0),
+        m.Vec2.init(1.0, 0.0),
+        m.Vec2.init(0.0, 0.0),
+    };
+
+    const vert = @embedFile("shaders/post.vert");
+    const frag = @embedFile("shaders/post.frag");
+
+    const Self = @This();
+
+    pub fn init() !Self
+    {
+        // TODO error check all these
+        const vertQuadId = w.compileShader(&vert[0], vert.len, w.GL_VERTEX_SHADER);
+        const fragQuadId = w.compileShader(&frag[0], frag.len, w.GL_FRAGMENT_SHADER);
+
+        const positionBuffer = w.glCreateBuffer();
+        w.glBindBuffer(w.GL_ARRAY_BUFFER, positionBuffer);
+        w.glBufferData(w.GL_ARRAY_BUFFER, @alignCast(4, &positions[0].x), positions.len * 2, w.GL_STATIC_DRAW);
+
+        const uvBuffer = w.glCreateBuffer();
+        w.glBindBuffer(w.GL_ARRAY_BUFFER, uvBuffer);
+        // UVs are the same as positions
+        w.glBufferData(w.GL_ARRAY_BUFFER, @alignCast(4, &positions[0].x), positions.len * 2, w.GL_STATIC_DRAW);
+
+        const programId = w.linkShaderProgram(vertQuadId, fragQuadId);
+
+        const a_position = "a_position";
+        const positionAttrLoc = w.glGetAttribLocation(programId, &a_position[0], a_position.len);
+        if (positionAttrLoc == -1) {
+            return error.MissingAttrLoc;
+        }
+        const a_uv = "a_uv";
+        const uvAttrLoc = w.glGetAttribLocation(programId, &a_uv[0], a_uv.len);
+        if (uvAttrLoc == -1) {
+            return error.MissingAttrLoc;
+        }
+
+        const u_sampler = "u_sampler";
+        const samplerUniLoc = w.glGetUniformLocation(programId, &u_sampler[0], u_sampler.len);
+        if (samplerUniLoc == -1) {
+            return error.MissingUniformLoc;
+        }
+        const u_screenSize = "u_screenSize";
+        const screenSizeUniLoc = w.glGetUniformLocation(programId, &u_screenSize[0], u_screenSize.len);
+        if (screenSizeUniLoc == -1) {
+            return error.MissingUniformLoc;
+        }
+
+        return Self {
+            .positionBuffer = positionBuffer,
+            .uvBuffer = uvBuffer,
+
+            .programId = programId,
+
+            .positionAttrLoc = positionAttrLoc,
+            .uvAttrLoc = uvAttrLoc,
+
+            .samplerUniLoc = samplerUniLoc,
+            .screenSizeUniLoc = screenSizeUniLoc,
+        };
+    }
+
+    pub fn draw(self: Self, texture: c_uint, screenSize: m.Vec2) void
+    {
+        w.glUseProgram(self.programId);
+
+        w.glEnableVertexAttribArray(@intCast(c_uint, self.positionAttrLoc));
+        w.glBindBuffer(w.GL_ARRAY_BUFFER, self.positionBuffer);
+        w.glVertexAttribPointer(@intCast(c_uint, self.positionAttrLoc), 2, w.GL_f32, 0, 0, 0);
+        w.glEnableVertexAttribArray(@intCast(c_uint, self.uvAttrLoc));
+        w.glBindBuffer(w.GL_ARRAY_BUFFER, self.uvBuffer);
+        w.glVertexAttribPointer(@intCast(c_uint, self.uvAttrLoc), 2, w.GL_f32, 0, 0, 0);
+
+        w.glUniform2fv(self.screenSizeUniLoc, screenSize.x, screenSize.y);
+
+        w.glActiveTexture(w.GL_TEXTURE0);
+        w.glBindTexture(w.GL_TEXTURE_2D, texture);
+        w.glUniform1i(self.samplerUniLoc, 0);
+
+        w.glDrawArrays(w.GL_TRIANGLES, 0, positions.len);
+    }
+};
+
 pub const RenderState = struct {
     quadState: QuadState,
     quadTexState: QuadTextureState,
     roundedFrameState: RoundedFrameState,
+    postProcessState: PostProcessState,
 
     const Self = @This();
 
@@ -554,6 +655,7 @@ pub const RenderState = struct {
             .quadState = try QuadState.init(),
             .quadTexState = try QuadTextureState.init(),
             .roundedFrameState = try RoundedFrameState.init(),
+            .postProcessState = try PostProcessState.init(),
         };
     }
 
@@ -562,6 +664,7 @@ pub const RenderState = struct {
         self.quadState.deinit();
         self.quadTexState.deinit();
         self.roundedFrameState.deinit();
+        self.postProcessState.deinit();
     }
 };
 

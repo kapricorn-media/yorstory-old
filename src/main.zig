@@ -673,7 +673,8 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
 
     w.glBindFramebuffer(w.GL_FRAMEBUFFER, state.fb);
 
-    w.glClear(w.GL_COLOR_BUFFER_BIT | w.GL_DEPTH_BUFFER_BIT);
+    // w.glClear(w.GL_COLOR_BUFFER_BIT | w.GL_DEPTH_BUFFER_BIT);
+    w.glClear(w.GL_COLOR_BUFFER_BIT);
 
     // const colorWhite = m.Vec4.init(1.0, 1.0, 1.0, 1.0);
     const colorBlack = m.Vec4.init(0.0, 0.0, 0.0, 1.0);
@@ -695,7 +696,7 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
         .Home => {
             // Determine whether the active parallax set is loaded
             var activeParallaxSet = tryLoadAndGetParallaxSet(state, state.activeParallaxSetIndex);
-            const parallaxSetSwapSeconds = 6000;
+            const parallaxSetSwapSeconds = 6;
             if (activeParallaxSet) |_| {
                 state.parallaxIdleTimeMs += deltaMs;
                 const nextSetIndex = (state.activeParallaxSetIndex + 1) % state.parallaxImageSets.len;
@@ -1133,7 +1134,8 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
 
     w.bindNullFramebuffer();
     w.glClear(w.GL_COLOR_BUFFER_BIT | w.GL_DEPTH_BUFFER_BIT);
-    state.renderState.quadTexState.drawQuad(m.Vec2.zero, screenSizeF, 0.0, state.fbTexture, m.Vec4.one, screenSizeF);
+    state.renderState.postProcessState.draw(state.fbTexture, screenSizeF);
+    // state.renderState.quadTexState.drawQuad(m.Vec2.zero, screenSizeF, 0.0, state.fbTexture, m.Vec4.one, screenSizeF);
 
     // debug grid
     if (state.debug) {
