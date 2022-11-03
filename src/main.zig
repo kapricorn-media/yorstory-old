@@ -7,6 +7,8 @@ const render = @import("render.zig");
 const w = @import("wasm_bindings.zig");
 const ww = @import("wasm.zig");
 
+const defaultTextureFilter = w.GL_LINEAR;
+
 const Memory = struct {
     persistent: [64 * 1024]u8 align(8),
     transient: [64 * 1024]u8 align(8),
@@ -111,25 +113,25 @@ const Assets = struct {
     {
         var self: Self = undefined;
         self.staticTextures[@enumToInt(Texture.DecalTopLeft)] = try TextureData.init(
-            "/images/decal-topleft-white.png", w.GL_CLAMP_TO_EDGE, w.GL_NEAREST
+            "/images/decal-topleft-white.png", w.GL_CLAMP_TO_EDGE, defaultTextureFilter
         );
         self.staticTextures[@enumToInt(Texture.IconContact)] = try TextureData.init(
-            "/images/icon-contact.png", w.GL_CLAMP_TO_EDGE, w.GL_NEAREST
+            "/images/icon-contact.png", w.GL_CLAMP_TO_EDGE, defaultTextureFilter
         );
         self.staticTextures[@enumToInt(Texture.IconHome)] = try TextureData.init(
-            "/images/icon-home.png", w.GL_CLAMP_TO_EDGE, w.GL_NEAREST
+            "/images/icon-home.png", w.GL_CLAMP_TO_EDGE, defaultTextureFilter
         );
         self.staticTextures[@enumToInt(Texture.IconPortfolio)] = try TextureData.init(
-            "/images/icon-portfolio.png", w.GL_CLAMP_TO_EDGE, w.GL_NEAREST
+            "/images/icon-portfolio.png", w.GL_CLAMP_TO_EDGE, defaultTextureFilter
         );
         self.staticTextures[@enumToInt(Texture.IconWork)] = try TextureData.init(
-            "/images/icon-work.png", w.GL_CLAMP_TO_EDGE, w.GL_NEAREST
+            "/images/icon-work.png", w.GL_CLAMP_TO_EDGE, defaultTextureFilter
         );
         self.staticTextures[@enumToInt(Texture.StickerBackgroundWithIcons)] = try TextureData.init(
-            "/images/sticker-background-white.png", w.GL_CLAMP_TO_EDGE, w.GL_NEAREST
+            "/images/sticker-background-white.png", w.GL_CLAMP_TO_EDGE, defaultTextureFilter
         );
         self.staticTextures[@enumToInt(Texture.StickerNumber)] = try TextureData.init(
-            "/images/sticker-number.png", w.GL_CLAMP_TO_EDGE, w.GL_NEAREST
+            "/images/sticker-number.png", w.GL_CLAMP_TO_EDGE, defaultTextureFilter
         );
         self.numDynamicTextures = 0;
         self.idMap = std.StringHashMap(usize).init(allocator);
@@ -521,7 +523,7 @@ fn tryLoadAndGetParallaxSet(state: *State, index: usize) ?ParallaxSet
         } else {
             loaded = false;
             parallaxImage.assetId = state.assets.registerDynamicTexture(
-                parallaxImage.url, w.GL_CLAMP_TO_EDGE, w.GL_NEAREST
+                parallaxImage.url, w.GL_CLAMP_TO_EDGE, defaultTextureFilter
             ) catch |err| {
                 std.log.err("register texture error {}", .{err});
                 break;
@@ -558,7 +560,7 @@ fn drawImageGrid(images: []const GridImage, itemsPerRow: usize, topLeft: m.Vec2,
                 );
             }
         } else {
-            _ = state.assets.registerDynamicTexture(img.uri, w.GL_CLAMP_TO_EDGE, w.GL_NEAREST) catch |err| {
+            _ = state.assets.registerDynamicTexture(img.uri, w.GL_CLAMP_TO_EDGE, defaultTextureFilter) catch |err| {
                 std.log.err("failed to register {s}, err {}", .{img.uri, err});
                 return 0;
             };
@@ -766,7 +768,7 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
                     renderQueue.quadTex(landingImagePos, landingImageSize, 1.0, landingTex.id, m.Vec4.one);
                 }
             } else {
-                _ = state.assets.registerDynamicTexture(pf.landing, w.GL_CLAMP_TO_EDGE, w.GL_NEAREST) catch |err| {
+                _ = state.assets.registerDynamicTexture(pf.landing, w.GL_CLAMP_TO_EDGE, defaultTextureFilter) catch |err| {
                     std.log.err("register failed for {s} error {}", .{pf.landing, err});
                 };
             }
