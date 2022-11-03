@@ -71,6 +71,7 @@ const ServerState = struct {
     allocator: std.mem.Allocator,
 
     chunkedPngStore: ChunkedPngStore,
+    chunkedPngLoadMutex: std.Thread.Mutex,
 
     port: u16,
 
@@ -81,6 +82,7 @@ const ServerState = struct {
         return Self {
             .allocator = allocator,
             .chunkedPngStore = ChunkedPngStore.init(allocator),
+            .chunkedPngLoadMutex = std.Thread.Mutex{},
             .port = port,
         };
     }
@@ -139,6 +141,10 @@ fn handleWebglPngRequest(state: *ServerState, path: []const u8, chunkSizeMax: us
     const allocator = arenaAllocator.allocator();
 
     const data = state.chunkedPngStore.get(path) orelse blk: {
+        // mutex here avoids crazy memory usage spikes at the cost of slowness
+        state.chunkedPngLoadMutex.lock();
+        defer state.chunkedPngLoadMutex.unlock();
+
         // Read file data
         const fullPath = try std.mem.concat(allocator, u8, &[_][]const u8 {"static", path});
         const cwd = std.fs.cwd();
