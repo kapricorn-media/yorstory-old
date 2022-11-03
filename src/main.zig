@@ -7,7 +7,11 @@ const render = @import("render.zig");
 const w = @import("wasm_bindings.zig");
 const ww = @import("wasm.zig");
 
+const defaultTextureWrap = w.GL_CLAMP_TO_EDGE;
 const defaultTextureFilter = w.GL_LINEAR;
+
+const refSize = m.Vec2.init(3840, 2000);
+const gridRefSize = 74;
 
 const Memory = struct {
     persistent: [64 * 1024]u8 align(8),
@@ -69,6 +73,8 @@ const Texture = enum(usize) {
     IconHome,
     IconPortfolio,
     IconWork,
+    Logo343,
+    LogoMicrosoft,
     StickerBackgroundWithIcons,
     StickerNumber,
 };
@@ -113,25 +119,31 @@ const Assets = struct {
     {
         var self: Self = undefined;
         self.staticTextures[@enumToInt(Texture.DecalTopLeft)] = try TextureData.init(
-            "/images/decal-topleft-white.png", w.GL_CLAMP_TO_EDGE, defaultTextureFilter
+            "/images/decal-topleft-white.png", defaultTextureWrap, defaultTextureFilter
         );
         self.staticTextures[@enumToInt(Texture.IconContact)] = try TextureData.init(
-            "/images/icon-contact.png", w.GL_CLAMP_TO_EDGE, defaultTextureFilter
+            "/images/icon-contact.png", defaultTextureWrap, defaultTextureFilter
         );
         self.staticTextures[@enumToInt(Texture.IconHome)] = try TextureData.init(
-            "/images/icon-home.png", w.GL_CLAMP_TO_EDGE, defaultTextureFilter
+            "/images/icon-home.png", defaultTextureWrap, defaultTextureFilter
         );
         self.staticTextures[@enumToInt(Texture.IconPortfolio)] = try TextureData.init(
-            "/images/icon-portfolio.png", w.GL_CLAMP_TO_EDGE, defaultTextureFilter
+            "/images/icon-portfolio.png", defaultTextureWrap, defaultTextureFilter
         );
         self.staticTextures[@enumToInt(Texture.IconWork)] = try TextureData.init(
-            "/images/icon-work.png", w.GL_CLAMP_TO_EDGE, defaultTextureFilter
+            "/images/icon-work.png", defaultTextureWrap, defaultTextureFilter
+        );
+        self.staticTextures[@enumToInt(Texture.Logo343)] = try TextureData.init(
+            "/images/logo-343.png", defaultTextureWrap, defaultTextureFilter
+        );
+        self.staticTextures[@enumToInt(Texture.LogoMicrosoft)] = try TextureData.init(
+            "/images/logo-microsoft.png", defaultTextureWrap, defaultTextureFilter
         );
         self.staticTextures[@enumToInt(Texture.StickerBackgroundWithIcons)] = try TextureData.init(
-            "/images/sticker-background-white.png", w.GL_CLAMP_TO_EDGE, defaultTextureFilter
+            "/images/sticker-background-white.png", defaultTextureWrap, defaultTextureFilter
         );
         self.staticTextures[@enumToInt(Texture.StickerNumber)] = try TextureData.init(
-            "/images/sticker-number.png", w.GL_CLAMP_TO_EDGE, defaultTextureFilter
+            "/images/sticker-number.png", defaultTextureWrap, defaultTextureFilter
         );
         self.numDynamicTextures = 0;
         self.idMap = std.StringHashMap(usize).init(allocator);
@@ -523,7 +535,7 @@ fn tryLoadAndGetParallaxSet(state: *State, index: usize) ?ParallaxSet
         } else {
             loaded = false;
             parallaxImage.assetId = state.assets.registerDynamicTexture(
-                parallaxImage.url, w.GL_CLAMP_TO_EDGE, defaultTextureFilter
+                parallaxImage.url, defaultTextureWrap, defaultTextureFilter
             ) catch |err| {
                 std.log.err("register texture error {}", .{err});
                 break;
@@ -560,7 +572,7 @@ fn drawImageGrid(images: []const GridImage, itemsPerRow: usize, topLeft: m.Vec2,
                 );
             }
         } else {
-            _ = state.assets.registerDynamicTexture(img.uri, w.GL_CLAMP_TO_EDGE, defaultTextureFilter) catch |err| {
+            _ = state.assets.registerDynamicTexture(img.uri, defaultTextureWrap, defaultTextureFilter) catch |err| {
                 std.log.err("failed to register {s}, err {}", .{img.uri, err});
                 return 0;
             };
@@ -583,6 +595,13 @@ fn drawImageGrid(images: []const GridImage, itemsPerRow: usize, topLeft: m.Vec2,
 
     // TODO doesn't work with titles
     return @intToFloat(f32, ((images.len - 1) / itemsPerRow) + 1) * (itemSize.y + spacing);
+}
+
+fn getTextureScaledSize(size: m.Vec2i, screenSize: m.Vec2) m.Vec2
+{
+    const sizeF = m.Vec2.initFromVec2i(size);
+    const scaleFactor = screenSize.y / refSize.y;
+    return m.Vec2.multScalar(sizeF, scaleFactor);
 }
 
 export fn onMouseDown(button: c_int, x: c_int, y: c_int) void
@@ -640,7 +659,7 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
 
     if (!m.Vec2i.eql(state.screenSizePrev, screenSizeI)) {
         std.log.info("resetting screen framebuffer", .{});
-        state.fbTexture = w.createTexture(screenSizeI.x, screenSizeI.y, w.GL_CLAMP_TO_EDGE, w.GL_NEAREST);
+        state.fbTexture = w.createTexture(screenSizeI.x, screenSizeI.y, defaultTextureWrap, w.GL_NEAREST);
         state.fb = w.glCreateFramebuffer();
         w.glBindFramebuffer(w.GL_FRAMEBUFFER, state.fb);
         w.glFramebufferTexture2D(w.GL_FRAMEBUFFER, w.GL_COLOR_ATTACHMENT0, w.GL_TEXTURE_2D, state.fbTexture, 0);
@@ -653,17 +672,13 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
     //     return 0;
     // }
 
-    const refSize = m.Vec2i.init(3840, 2000);
     // const refImageSize = m.Vec2i.init(3692, 1778);
-    const gridRefSize = 74;
 
-    const fontStickerSize = 124 / @intToFloat(f32, refSize.y) * screenSizeF.y;
-    const fontStickerSmallSize = 26 / @intToFloat(f32, refSize.y) * screenSizeF.y;
-    const fontSubtitleSize = 84 / @intToFloat(f32, refSize.y) * screenSizeF.y;
-    const fontTextSize = 30 / @intToFloat(f32, refSize.y) * screenSizeF.y;
-    const gridSize = std.math.round(
-        @intToFloat(f32, gridRefSize) / @intToFloat(f32, refSize.y) * screenSizeF.y
-    );
+    const fontStickerSize = 124 / refSize.y * screenSizeF.y;
+    const fontStickerSmallSize = 26 / refSize.y * screenSizeF.y;
+    const fontSubtitleSize = 84 / refSize.y * screenSizeF.y;
+    const fontTextSize = 30 / refSize.y * screenSizeF.y;
+    const gridSize = std.math.round(gridRefSize / refSize.y * screenSizeF.y);
     const halfGridSize = gridSize / 2.0;
 
     const maxAspect = 2.0;
@@ -768,7 +783,7 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
                     renderQueue.quadTex(landingImagePos, landingImageSize, 1.0, landingTex.id, m.Vec4.one);
                 }
             } else {
-                _ = state.assets.registerDynamicTexture(pf.landing, w.GL_CLAMP_TO_EDGE, defaultTextureFilter) catch |err| {
+                _ = state.assets.registerDynamicTexture(pf.landing, defaultTextureWrap, defaultTextureFilter) catch |err| {
                     std.log.err("register failed for {s} error {}", .{pf.landing, err});
                 };
             }
@@ -955,6 +970,28 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
         fontTextSize, lineHeight, 0.0,
         colorUi, "HelveticaMedium"
     );
+
+    if (state.pageData == .Entry) {
+        const logoMicrosoft = state.assets.getStaticTextureData(Texture.LogoMicrosoft);
+        const logo343 = state.assets.getStaticTextureData(Texture.Logo343);
+        if (logoMicrosoft.loaded() and logo343.loaded()) {
+            const yBase = textSubRightPos.y + gridSize * 2.0;
+            const size343 = getTextureScaledSize(logo343.size, screenSizeF);
+            const pos343 = m.Vec2.init(
+                screenSizeF.x - marginX - gridSize * 5.5 - size343.x + gridSize * 0.5,
+                yBase - size343.y
+            );
+            renderQueue.quadTex(pos343, size343, 0.0, logo343.id, colorUi);
+
+            const sizeMicrosoft = getTextureScaledSize(logoMicrosoft.size, screenSizeF);
+            const posMicrosoft = m.Vec2.init(
+                pos343.x - gridSize * 3 - sizeMicrosoft.x,
+                yBase - sizeMicrosoft.y
+            );
+            renderQueue.quadTex(posMicrosoft, sizeMicrosoft, 0.0, logoMicrosoft.id, colorUi);
+
+        }
+    }
 
     // content section
     const headerText = switch (state.pageData) {

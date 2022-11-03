@@ -1,11 +1,9 @@
 CRITICAL
-- image loading scroll
 
 MEDIUM
 - gallery
-- alpha blending of borders
-- logos of brands we've worked with
 - mobile
+- smarter should-redraw logic
 
 LOW
 - rounded corners
