@@ -1,5 +1,6 @@
 const std = @import("std");
 
+const assets = @import("assets.zig");
 const m = @import("math.zig");
 const parallax = @import("parallax.zig");
 const portfolio = @import("portfolio.zig");
@@ -77,113 +78,6 @@ const Texture = enum(usize) {
     LogoMicrosoft,
     StickerBackgroundWithIcons,
     StickerNumber,
-};
-
-const TextureData = struct {
-    id: c_uint,
-    size: m.Vec2i,
-
-    const Self = @This();
-
-    fn init(url: []const u8, wrapMode: c_uint, filter: c_uint, priority: u32) !Self
-    {
-        _ = priority;
-        const texture = w.loadTexture(&url[0], url.len, wrapMode, filter);
-        if (texture == -1) {
-            return error.createTextureFailed;
-        }
-
-        return Self {
-            .id = texture,
-            .size = m.Vec2i.zero, // set later when the image is loaded from URL
-        };
-    }
-
-    fn loaded(self: Self) bool
-    {
-        return !m.Vec2i.eql(self.size, m.Vec2i.zero);
-    }
-};
-
-const Assets = struct {
-    const numStaticTextures = @typeInfo(Texture).Enum.fields.len;
-    const maxDynamicTextures = 256;
-
-    staticTextures: [numStaticTextures]TextureData,
-    numDynamicTextures: usize,
-    dynamicTextures: [maxDynamicTextures]TextureData,
-    idMap: std.StringHashMap(usize),
-
-    const Self = @This();
-
-    fn init(allocator: std.mem.Allocator) !Self
-    {
-        var self: Self = undefined;
-        self.staticTextures[@enumToInt(Texture.DecalTopLeft)] = try TextureData.init(
-            "/images/decal-topleft-white.png", defaultTextureWrap, defaultTextureFilter, 0
-        );
-        self.staticTextures[@enumToInt(Texture.IconContact)] = try TextureData.init(
-            "/images/icon-contact.png", defaultTextureWrap, defaultTextureFilter, 0
-        );
-        self.staticTextures[@enumToInt(Texture.IconHome)] = try TextureData.init(
-            "/images/icon-home.png", defaultTextureWrap, defaultTextureFilter, 0
-        );
-        self.staticTextures[@enumToInt(Texture.IconPortfolio)] = try TextureData.init(
-            "/images/icon-portfolio.png", defaultTextureWrap, defaultTextureFilter, 0
-        );
-        self.staticTextures[@enumToInt(Texture.IconWork)] = try TextureData.init(
-            "/images/icon-work.png", defaultTextureWrap, defaultTextureFilter, 0
-        );
-        self.staticTextures[@enumToInt(Texture.Logo343)] = try TextureData.init(
-            "/images/logo-343.png", defaultTextureWrap, defaultTextureFilter, 1
-        );
-        self.staticTextures[@enumToInt(Texture.LogoMicrosoft)] = try TextureData.init(
-            "/images/logo-microsoft.png", defaultTextureWrap, defaultTextureFilter, 1
-        );
-        self.staticTextures[@enumToInt(Texture.StickerBackgroundWithIcons)] = try TextureData.init(
-            "/images/sticker-background-white.png", defaultTextureWrap, defaultTextureFilter, 0
-        );
-        self.staticTextures[@enumToInt(Texture.StickerNumber)] = try TextureData.init(
-            "/images/sticker-number.png", defaultTextureWrap, defaultTextureFilter, 1
-        );
-        self.numDynamicTextures = 0;
-        self.idMap = std.StringHashMap(usize).init(allocator);
-        return self;
-    }
-
-    fn getStaticTextureData(self: Self, texture: Texture) TextureData
-    {
-        return self.staticTextures[@enumToInt(texture)];
-    }
-
-    fn getDynamicTextureData(self: Self, id: usize) ?TextureData
-    {
-        if (id >= self.numDynamicTextures) {
-            return null;
-        }
-        return self.dynamicTextures[id];
-    }
-
-    fn getDynamicTextureDataUri(self: Self, uri: []const u8) ?TextureData
-    {
-        const id = self.idMap.get(uri) orelse return null;
-        return self.getDynamicTextureData(id);
-    }
-
-    fn registerDynamicTexture(self: *Self, url: []const u8, wrapMode: c_uint, filter: c_uint, priority: u32) !usize
-    {
-        if (self.numDynamicTextures >= self.dynamicTextures.len) {
-            return error.FullDynamicTextures;
-        }
-
-        const id = self.numDynamicTextures;
-        self.dynamicTextures[id] = try TextureData.init(url, wrapMode, filter, priority);
-
-        try self.idMap.put(url, id);
-
-        self.numDynamicTextures += 1;
-        return id;
-    }
 };
 
 // return true when pressed
@@ -393,7 +287,7 @@ const State = struct {
     fbTexture: c_uint,
     fb: c_uint,
 
-    assets: Assets,
+    assets: assets.Assets(Texture, 256),
 
     pageData: PageData,
     screenSizePrev: m.Vec2i,
@@ -428,14 +322,14 @@ const State = struct {
 
         ww.setCursor("auto");
 
-        return Self {
+        var self = Self {
             .fbAllocator = fbAllocator,
 
             .renderState = try render.RenderState.init(),
             .fbTexture = 0,
             .fb = 0,
 
-            .assets = try Assets.init(fbAllocator.allocator()),
+            .assets = assets.Assets(Texture, 256).init(fbAllocator.allocator()),
 
             .pageData = try uriToPageData(uri),
             .screenSizePrev = m.Vec2i.zero,
@@ -449,6 +343,36 @@ const State = struct {
 
             .debug = false,
         };
+
+        self.assets.staticTextures[@enumToInt(Texture.DecalTopLeft)] = try assets.TextureData.init(
+            "/images/decal-topleft-white.png", defaultTextureWrap, defaultTextureFilter, 0
+        );
+        self.assets.staticTextures[@enumToInt(Texture.IconContact)] = try assets.TextureData.init(
+            "/images/icon-contact.png", defaultTextureWrap, defaultTextureFilter, 0
+        );
+        self.assets.staticTextures[@enumToInt(Texture.IconHome)] = try assets.TextureData.init(
+            "/images/icon-home.png", defaultTextureWrap, defaultTextureFilter, 0
+        );
+        self.assets.staticTextures[@enumToInt(Texture.IconPortfolio)] = try assets.TextureData.init(
+            "/images/icon-portfolio.png", defaultTextureWrap, defaultTextureFilter, 0
+        );
+        self.assets.staticTextures[@enumToInt(Texture.IconWork)] = try assets.TextureData.init(
+            "/images/icon-work.png", defaultTextureWrap, defaultTextureFilter, 0
+        );
+        self.assets.staticTextures[@enumToInt(Texture.Logo343)] = try assets.TextureData.init(
+            "/images/logo-343.png", defaultTextureWrap, defaultTextureFilter, 1
+        );
+        self.assets.staticTextures[@enumToInt(Texture.LogoMicrosoft)] = try assets.TextureData.init(
+            "/images/logo-microsoft.png", defaultTextureWrap, defaultTextureFilter, 1
+        );
+        self.assets.staticTextures[@enumToInt(Texture.StickerBackgroundWithIcons)] = try assets.TextureData.init(
+            "/images/sticker-background-white.png", defaultTextureWrap, defaultTextureFilter, 0
+        );
+        self.assets.staticTextures[@enumToInt(Texture.StickerNumber)] = try assets.TextureData.init(
+            "/images/sticker-number.png", defaultTextureWrap, defaultTextureFilter, 1
+        );
+
+        return self;
     }
 
     pub fn deinit(self: Self) void
