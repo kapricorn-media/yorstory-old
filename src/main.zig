@@ -15,7 +15,7 @@ const refSize = m.Vec2.init(3840, 2000);
 const gridRefSize = 74;
 
 const Memory = struct {
-    persistent: [64 * 1024]u8 align(8),
+    persistent: [128 * 1024]u8 align(8),
     transient: [64 * 1024]u8 align(8),
 
     const Self = @This();
@@ -344,31 +344,34 @@ const State = struct {
             .debug = false,
         };
 
-        self.assets.staticTextures[@enumToInt(Texture.DecalTopLeft)] = try assets.TextureData.init(
+        _ = try self.assets.register(.{ .Static = Texture.DecalTopLeft },
             "/images/decal-topleft-white.png", defaultTextureWrap, defaultTextureFilter, 0
         );
-        self.assets.staticTextures[@enumToInt(Texture.IconContact)] = try assets.TextureData.init(
+        _ = try self.assets.register(.{ .Static = Texture.DecalTopLeft },
+            "/images/decal-topleft-white.png", defaultTextureWrap, defaultTextureFilter, 0
+        );
+        _ = try self.assets.register(.{ .Static = Texture.IconContact },
             "/images/icon-contact.png", defaultTextureWrap, defaultTextureFilter, 0
         );
-        self.assets.staticTextures[@enumToInt(Texture.IconHome)] = try assets.TextureData.init(
+        _ = try self.assets.register(.{ .Static = Texture.IconHome },
             "/images/icon-home.png", defaultTextureWrap, defaultTextureFilter, 0
         );
-        self.assets.staticTextures[@enumToInt(Texture.IconPortfolio)] = try assets.TextureData.init(
+        _ = try self.assets.register(.{ .Static = Texture.IconPortfolio },
             "/images/icon-portfolio.png", defaultTextureWrap, defaultTextureFilter, 0
         );
-        self.assets.staticTextures[@enumToInt(Texture.IconWork)] = try assets.TextureData.init(
+        _ = try self.assets.register(.{ .Static = Texture.IconWork },
             "/images/icon-work.png", defaultTextureWrap, defaultTextureFilter, 0
         );
-        self.assets.staticTextures[@enumToInt(Texture.Logo343)] = try assets.TextureData.init(
+        _ = try self.assets.register(.{ .Static = Texture.Logo343 },
             "/images/logo-343.png", defaultTextureWrap, defaultTextureFilter, 1
         );
-        self.assets.staticTextures[@enumToInt(Texture.LogoMicrosoft)] = try assets.TextureData.init(
+        _ = try self.assets.register(.{ .Static = Texture.LogoMicrosoft },
             "/images/logo-microsoft.png", defaultTextureWrap, defaultTextureFilter, 1
         );
-        self.assets.staticTextures[@enumToInt(Texture.StickerBackgroundWithIcons)] = try assets.TextureData.init(
+        _ = try self.assets.register(.{ .Static = Texture.StickerBackgroundWithIcons },
             "/images/sticker-background-white.png", defaultTextureWrap, defaultTextureFilter, 0
         );
-        self.assets.staticTextures[@enumToInt(Texture.StickerNumber)] = try assets.TextureData.init(
+        _ = try self.assets.register(.{ .Static = Texture.StickerNumber },
             "/images/sticker-number.png", defaultTextureWrap, defaultTextureFilter, 1
         );
 
@@ -448,7 +451,7 @@ fn tryLoadAndGetParallaxSet(state: *State, index: usize) ?ParallaxSet
     var loaded = true;
     for (parallaxSet.images) |*parallaxImage| {
         if (parallaxImage.assetId) |id| {
-            if (state.assets.getDynamicTextureData(id)) |parallaxTexData| {
+            if (state.assets.getTextureData(.{.DynamicId = id})) |parallaxTexData| {
                 if (!parallaxTexData.loaded()) {
                     loaded = false;
                     break;
@@ -459,7 +462,7 @@ fn tryLoadAndGetParallaxSet(state: *State, index: usize) ?ParallaxSet
             }
         } else {
             loaded = false;
-            parallaxImage.assetId = state.assets.registerDynamicTexture(
+            parallaxImage.assetId = state.assets.register(.{ .DynamicUrl = parallaxImage.url },
                 parallaxImage.url, defaultTextureWrap, defaultTextureFilter, 2
             ) catch |err| {
                 std.log.err("register texture error {}", .{err});
@@ -490,14 +493,16 @@ fn drawImageGrid(images: []const GridImage, itemsPerRow: usize, topLeft: m.Vec2,
             topLeft.x + colF * (itemSize.x + spacing),
             topLeft.y + rowF * (itemSize.y + spacingY)
         );
-        if (state.assets.getDynamicTextureDataUri(img.uri)) |tex| {
+        if (state.assets.getTextureData(.{.DynamicUrl = img.uri})) |tex| {
             if (tex.loaded()) {
                 renderQueue.quadTex(
                     itemPos, itemSize, 0, tex.id, m.Vec4.one
                 );
             }
         } else {
-            _ = state.assets.registerDynamicTexture(img.uri, defaultTextureWrap, defaultTextureFilter, 2) catch |err| {
+            _ = state.assets.register(.{ .DynamicUrl = img.uri},
+                img.uri, defaultTextureWrap, defaultTextureFilter, 2
+            ) catch |err| {
                 std.log.err("failed to register {s}, err {}", .{img.uri, err});
                 return 0;
             };
@@ -683,7 +688,7 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
 
                 for (parallaxSet.images) |parallaxImage| {
                     const assetId = parallaxImage.assetId orelse continue;
-                    const textureData = state.assets.getDynamicTextureData(assetId) orelse continue;
+                    const textureData = state.assets.getTextureData(.{.DynamicId = assetId}) orelse continue;
                     if (!textureData.loaded()) continue;
 
                     const textureSizeF = m.Vec2.initFromVec2i(textureData.size);
@@ -703,12 +708,14 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
         },
         .Entry => |entryData| {
             const pf = portfolio.PORTFOLIO_LIST[entryData.portfolioIndex];
-            if (state.assets.getDynamicTextureDataUri(pf.landing)) |landingTex| {
+            if (state.assets.getTextureData(.{.DynamicUrl = pf.landing})) |landingTex| {
                 if (landingTex.loaded()) {
                     renderQueue.quadTex(landingImagePos, landingImageSize, 1.0, landingTex.id, m.Vec4.one);
                 }
             } else {
-                _ = state.assets.registerDynamicTexture(pf.landing, defaultTextureWrap, defaultTextureFilter, 1) catch |err| {
+                _ = state.assets.register(.{.DynamicUrl = pf.landing},
+                    pf.landing, defaultTextureWrap, defaultTextureFilter, 1
+                ) catch |err| {
                     std.log.err("register failed for {s} error {}", .{pf.landing, err});
                 };
             }
@@ -1142,6 +1149,7 @@ export fn onTextureLoaded(textureId: c_uint, width: c_int, height: c_int) void
 
     var state = _memory.getState();
 
+    // TODO move to assets
     var found = false;
     for (state.assets.staticTextures) |*texture| {
         if (texture.id == textureId) {

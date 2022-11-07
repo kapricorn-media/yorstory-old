@@ -249,7 +249,7 @@ function createTexture(width, height, wrap, filter) {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, filter);
 
     return textureId;
-};
+}
 
 function loadTexture(imgUrlPtr, imgUrlLen, wrap, filter) {
     const imgUrl = readCharStr(imgUrlPtr, imgUrlLen);

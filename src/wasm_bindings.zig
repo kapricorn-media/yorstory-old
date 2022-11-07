@@ -51,13 +51,14 @@ pub extern fn glCreateBuffer() c_uint;
 pub extern fn glBindBuffer(_: c_uint, _: c_uint) void;
 pub extern fn glBufferData(_: c_uint, _: *const f32,  _: c_uint, _: c_uint) void;
 
+pub extern fn glCreateTexture() c_uint;
+pub extern fn glBindTexture(_: c_uint, _: c_uint) void;
+pub extern fn glActiveTexture(_: c_uint) void;
+
 pub extern fn glUseProgram(_: c_uint) void;
 
 pub extern fn glEnableVertexAttribArray(_: c_uint) void;
 pub extern fn glVertexAttribPointer(_: c_uint, _: c_uint, _: c_uint, _: c_uint, _: c_uint, _: c_uint) void;
-
-pub extern fn glActiveTexture(_: c_uint) void;
-pub extern fn glBindTexture(_: c_uint, _: c_uint) void;
 
 pub extern fn glDrawArrays(_: c_uint, _: c_uint, _: c_uint) void;
 
