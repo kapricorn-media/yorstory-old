@@ -153,7 +153,6 @@ pub fn Assets(comptime StaticTextureEnum: type, comptime maxDynamicTextures: usi
 
         pub fn loadQueued(self: *Self) void
         {
-            std.log.info("size {}", .{self.loadQueueSize});
             for (self.loadQueue[0..self.loadQueueSize]) |entry| {
                 w.loadTexture(entry.id, &entry.url[0], entry.url.len, entry.wrapMode, entry.filter);
             }

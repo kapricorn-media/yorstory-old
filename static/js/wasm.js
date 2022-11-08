@@ -271,6 +271,11 @@ function loadTexture(textureId, imgUrlPtr, imgUrlLen, wrap, filter) {
         const width = metadata.width;
         const height = metadata.height;
         const chunkSize = metadata.chunkSize;
+        const level = 0;
+        const internalFormat = gl.RGBA;
+        const border = 0;
+        const srcFormat = gl.RGBA;
+        const srcType = gl.UNSIGNED_BYTE;
 
         const pixels = new Uint8Array(width * height * 4);
         gl.bindTexture(gl.TEXTURE_2D, texture);

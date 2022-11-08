@@ -453,7 +453,7 @@ const GridImage = struct {
     goToUri: ?[]const u8,
 };
 
-fn drawImageGrid(images: []const GridImage, itemsPerRow: usize, topLeft: m.Vec2, width: f32, spacing: f32, fontSize: f32, fontColor: m.Vec4, state: *State, scrollY: f32, mouseHoverGlobal: *bool,renderQueue: *render.RenderQueue, callback: fn(*State, GridImage) void) f32
+fn drawImageGrid(images: []const GridImage, itemsPerRow: usize, topLeft: m.Vec2, width: f32, spacing: f32, fontSize: f32, fontColor: m.Vec4, state: *State, scrollY: f32, mouseHoverGlobal: *bool,renderQueue: *render.RenderQueue, callback: *const fn(*State, GridImage) void) f32
 {
     const itemWidth = (width - spacing * (@intToFloat(f32, itemsPerRow) - 1)) / @intToFloat(f32, itemsPerRow);
     const itemSize = m.Vec2.init(itemWidth, itemWidth * 0.5);
@@ -507,7 +507,7 @@ fn getTextureScaledSize(size: m.Vec2i, screenSize: m.Vec2) m.Vec2
     return m.Vec2.multScalar(sizeF, scaleFactor);
 }
 
-export fn onInit() *Memory
+export fn onInit() void
 {
     std.log.info("onInit", .{});
 
@@ -535,9 +535,7 @@ export fn onInit() *Memory
 
 export fn onMouseMove(x: c_int, y: c_int) void
 {
-    std.log.info("{*}", .{_memory});
     var state = _memory.getState();
-    std.log.info("{*}", .{state});
     state.mouseState.pos = m.Vec2i.init(x, y);
 }
 
@@ -546,7 +544,6 @@ export fn onMouseDown(button: c_int, x: c_int, y: c_int) void
     std.log.info("onMouseDown {} ({},{})", .{button, x, y});
 
     var state = _memory.getState();
-    std.log.info("{*}", .{state});
     addClickEvent(&state.mouseState, m.Vec2i.init(x, y), buttonToClickType(button), true);
 }
 
@@ -555,7 +552,6 @@ export fn onMouseUp(button: c_int, x: c_int, y: c_int) void
     std.log.info("onMouseUp {} ({},{})", .{button, x, y});
 
     var state = _memory.getState();
-    std.log.info("{*}", .{state});
     addClickEvent(&state.mouseState, m.Vec2i.init(x, y), buttonToClickType(button), false);
 }
 
@@ -564,7 +560,6 @@ export fn onKeyDown(keyCode: c_int) void
     std.log.info("onKeyDown: {}", .{keyCode});
 
     var state = _memory.getState();
-    std.log.info("{*}", .{state});
 
     if (keyCode == 71) {
         state.debug = !state.debug;
@@ -573,8 +568,6 @@ export fn onKeyDown(keyCode: c_int) void
 
 export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestampMs: c_int) c_int
 {
-    std.log.info("{*}", .{_memory});
-
     const screenSizeI = m.Vec2i.init(@intCast(i32, width), @intCast(i32, height));
     const screenSizeF = m.Vec2.initFromVec2i(screenSizeI);
 
@@ -679,7 +672,7 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
             const parallaxTXMaxSpeed = 10.0;
             const parallaxTXMaxDelta = parallaxTXMaxSpeed * deltaS;
             const parallaxTXDelta = targetParallaxTX - state.parallaxTX;
-            if (std.math.absFloat(parallaxTXDelta) > 0.01) {
+            if (std.math.fabs(parallaxTXDelta) > 0.01) {
                 state.parallaxTX += std.math.clamp(
                     parallaxTXDelta, -parallaxTXMaxDelta, parallaxTXMaxDelta
                 );
