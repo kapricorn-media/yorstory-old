@@ -22,8 +22,9 @@ pub extern fn setUri(uriPtr: *const u8, uriLen: c_uint) void;
 // GL
 pub extern fn compileShader(source: *const u8 , len: c_uint, type: c_uint) c_uint;
 pub extern fn linkShaderProgram(vertexShaderId: c_uint, fragmentShaderId: c_uint) c_uint;
+pub extern fn createAndLoadTexture(imgUrlPtr: *const u8, imgUrlLen: c_uint, wrapMode: c_uint, filter: c_uint) c_uint;
 pub extern fn createTexture(width: c_int, height: c_int, wrapMode: c_uint, filter: c_uint) c_uint;
-pub extern fn loadTexture(imgUrlPtr: *const u8, imgUrlLen: c_uint, wrapMode: c_uint, filter: c_uint) c_uint;
+pub extern fn loadTexture(textureId: c_uint, imgUrlPtr: *const u8, imgUrlLen: c_uint, wrapMode: c_uint, filter: c_uint) void;
 pub extern fn bindNullFramebuffer() void;
 
 pub extern fn glClear(_: c_uint) void;

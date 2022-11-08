@@ -22,7 +22,7 @@ const Memory = struct {
 
     fn getState(self: *Self) *State
     {
-        return @ptrCast(*State, @alignCast(8, &self.persistent[0]));
+        return @ptrCast(*State, &self.persistent[0]);
     }
 
     fn getTransientAllocator(self: *Self) std.heap.FixedBufferAllocator
@@ -31,7 +31,7 @@ const Memory = struct {
     }
 };
 
-var _memory: *Memory = undefined;
+var _memory: *Memory align(8) = undefined;
 
 fn hexU8ToFloatNormalized(hexString: []const u8) !f32
 {
@@ -389,33 +389,6 @@ const State = struct {
     }
 };
 
-export fn onInit() void
-{
-    std.log.info("onInit", .{});
-
-    _memory = std.heap.page_allocator.create(Memory) catch |err| {
-        std.log.err("Failed to allocate WASM memory, error {}", .{err});
-        return;
-    };
-
-    var buf: [64]u8 = undefined;
-    const uriLen = ww.getUri(&buf);
-    const uri = buf[0..uriLen];
-
-    var state = _memory.getState();
-    var remaining = _memory.persistent[@sizeOf(State)..];
-    state.* = State.init(remaining, uri) catch |err| {
-        std.log.err("State init failed, err {}", .{err});
-        return;
-    };
-}
-
-export fn onMouseMove(x: c_int, y: c_int) void
-{
-    var state = _memory.getState();
-    state.mouseState.pos = m.Vec2i.init(x, y);
-}
-
 fn addClickEvent(mouseState: *MouseState, pos: m.Vec2i, clickType: ClickType, down: bool) void
 {
     const i = mouseState.numClickEvents;
@@ -534,11 +507,46 @@ fn getTextureScaledSize(size: m.Vec2i, screenSize: m.Vec2) m.Vec2
     return m.Vec2.multScalar(sizeF, scaleFactor);
 }
 
+export fn onInit() *Memory
+{
+    std.log.info("onInit", .{});
+
+    _memory = std.heap.page_allocator.create(Memory) catch |err| {
+        std.log.err("Failed to allocate WASM memory, error {}", .{err});
+        return;
+    };
+    var memoryBytes = std.mem.asBytes(_memory);
+    std.mem.set(u8, memoryBytes, 0);
+
+    var buf: [64]u8 = undefined;
+    const uriLen = ww.getUri(&buf);
+    const uri = buf[0..uriLen];
+
+    var state = _memory.getState();
+    const stateSize = @sizeOf(State);
+    var remaining = _memory.persistent[stateSize..];
+    std.log.info("memory - {*}\npersistent store - {} ({} state | {} remaining)\ntransient store - {}\ntotal - {}", .{_memory, _memory.persistent.len, stateSize, remaining.len, _memory.transient.len, memoryBytes.len});
+
+    state.* = State.init(remaining, uri) catch |err| {
+        std.log.err("State init failed, err {}", .{err});
+        return;
+    };
+}
+
+export fn onMouseMove(x: c_int, y: c_int) void
+{
+    std.log.info("{*}", .{_memory});
+    var state = _memory.getState();
+    std.log.info("{*}", .{state});
+    state.mouseState.pos = m.Vec2i.init(x, y);
+}
+
 export fn onMouseDown(button: c_int, x: c_int, y: c_int) void
 {
     std.log.info("onMouseDown {} ({},{})", .{button, x, y});
 
     var state = _memory.getState();
+    std.log.info("{*}", .{state});
     addClickEvent(&state.mouseState, m.Vec2i.init(x, y), buttonToClickType(button), true);
 }
 
@@ -547,6 +555,7 @@ export fn onMouseUp(button: c_int, x: c_int, y: c_int) void
     std.log.info("onMouseUp {} ({},{})", .{button, x, y});
 
     var state = _memory.getState();
+    std.log.info("{*}", .{state});
     addClickEvent(&state.mouseState, m.Vec2i.init(x, y), buttonToClickType(button), false);
 }
 
@@ -555,6 +564,7 @@ export fn onKeyDown(keyCode: c_int) void
     std.log.info("onKeyDown: {}", .{keyCode});
 
     var state = _memory.getState();
+    std.log.info("{*}", .{state});
 
     if (keyCode == 71) {
         state.debug = !state.debug;
@@ -563,6 +573,8 @@ export fn onKeyDown(keyCode: c_int) void
 
 export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestampMs: c_int) c_int
 {
+    std.log.info("{*}", .{_memory});
+
     const screenSizeI = m.Vec2i.init(@intCast(i32, width), @intCast(i32, height));
     const screenSizeF = m.Vec2.initFromVec2i(screenSizeI);
 
@@ -1107,6 +1119,8 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
     w.glClear(w.GL_COLOR_BUFFER_BIT | w.GL_DEPTH_BUFFER_BIT);
     state.renderState.postProcessState.draw(state.fbTexture, screenSizeF);
     // state.renderState.quadTexState.drawQuad(m.Vec2.zero, screenSizeF, 0.0, state.fbTexture, m.Vec4.one, screenSizeF);
+
+    state.assets.loadQueued();
 
     // debug grid
     if (state.debug) {

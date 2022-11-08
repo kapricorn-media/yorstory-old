@@ -15,8 +15,8 @@ pub fn isInsideRect(p: Vec2, rectOrigin: Vec2, rectSize: Vec2) bool
 }
 
 pub const Vec2i = packed struct {
-    x: i32,
-    y: i32,
+    x: i32 align(4),
+    y: i32 align(4),
 
     const Self = @This();
 
@@ -74,8 +74,8 @@ pub const Vec2i = packed struct {
 };
 
 pub const Vec2 = packed struct {
-    x: f32,
-    y: f32,
+    x: f32 align(4),
+    y: f32 align(4),
 
     const Self = @This();
 
@@ -138,9 +138,9 @@ pub const Vec2 = packed struct {
 };
 
 pub const Vec3 = packed struct {
-    x: f32,
-    y: f32,
-    z: f32,
+    x: f32 align(4),
+    y: f32 align(4),
+    z: f32 align(4),
 
     const Self = @This();
 
@@ -203,10 +203,10 @@ pub const Vec3 = packed struct {
 };
 
 pub const Vec4 = packed struct {
-    x: f32,
-    y: f32,
-    z: f32,
-    w: f32,
+    x: f32 align(4),
+    y: f32 align(4),
+    z: f32 align(4),
+    w: f32 align(4),
 
     const Self = @This();
 
@@ -270,7 +270,7 @@ pub const Vec4 = packed struct {
 };
 
 pub const Mat4x4 = packed struct {
-    e: [4][4]f32,
+    e: [4][4]f32 align(4),
 
     const Self = @This();
 

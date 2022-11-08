@@ -3,26 +3,21 @@ const std = @import("std");
 const m = @import("math.zig");
 const w = @import("wasm_bindings.zig");
 
+pub const TextureLoadEntry = struct {
+    id: c_uint,
+    url: []const u8,
+    wrapMode: c_uint,
+    filter: c_uint,
+    priority: u32,
+};
+
 pub const TextureData = struct {
     id: c_uint,
     size: m.Vec2i,
 
     const Self = @This();
 
-    pub fn init(url: []const u8, wrapMode: c_uint, filter: c_uint) !Self
-    {
-        const texture = w.loadTexture(&url[0], url.len, wrapMode, filter);
-        if (texture == -1) {
-            return error.createTextureFailed;
-        }
-
-        return Self {
-            .id = texture,
-            .size = m.Vec2i.zero, // set later when the image is loaded from URL
-        };
-    }
-
-    pub fn initNew() Self
+    pub fn init() Self
     {
         return Self {
             .id = w.glCreateTexture(),
@@ -51,11 +46,14 @@ pub fn Assets(comptime StaticTextureEnum: type, comptime maxDynamicTextures: usi
 
     const T = struct {
         const numStaticTextures = @typeInfo(StaticTextureEnum).Enum.fields.len;
+        const maxTotalTextures = numStaticTextures + maxDynamicTextures;
 
         allocator: std.mem.Allocator,
         staticTextures: [numStaticTextures]TextureData,
-        numDynamicTextures: usize,
+        dynamicTexturesSize: usize,
         dynamicTextures: [maxDynamicTextures]TextureData,
+        loadQueueSize: usize,
+        loadQueue: [maxTotalTextures]TextureLoadEntry,
         idMap: std.StringHashMap(usize),
 
         const Self = @This();
@@ -65,8 +63,10 @@ pub fn Assets(comptime StaticTextureEnum: type, comptime maxDynamicTextures: usi
             return Self {
                 .allocator = allocator,
                 .staticTextures = undefined,
-                .numDynamicTextures = 0,
+                .dynamicTexturesSize = 0,
                 .dynamicTextures = undefined,
+                .loadQueueSize = 0,
+                .loadQueue = undefined,
                 .idMap = std.StringHashMap(usize).init(allocator),
             };
         }
@@ -78,7 +78,7 @@ pub fn Assets(comptime StaticTextureEnum: type, comptime maxDynamicTextures: usi
 
         fn getDynamicTextureData(self: Self, id: usize) ?TextureData
         {
-            if (id >= self.numDynamicTextures) {
+            if (id >= self.dynamicTexturesSize) {
                 return null;
             }
             return self.dynamicTextures[id];
@@ -91,18 +91,34 @@ pub fn Assets(comptime StaticTextureEnum: type, comptime maxDynamicTextures: usi
 
         fn registerDynamicTexture(self: *Self, url: []const u8, textureData: TextureData) !usize
         {
-            if (self.numDynamicTextures >= self.dynamicTextures.len) {
+            if (self.dynamicTexturesSize >= self.dynamicTextures.len) {
                 return error.FullDynamicTextures;
             }
 
-            const id = self.numDynamicTextures;
+            const id = self.dynamicTexturesSize;
             self.dynamicTextures[id] = textureData;
 
             const urlCopy = try self.allocator.dupe(u8, url);
             try self.idMap.put(urlCopy, id);
 
-            self.numDynamicTextures += 1;
+            self.dynamicTexturesSize += 1;
             return id;
+        }
+
+        fn addLoadEntry(self: *Self, id: c_uint, url: []const u8, wrapMode: c_uint, filter: c_uint, priority: u32) !void
+        {
+            if (self.loadQueueSize >= self.loadQueue.len) {
+                return error.FullLoadQueue;
+            }
+
+            self.loadQueue[self.loadQueueSize] = TextureLoadEntry {
+                .id = id,
+                .url = url,
+                .wrapMode = wrapMode,
+                .filter = filter,
+                .priority = priority,
+            };
+            self.loadQueueSize += 1;
         }
 
         pub fn getTextureData(self: Self, id: TextureId) ?TextureData
@@ -119,9 +135,8 @@ pub fn Assets(comptime StaticTextureEnum: type, comptime maxDynamicTextures: usi
 
         pub fn register(self: *Self, id: TextureId, url: []const u8, wrapMode: c_uint, filter: c_uint, priority: u32) !usize
         {
-            _ = priority;
-            // const data = try TextureData.init(url, wrapMode, filter);
-            const data = TextureData.initNew(); _ = url; _ = wrapMode; _ = filter;
+            const data = TextureData.init();
+            try self.addLoadEntry(data.id, url, wrapMode, filter, priority);
             switch (id) {
                 .Static => |t| {
                     try self.registerStaticTexture(t, data);
@@ -134,6 +149,15 @@ pub fn Assets(comptime StaticTextureEnum: type, comptime maxDynamicTextures: usi
                     return self.registerDynamicTexture(url, data);
                 },
             }
+        }
+
+        pub fn loadQueued(self: *Self) void
+        {
+            std.log.info("size {}", .{self.loadQueueSize});
+            for (self.loadQueue[0..self.loadQueueSize]) |entry| {
+                w.loadTexture(entry.id, &entry.url[0], entry.url.len, entry.wrapMode, entry.filter);
+            }
+            self.loadQueueSize = 0;
         }
     };
 

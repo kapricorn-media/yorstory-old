@@ -3,6 +3,15 @@ const std = @import("std");
 const m = @import("math.zig");
 const w = @import("wasm_bindings.zig");
 
+const POS_UNIT_SQUARE: [6]m.Vec2 align(4) = [6]m.Vec2 {
+    m.Vec2.init(0.0, 0.0),
+    m.Vec2.init(0.0, 1.0),
+    m.Vec2.init(1.0, 1.0),
+    m.Vec2.init(1.0, 1.0),
+    m.Vec2.init(1.0, 0.0),
+    m.Vec2.init(0.0, 0.0),
+};
+
 fn floatPosToNdc(pos: f32, canvas: f32) f32
 {
     return pos / canvas * 2.0 - 1.0;
@@ -75,15 +84,6 @@ const QuadState = struct {
     colorBLUniLoc: c_int,
     colorBRUniLoc: c_int,
 
-    const positions = [6]m.Vec2 {
-        m.Vec2.init(0.0, 0.0),
-        m.Vec2.init(0.0, 1.0),
-        m.Vec2.init(1.0, 1.0),
-        m.Vec2.init(1.0, 1.0),
-        m.Vec2.init(1.0, 0.0),
-        m.Vec2.init(0.0, 0.0),
-    };
-
     const vert = @embedFile("shaders/quad.vert");
     const frag = @embedFile("shaders/quad.frag");
 
@@ -97,12 +97,11 @@ const QuadState = struct {
 
         const positionBuffer = w.glCreateBuffer();
         w.glBindBuffer(w.GL_ARRAY_BUFFER, positionBuffer);
-        w.glBufferData(w.GL_ARRAY_BUFFER, @alignCast(4, &positions[0].x), positions.len * 2, w.GL_STATIC_DRAW);
+        w.glBufferData(w.GL_ARRAY_BUFFER, &POS_UNIT_SQUARE[0].x, POS_UNIT_SQUARE.len * 2, w.GL_STATIC_DRAW);
 
         const uvBuffer = w.glCreateBuffer();
         w.glBindBuffer(w.GL_ARRAY_BUFFER, uvBuffer);
-        // UVs are the same as positions
-        w.glBufferData(w.GL_ARRAY_BUFFER, @alignCast(4, &positions[0].x), positions.len * 2, w.GL_STATIC_DRAW);
+        w.glBufferData(w.GL_ARRAY_BUFFER, &POS_UNIT_SQUARE[0].x, POS_UNIT_SQUARE.len * 2, w.GL_STATIC_DRAW);
 
         const programId = w.linkShaderProgram(vertQuadId, fragQuadId);
 
@@ -192,7 +191,7 @@ const QuadState = struct {
         w.glUniform4fv(self.colorBLUniLoc, colorBL.x, colorBL.y, colorBL.z, colorBL.w);
         w.glUniform4fv(self.colorBRUniLoc, colorBR.x, colorBR.y, colorBR.z, colorBR.w);
 
-        w.glDrawArrays(w.GL_TRIANGLES, 0, positions.len);
+        w.glDrawArrays(w.GL_TRIANGLES, 0, POS_UNIT_SQUARE.len);
     }
 
     pub fn drawQuadGradient(
@@ -239,15 +238,6 @@ const QuadTextureState = struct {
     samplerUniLoc: c_int,
     colorUniLoc: c_int,
 
-    const positions = [6]m.Vec2 {
-        m.Vec2.init(0.0, 0.0),
-        m.Vec2.init(0.0, 1.0),
-        m.Vec2.init(1.0, 1.0),
-        m.Vec2.init(1.0, 1.0),
-        m.Vec2.init(1.0, 0.0),
-        m.Vec2.init(0.0, 0.0),
-    };
-
     const vert = @embedFile("shaders/quadTexture.vert");
     const frag = @embedFile("shaders/quadTexture.frag");
 
@@ -261,12 +251,11 @@ const QuadTextureState = struct {
 
         const positionBuffer = w.glCreateBuffer();
         w.glBindBuffer(w.GL_ARRAY_BUFFER, positionBuffer);
-        w.glBufferData(w.GL_ARRAY_BUFFER, @alignCast(4, &positions[0].x), positions.len * 2, w.GL_STATIC_DRAW);
+        w.glBufferData(w.GL_ARRAY_BUFFER, &POS_UNIT_SQUARE[0].x, POS_UNIT_SQUARE.len * 2, w.GL_STATIC_DRAW);
 
         const uvBuffer = w.glCreateBuffer();
         w.glBindBuffer(w.GL_ARRAY_BUFFER, uvBuffer);
-        // UVs are the same as positions
-        w.glBufferData(w.GL_ARRAY_BUFFER, @alignCast(4, &positions[0].x), positions.len * 2, w.GL_STATIC_DRAW);
+        w.glBufferData(w.GL_ARRAY_BUFFER, &POS_UNIT_SQUARE[0].x, POS_UNIT_SQUARE.len * 2, w.GL_STATIC_DRAW);
 
         const programId = w.linkShaderProgram(vertQuadId, fragQuadId);
 
@@ -359,7 +348,7 @@ const QuadTextureState = struct {
         w.glBindTexture(w.GL_TEXTURE_2D, texture);
         w.glUniform1i(self.samplerUniLoc, 0);
 
-        w.glDrawArrays(w.GL_TRIANGLES, 0, positions.len);
+        w.glDrawArrays(w.GL_TRIANGLES, 0, POS_UNIT_SQUARE.len);
     }
 
     pub fn drawQuadUvOffset(
@@ -408,15 +397,6 @@ const RoundedFrameState = struct {
     colorUniLoc: c_int,
     screenSizeUniLoc: c_int,
 
-    const positions = [6]m.Vec2 {
-        m.Vec2.init(0.0, 0.0),
-        m.Vec2.init(0.0, 1.0),
-        m.Vec2.init(1.0, 1.0),
-        m.Vec2.init(1.0, 1.0),
-        m.Vec2.init(1.0, 0.0),
-        m.Vec2.init(0.0, 0.0),
-    };
-
     const vert = @embedFile("shaders/roundedFrame.vert");
     const frag = @embedFile("shaders/roundedFrame.frag");
 
@@ -430,7 +410,7 @@ const RoundedFrameState = struct {
 
         const positionBuffer = w.glCreateBuffer();
         w.glBindBuffer(w.GL_ARRAY_BUFFER, positionBuffer);
-        w.glBufferData(w.GL_ARRAY_BUFFER, @alignCast(4, &positions[0].x), positions.len * 2, w.GL_STATIC_DRAW);
+        w.glBufferData(w.GL_ARRAY_BUFFER, &POS_UNIT_SQUARE[0].x, POS_UNIT_SQUARE.len * 2, w.GL_STATIC_DRAW);
 
         const programId = w.linkShaderProgram(vertQuadId, fragQuadId);
 
@@ -518,7 +498,7 @@ const RoundedFrameState = struct {
         w.glUniform4fv(self.colorUniLoc, color.x, color.y, color.z, color.w);
         w.glUniform2fv(self.screenSizeUniLoc, screenSize.x, screenSize.y);
 
-        w.glDrawArrays(w.GL_TRIANGLES, 0, positions.len);
+        w.glDrawArrays(w.GL_TRIANGLES, 0, POS_UNIT_SQUARE.len);
     }
 
     pub fn drawFrame(
@@ -553,15 +533,6 @@ const PostProcessState = struct {
     samplerUniLoc: c_int,
     screenSizeUniLoc: c_int,
 
-    const positions = [6]m.Vec2 {
-        m.Vec2.init(0.0, 0.0),
-        m.Vec2.init(0.0, 1.0),
-        m.Vec2.init(1.0, 1.0),
-        m.Vec2.init(1.0, 1.0),
-        m.Vec2.init(1.0, 0.0),
-        m.Vec2.init(0.0, 0.0),
-    };
-
     const vert = @embedFile("shaders/post.vert");
     const frag = @embedFile("shaders/post.frag");
 
@@ -575,12 +546,11 @@ const PostProcessState = struct {
 
         const positionBuffer = w.glCreateBuffer();
         w.glBindBuffer(w.GL_ARRAY_BUFFER, positionBuffer);
-        w.glBufferData(w.GL_ARRAY_BUFFER, @alignCast(4, &positions[0].x), positions.len * 2, w.GL_STATIC_DRAW);
+        w.glBufferData(w.GL_ARRAY_BUFFER, &POS_UNIT_SQUARE[0].x, POS_UNIT_SQUARE.len * 2, w.GL_STATIC_DRAW);
 
         const uvBuffer = w.glCreateBuffer();
         w.glBindBuffer(w.GL_ARRAY_BUFFER, uvBuffer);
-        // UVs are the same as positions
-        w.glBufferData(w.GL_ARRAY_BUFFER, @alignCast(4, &positions[0].x), positions.len * 2, w.GL_STATIC_DRAW);
+        w.glBufferData(w.GL_ARRAY_BUFFER, &POS_UNIT_SQUARE[0].x, POS_UNIT_SQUARE.len * 2, w.GL_STATIC_DRAW);
 
         const programId = w.linkShaderProgram(vertQuadId, fragQuadId);
 
@@ -637,7 +607,7 @@ const PostProcessState = struct {
         w.glBindTexture(w.GL_TEXTURE_2D, texture);
         w.glUniform1i(self.samplerUniLoc, 0);
 
-        w.glDrawArrays(w.GL_TRIANGLES, 0, positions.len);
+        w.glDrawArrays(w.GL_TRIANGLES, 0, POS_UNIT_SQUARE.len);
     }
 };
 

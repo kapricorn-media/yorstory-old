@@ -1,6 +1,7 @@
 let gl = null;
 let _wasmInstance = null;
 let _memory = null;
+let _memoryPtr = null;
 let _canvas = null;
 
 let _currentHeight = null;
@@ -251,7 +252,43 @@ function createTexture(width, height, wrap, filter) {
     return textureId;
 }
 
-function loadTexture(imgUrlPtr, imgUrlLen, wrap, filter) {
+function loadTexture(textureId, imgUrlPtr, imgUrlLen, wrap, filter) {
+    const imgUrl = readCharStr(imgUrlPtr, imgUrlLen);
+    const chunkSizeMax = 512 * 1024;
+
+    const texture = _glTextures[textureId];
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+
+    const uri = `/webgl_png?path=${imgUrl}&chunkSizeMax=${chunkSizeMax}`;
+    httpGet(uri, function(status, data) {
+        if (status !== 200) {
+            console.log("webgl_png failed");
+            return;
+        }
+
+        const metadata = JSON.parse(data);
+        const width = metadata.width;
+        const height = metadata.height;
+        const chunkSize = metadata.chunkSize;
+
+        const pixels = new Uint8Array(width * height * 4);
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.texImage2D(gl.TEXTURE_2D, level, internalFormat, width, height, border, srcFormat, srcType, pixels);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrap);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, wrap);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, filter);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, filter);
+
+        if (chunkSize === 0) {
+            queueTextureLoadDirect(imgUrl, textureId, width, height);
+        } else {
+            queueTextureLoadChunked(imgUrl, textureId, width, height, chunkSize);
+        }
+    });
+};
+
+function createAndLoadTexture(imgUrlPtr, imgUrlLen, wrap, filter) {
     const imgUrl = readCharStr(imgUrlPtr, imgUrlLen);
     const chunkSizeMax = 512 * 1024;
 
@@ -319,6 +356,7 @@ const env = {
     // GL derived functions
     compileShader,
     linkShaderProgram,
+    createAndLoadTexture,
     createTexture,
     loadTexture,
     bindNullFramebuffer
@@ -443,8 +481,8 @@ function wasmInit(wasmUri, memoryBytes)
         updateCanvasSize();
     });
 
-    const WASM_PAGE_SIZE = 64 * 1024;
-    const memoryPages = Math.ceil(memoryBytes / WASM_PAGE_SIZE);
+    // const WASM_PAGE_SIZE = 64 * 1024;
+    // const memoryPages = Math.ceil(memoryBytes / WASM_PAGE_SIZE);
     // _memory = new WebAssembly.Memory({
     //     initial: memoryPages,
     //     maximum: memoryPages,
@@ -458,10 +496,10 @@ function wasmInit(wasmUri, memoryBytes)
 
     WebAssembly.instantiateStreaming(fetch(wasmUri), importObject).then(function(obj) {
         _wasmInstance = obj.instance;
-        const pages = Math.round(_wasmInstance.exports.memory.buffer.byteLength / WASM_PAGE_SIZE);
-        if (pages < memoryPages) {
-            _wasmInstance.exports.memory.grow(memoryPages - pages);
-        }
+        // const pages = Math.round(_wasmInstance.exports.memory.buffer.byteLength / WASM_PAGE_SIZE);
+        // if (pages < memoryPages) {
+        //     _wasmInstance.exports.memory.grow(memoryPages - pages);
+        // }
         _wasmInstance.exports.onInit();
 
         const onAnimationFrame = _wasmInstance.exports.onAnimationFrame;
