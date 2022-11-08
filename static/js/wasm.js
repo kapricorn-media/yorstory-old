@@ -263,7 +263,8 @@ function loadTexture(textureId, imgUrlPtr, imgUrlLen, wrap, filter) {
     const uri = `/webgl_png?path=${imgUrl}&chunkSizeMax=${chunkSizeMax}`;
     httpGet(uri, function(status, data) {
         if (status !== 200) {
-            console.log("webgl_png failed");
+            console.log(`webgl_png failed with status ${status} for URL ${imgUrl}`);
+            _wasmInstance.exports.onTextureLoaded(textureId, 0, 0);
             return;
         }
 

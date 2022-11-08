@@ -347,9 +347,6 @@ const State = struct {
         _ = try self.assets.register(.{ .Static = Texture.DecalTopLeft },
             "/images/decal-topleft-white.png", defaultTextureWrap, defaultTextureFilter, 0
         );
-        _ = try self.assets.register(.{ .Static = Texture.DecalTopLeft },
-            "/images/decal-topleft-white.png", defaultTextureWrap, defaultTextureFilter, 0
-        );
         _ = try self.assets.register(.{ .Static = Texture.IconContact },
             "/images/icon-contact.png", defaultTextureWrap, defaultTextureFilter, 0
         );
@@ -1113,7 +1110,8 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
     state.renderState.postProcessState.draw(state.fbTexture, screenSizeF);
     // state.renderState.quadTexState.drawQuad(m.Vec2.zero, screenSizeF, 0.0, state.fbTexture, m.Vec4.one, screenSizeF);
 
-    state.assets.loadQueued();
+    const maxInflight = 4;
+    state.assets.loadQueued(maxInflight);
 
     // debug grid
     if (state.debug) {
@@ -1155,25 +1153,7 @@ export fn onTextureLoaded(textureId: c_uint, width: c_int, height: c_int) void
     std.log.info("onTextureLoaded {}: {} x {}", .{textureId, width, height});
 
     var state = _memory.getState();
-
-    // TODO move to assets
-    var found = false;
-    for (state.assets.staticTextures) |*texture| {
-        if (texture.id == textureId) {
-            texture.size = m.Vec2i.init(width, height);
-            found = true;
-            break;
-        }
-    }
-    for (state.assets.dynamicTextures) |*texture| {
-        if (texture.id == textureId) {
-            texture.size = m.Vec2i.init(width, height);
-            found = true;
-            break;
-        }
-    }
-
-    if (!found) {
-        std.log.err("onTextureLoaded not found!", .{});
-    }
+    state.assets.onTextureLoaded(textureId, m.Vec2i.init(width, height)) catch |err| {
+        std.log.err("onTextureLoaded error {}", .{err});
+    };
 }

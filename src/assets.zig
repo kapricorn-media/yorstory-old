@@ -50,30 +50,24 @@ pub fn Assets(comptime StaticTextureEnum: type, comptime maxDynamicTextures: usi
 
         allocator: std.mem.Allocator,
         staticTextures: [numStaticTextures]TextureData,
+        // TODO use BoundedArray?
         dynamicTexturesSize: usize,
         dynamicTextures: [maxDynamicTextures]TextureData,
         loadQueueSize: usize,
         loadQueue: [maxTotalTextures]TextureLoadEntry,
+        inflight: usize,
         idMap: std.StringHashMap(usize),
 
         const Self = @This();
 
-        pub fn init(allocator: std.mem.Allocator) Self
+        fn getDynamicTextures(self: *Self) []TextureData
         {
-            return Self {
-                .allocator = allocator,
-                .staticTextures = undefined,
-                .dynamicTexturesSize = 0,
-                .dynamicTextures = undefined,
-                .loadQueueSize = 0,
-                .loadQueue = undefined,
-                .idMap = std.StringHashMap(usize).init(allocator),
-            };
+            return self.dynamicTextures[0..self.dynamicTexturesSize];
         }
 
-        pub fn getStaticTextureData(self: Self, texture: StaticTextureEnum) TextureData
+        fn getDynamicTexturesConst(self: Self) []const TextureData
         {
-            return self.staticTextures[@enumToInt(texture)];
+            return self.dynamicTextures[0..self.dynamicTexturesSize];
         }
 
         fn getDynamicTextureData(self: Self, id: usize) ?TextureData
@@ -121,6 +115,25 @@ pub fn Assets(comptime StaticTextureEnum: type, comptime maxDynamicTextures: usi
             self.loadQueueSize += 1;
         }
 
+        pub fn init(allocator: std.mem.Allocator) Self
+        {
+            return Self {
+                .allocator = allocator,
+                .staticTextures = undefined,
+                .dynamicTexturesSize = 0,
+                .dynamicTextures = undefined,
+                .loadQueueSize = 0,
+                .loadQueue = undefined,
+                .inflight = 0,
+                .idMap = std.StringHashMap(usize).init(allocator),
+            };
+        }
+
+        pub fn getStaticTextureData(self: Self, texture: StaticTextureEnum) TextureData
+        {
+            return self.staticTextures[@enumToInt(texture)];
+        }
+
         pub fn getTextureData(self: Self, id: TextureId) ?TextureData
         {
             switch (id) {
@@ -151,12 +164,58 @@ pub fn Assets(comptime StaticTextureEnum: type, comptime maxDynamicTextures: usi
             }
         }
 
-        pub fn loadQueued(self: *Self) void
+        pub fn loadQueued(self: *Self, maxInflight: usize) void
         {
-            for (self.loadQueue[0..self.loadQueueSize]) |entry| {
-                w.loadTexture(entry.id, &entry.url[0], entry.url.len, entry.wrapMode, entry.filter);
+            if (self.loadQueueSize == 0) {
+                return;
             }
-            self.loadQueueSize = 0;
+
+            const inflight = self.inflight;
+            const maxToAddInflight = if (maxInflight >= inflight) maxInflight - inflight else 0;
+            const numToLoad = std.math.min(maxToAddInflight, self.loadQueueSize);
+
+            var i: usize = 0;
+            while (i < numToLoad) : (i += 1) {
+                var entryIndex: usize = 0;
+                var j: usize = 1;
+                while (j < self.loadQueueSize) : (j += 1) {
+                    if (self.loadQueue[j].priority < self.loadQueue[entryIndex].priority) {
+                        entryIndex = j;
+                    }
+                }
+
+                const entry = self.loadQueue[entryIndex];
+                w.loadTexture(entry.id, &entry.url[0], entry.url.len, entry.wrapMode, entry.filter);
+                self.inflight += 1;
+                self.loadQueue[entryIndex] = self.loadQueue[self.loadQueueSize - 1];
+                self.loadQueueSize -= 1;
+            }
+        }
+
+        pub fn onTextureLoaded(self: *Self, id: c_uint, size: m.Vec2i) !void
+        {
+            var found = false;
+            for (self.staticTextures) |*texture| {
+                if (texture.id == id) {
+                    texture.size = size;
+                    found = true;
+                    break;
+                }
+            }
+
+            for (self.getDynamicTextures()) |*texture| {
+                if (texture.id == id) {
+                    texture.size = size;
+                    found = true;
+                    break;
+                }
+            }
+
+            self.inflight -= 1;
+
+            if (!found) {
+                return error.TextureNotFound;
+            }
         }
     };
 
