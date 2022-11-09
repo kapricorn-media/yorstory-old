@@ -4,6 +4,7 @@ MEDIUM
 - gallery
 - mobile
 - smarter should-redraw logic
+- release mode crash
 
 LOW
 - rounded corners

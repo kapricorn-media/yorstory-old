@@ -1108,7 +1108,6 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
     w.bindNullFramebuffer();
     w.glClear(w.GL_COLOR_BUFFER_BIT | w.GL_DEPTH_BUFFER_BIT);
     state.renderState.postProcessState.draw(state.fbTexture, screenSizeF);
-    // state.renderState.quadTexState.drawQuad(m.Vec2.zero, screenSizeF, 0.0, state.fbTexture, m.Vec4.one, screenSizeF);
 
     const maxInflight = 4;
     state.assets.loadQueued(maxInflight);
