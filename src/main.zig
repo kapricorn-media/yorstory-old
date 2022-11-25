@@ -841,7 +841,7 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
     }
 
     const stickerText = switch (state.pageData) {
-        .Home => "yorstory",
+        .Home => "Yorstory",
         .Entry => "HALO IV",
     };
     const textStickerPos1 = m.Vec2.init(

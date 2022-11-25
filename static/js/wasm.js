@@ -514,7 +514,7 @@ function wasmInit(wasmUri, memoryBytes)
         function step(timestamp) {
             doNextLoadTextureJob();
 
-            const scrollY = document.documentElement.scrollTop || document.body.scrollTop;
+            const scrollY = window.scrollY;
             const totalHeight = onAnimationFrame(_canvas.width, _canvas.height, scrollY, timestamp);
             if (totalHeight !== 0 && _currentHeight !== totalHeight) {
                 _currentHeight = totalHeight;
