@@ -76,8 +76,11 @@ const Texture = enum(usize) {
     IconWork,
     Logo343,
     LogoMicrosoft,
-    StickerBackgroundWithIcons,
     StickerNumber,
+    StickerShiny,
+
+    StickerMainHome,
+    StickerMainHalo,
 };
 
 // return true when pressed
@@ -365,12 +368,25 @@ const State = struct {
         _ = try self.assets.register(.{ .Static = Texture.LogoMicrosoft },
             "/images/logo-microsoft.png", defaultTextureWrap, defaultTextureFilter, 1
         );
-        _ = try self.assets.register(.{ .Static = Texture.StickerBackgroundWithIcons },
-            "/images/sticker-background-white.png", defaultTextureWrap, defaultTextureFilter, 0
-        );
         _ = try self.assets.register(.{ .Static = Texture.StickerNumber },
             "/images/sticker-number.png", defaultTextureWrap, defaultTextureFilter, 1
         );
+        _ = try self.assets.register(.{ .Static = Texture.StickerShiny },
+            "/images/sticker-shiny.png", defaultTextureWrap, defaultTextureFilter, 1
+        );
+
+        switch (self.pageData) {
+            .Home => {
+                _ = try self.assets.register(.{ .Static = Texture.StickerMainHome },
+                    "/images/sticker-main-home.png", defaultTextureWrap, defaultTextureFilter, 1
+                );
+            },
+            .Entry => {
+                _ = try self.assets.register(.{ .Static = Texture.StickerMainHalo },
+                    "/images/sticker-main-halo.png", defaultTextureWrap, defaultTextureFilter, 1
+                );
+            },
+        }
 
         return self;
     }
@@ -604,10 +620,8 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
     //     return 0;
     // }
 
-    // const refImageSize = m.Vec2i.init(3692, 1778);
-
     const fontStickerSize = 124 / refSize.y * screenSizeF.y;
-    const fontStickerSmallSize = 26 / refSize.y * screenSizeF.y;
+    // const fontStickerSmallSize = 26 / refSize.y * screenSizeF.y;
     const fontSubtitleSize = 84 / refSize.y * screenSizeF.y;
     const fontTextSize = 30 / refSize.y * screenSizeF.y;
     const gridSize = std.math.round(gridRefSize / refSize.y * screenSizeF.y);
@@ -666,14 +680,16 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
             }
 
             const targetParallaxTX = mousePosF.x / screenSizeF.x * 2.0 - 1.0; // -1 to 1
-            const parallaxTXMaxSpeed = 10.0;
-            const parallaxTXMaxDelta = parallaxTXMaxSpeed * deltaS;
-            const parallaxTXDelta = targetParallaxTX - state.parallaxTX;
-            if (std.math.fabs(parallaxTXDelta) > 0.01) {
-                state.parallaxTX += std.math.clamp(
-                    parallaxTXDelta, -parallaxTXMaxDelta, parallaxTXMaxDelta
-                );
-            }
+            state.parallaxTX = targetParallaxTX;
+            _ = deltaS;
+            // const parallaxTXMaxSpeed = 10.0;
+            // const parallaxTXMaxDelta = parallaxTXMaxSpeed * deltaS;
+            // const parallaxTXDelta = targetParallaxTX - state.parallaxTX;
+            // if (std.math.fabs(parallaxTXDelta) > 0.01) {
+            //     state.parallaxTX += std.math.clamp(
+            //         parallaxTXDelta, -parallaxTXMaxDelta, parallaxTXMaxDelta
+            //     );
+            // }
 
             if (activeParallaxSet) |parallaxSet| {
                 switch (parallaxSet.bgColor) {
@@ -752,7 +768,7 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
                 gridSize * 5,
             );
             renderQueue.quadTex(
-                iconPos, iconSizeF, 0.0, textureData.id, m.Vec4.one
+                iconPos, iconSizeF, 0.0, textureData.id, colorUi
             );
             if (updateButton(iconPos, iconSizeF, state.mouseState, scrollYF, &mouseHoverGlobal)) {
                 const uri = switch (iconTexture) {
@@ -827,53 +843,35 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
         );
     }
 
-    // sticker
-    const stickerBackground = state.assets.getStaticTextureData(Texture.StickerBackgroundWithIcons);
-    if (stickerBackground.loaded()) {
+    // sticker (main)
+    const texture = blk: {
+        switch (state.pageData) {
+            .Home => break :blk Texture.StickerMainHome,
+            .Entry => break :blk Texture.StickerMainHalo,
+        }
+    };
+    const stickerMain = state.assets.getStaticTextureData(texture);
+    if (stickerMain.loaded()) {
         const stickerSize = m.Vec2.init(gridSize * 14.5, gridSize * 3);
         const stickerPos = m.Vec2.init(
             marginX + gridSize * 4.5,
             screenSizeF.y - gridSize * 6 - stickerSize.y
         );
         renderQueue.quadTex(
-            stickerPos, stickerSize, 0, stickerBackground.id, colorUi
+            stickerPos, stickerSize, 0, stickerMain.id, colorUi
         );
     }
 
-    const stickerText = switch (state.pageData) {
-        .Home => "Yorstory",
-        .Entry => "HALO IV",
-    };
-    const textStickerPos1 = m.Vec2.init(
-        marginX + gridSize * 5.5,
-        screenSizeF.y - gridSize * 7.4
-    );
-    renderQueue.textLine(
-        stickerText,
-        textStickerPos1, fontStickerSize, gridSize * -0.05,
-        colorBlack, "HelveticaBold"
-    );
-
-    const textStickerPos2 = m.Vec2.init(
-        marginX + gridSize * 5.5,
-        screenSizeF.y - gridSize * 6.5
-    );
-    renderQueue.textLine(
-        "A YORSTORY company © 2018-2022.",
-        textStickerPos2, fontStickerSmallSize, 0.0,
-        colorBlack, "HelveticaBold",
-    );
-
-    const textStickerPos3 = m.Vec2.init(
-        marginX + gridSize * 12,
-        screenSizeF.y - gridSize * 8.55
-    );
-    renderQueue.textBox(
-        "At Yorstory, alchemists and wizards fashion your story with style, light, and shadow.",
-        textStickerPos3, gridSize * 6,
-        fontStickerSmallSize, fontStickerSmallSize, 0.0,
-        colorBlack, "HelveticaBold",
-    );
+    // sticker (shiny)
+    const stickerShiny = state.assets.getStaticTextureData(Texture.StickerShiny);
+    if (stickerShiny.loaded()) {
+        const stickerShinySize = getTextureScaledSize(stickerShiny.size, screenSizeF);
+        const stickerShinyPos = m.Vec2.init(
+            screenSizeF.x - marginX - gridSize * 5.0 - stickerShinySize.x,
+            gridSize * 5.0
+        );
+        renderQueue.quadTex(stickerShinyPos, stickerShinySize, 0, stickerShiny.id, m.Vec4.one);
+    }
 
     const framePos = m.Vec2.init(marginX + gridSize * 1, gridSize * 1);
     const frameSize = m.Vec2.init(
@@ -1144,7 +1142,7 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
         }
     }
 
-    return @floatToInt(c_int, yMax); //@floatToInt(c_int, screenSizeF.y * 2.5);
+    return @floatToInt(c_int, yMax);
 }
 
 export fn onTextureLoaded(textureId: c_uint, width: c_int, height: c_int) void
