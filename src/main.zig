@@ -1091,7 +1091,7 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
                 numberPos.y + gridSize * 0.1
             );
             renderQueue.textBox(
-                numStr, numberTextPos, numberSize.x, fontStickerSize, fontStickerSize, 0.0, colorBlack, "HelveticaBold", .Center
+                numStr, numberTextPos, gridSize * 2.16, fontStickerSize, fontStickerSize, 0.0, colorBlack, "HelveticaBold", .Center
             );
 
             renderQueue.textLine(
