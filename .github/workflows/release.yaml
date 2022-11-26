@@ -20,10 +20,10 @@ jobs:
           submodules: 'recursive'
 
       - name: test
-        run: ~/zig-0.10.0/zig build -Dtarget=x86_64-linux test
+        run: ~/zig-0.10.0/zig build -Dtarget=x86_64-linux -Drelease-fast=true test
 
       - name: build
-        run: ~/zig-0.10.0/zig build -Dtarget=x86_64-linux
+        run: ~/zig-0.10.0/zig build -Dtarget=x86_64-linux -Drelease-fast=true
 
       - name: rename
         run: mv zig-out yorstory

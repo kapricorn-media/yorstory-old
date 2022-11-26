@@ -273,6 +273,8 @@ fn serverCallback(
             if (std.mem.eql(u8, request.uri, "/") or std.mem.eql(u8, request.uri, "/halo")) {
                 try server.writeFileResponse(writer, "static/wasm.html", allocator);
                 return;
+            } else if (std.mem.eql(u8, request.uri, "/png_test")) {
+                try server.writeFileResponse(writer, "static/images/sticker-main.png", allocator);
             } else if (std.mem.eql(u8, request.uri, "/webgl_png")) {
                 if (request.queryParams.len != 2) {
                     try server.writeCode(writer, ._400);

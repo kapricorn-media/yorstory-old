@@ -35,7 +35,7 @@ pub fn build(b: *std.build.Builder) void
     server.install();
 
     const wasm = b.addSharedLibrary(PROJECT_NAME, "src/main.zig", .unversioned);
-    wasm.setBuildMode(mode);
+    wasm.setBuildMode(.Debug); // TODO wasm release mode build not working
     wasm.setTarget(.{
         .cpu_arch = .wasm32,
         .os_tag = .freestanding,

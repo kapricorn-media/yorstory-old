@@ -7,12 +7,12 @@ function httpGet(url, callback)
 {
     const request = new XMLHttpRequest();
     request.open("GET", url);
-    request.responseType = "text";
+    request.responseType = "arraybuffer";
     request.send();
     request.onreadystatechange = function() {
         if (this.readyState == 4) {
             const responseOk = this.status === 200;
-            callback(this.status, responseOk ? request.responseText : null);
+            callback(this.status, responseOk ? request.response : null);
         }
     };
 }
@@ -21,14 +21,24 @@ function httpPost(url, data, callback)
 {
     const request = new XMLHttpRequest();
     request.open("POST", url);
-    request.responseType = "text";
+    request.responseType = "arraybuffer";
     request.send(data);
     request.onreadystatechange = function() {
         if (this.readyState == 4) {
             const responseOk = this.status === 200;
-            callback(this.status, responseOk ? request.responseText : null);
+            callback(this.status, responseOk ? request.response : null);
         }
     };
+}
+
+function arrayBufferToBase64(arrayBuffer)
+{
+    return btoa(String.fromCharCode.apply(null, new Uint8Array(arrayBuffer)));
+}
+
+function arrayBufferToImageSrc(arrayBuffer)
+{
+    return "data:image/png;base64," + arrayBufferToBase64(arrayBuffer);
 }
 
 let _loadedImages = {};
