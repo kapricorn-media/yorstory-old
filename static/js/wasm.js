@@ -123,10 +123,11 @@ function addTextLine(
 
 function addTextBox(
     textPtr, textLen, left, top, width, fontSize, lineHeight, letterSpacing,
-    hexColorPtr, hexColorLen, fontFamilyPtr, fontFamilyLen) {
+    hexColorPtr, hexColorLen, fontFamilyPtr, fontFamilyLen, textAlignPtr, textAlignLen) {
     const text = readCharStr(textPtr, textLen);
     const hexColor = readCharStr(hexColorPtr, hexColorLen);
     const fontFamily = readCharStr(fontFamilyPtr, fontFamilyLen);
+    const textAlign = readCharStr(textAlignPtr, textAlignLen);
 
     const div = document.createElement("div");
     div.classList.add("_wasmTextBox");
@@ -138,6 +139,7 @@ function addTextBox(
     div.style.fontSize = px(fontSize);
     div.style.lineHeight = px(lineHeight);
     div.style.letterSpacing = px(letterSpacing);
+    div.style.textAlign = textAlign;
     div.innerHTML = text;
     document.getElementById("dummyBackground").appendChild(div);
 }

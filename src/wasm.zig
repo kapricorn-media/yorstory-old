@@ -17,8 +17,6 @@ pub fn addTextLine(text: []const u8, topLeft: m.Vec2i, fontSize: i32, hexColor: 
     bindings.addTextLine(&text[0], text.len, topLeft.x, topLeft.y, fontSize, &hexColor[0], hexColor.len, &fontFamily[0], fontFamily.len);
 }
 
-// pub fn addTextBox()
-
 pub fn setCursor(cursor: []const u8) void
 {
     bindings.setCursor(&cursor[0], cursor.len);

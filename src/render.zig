@@ -3,6 +3,21 @@ const std = @import("std");
 const m = @import("math.zig");
 const w = @import("wasm_bindings.zig");
 
+const TextAlign = enum {
+    Left,
+    Center,
+    Right,
+};
+
+fn textAlignToString(textAlign: TextAlign) []const u8
+{
+    return switch (textAlign) {
+        .Left => "left",
+        .Center => "center",
+        .Right => "right",
+    };
+}
+
 const POS_UNIT_SQUARE: [6]m.Vec2 align(4) = [6]m.Vec2 {
     m.Vec2.init(0.0, 0.0),
     m.Vec2.init(0.0, 1.0),
@@ -681,7 +696,7 @@ const RenderEntryRoundedFrame = struct {
 
 const RenderEntryTextLine = struct {
     text: []const u8,
-    topLeft: m.Vec2,
+    baselineLeft: m.Vec2,
     fontSize: f32,
     letterSpacing: f32,
     color: m.Vec4,
@@ -696,7 +711,8 @@ const RenderEntryTextBox = struct {
     lineHeight: f32,
     letterSpacing: f32,
     color: m.Vec4,
-    fontFamily: []const u8
+    fontFamily: []const u8,
+    textAlign: TextAlign,
 };
 
 fn posTopLeftToBottomLeft(pos: m.Vec2, size: m.Vec2, screenSize: m.Vec2, scrollY: f32) m.Vec2
@@ -786,11 +802,11 @@ pub const RenderQueue = struct
         };
     }
 
-    pub fn textLine(self: *Self, text: []const u8, topLeft: m.Vec2, fontSize: f32, letterSpacing: f32, color: m.Vec4, fontFamily: []const u8) void
+    pub fn textLine(self: *Self, text: []const u8, baselineLeft: m.Vec2, fontSize: f32, letterSpacing: f32, color: m.Vec4, fontFamily: []const u8) void
     {
         (self.textLines.addOne() catch return).* = RenderEntryTextLine {
             .text = text,
-            .topLeft = topLeft,
+            .baselineLeft = baselineLeft,
             .fontSize = fontSize,
             .letterSpacing = letterSpacing,
             .color = color,
@@ -798,7 +814,7 @@ pub const RenderQueue = struct
         };
     }
 
-    pub fn textBox(self: *Self, text: []const u8, topLeft: m.Vec2, width: f32, fontSize: f32, lineHeight: f32, letterSpacing: f32, color: m.Vec4, fontFamily: []const u8) void
+    pub fn textBox(self: *Self, text: []const u8, topLeft: m.Vec2, width: f32, fontSize: f32, lineHeight: f32, letterSpacing: f32, color: m.Vec4, fontFamily: []const u8, textAlign: TextAlign) void
     {
         (self.textBoxes.addOne() catch return).* = RenderEntryTextBox {
             .text = text,
@@ -809,6 +825,7 @@ pub const RenderQueue = struct
             .letterSpacing = letterSpacing,
             .color = color,
             .fontFamily = fontFamily,
+            .textAlign = textAlign,
         };
     }
 
@@ -838,19 +855,21 @@ pub const RenderQueue = struct
             const hexColor = colorToHexString(&buf, e.color) catch continue;
             w.addTextLine(
                 &e.text[0], e.text.len,
-                @floatToInt(c_int, e.topLeft.x), @floatToInt(c_int, e.topLeft.y),
+                @floatToInt(c_int, e.baselineLeft.x), @floatToInt(c_int, e.baselineLeft.y),
                 @floatToInt(c_int, e.fontSize), e.letterSpacing,
                 &hexColor[0], hexColor.len, &e.fontFamily[0], e.fontFamily.len
             );
         }
         for (self.textBoxes.items) |e| {
+            const textAlign = textAlignToString(e.textAlign);
             const hexColor = colorToHexString(&buf, e.color) catch continue;
             w.addTextBox(
                 &e.text[0], e.text.len,
                 @floatToInt(c_int, e.topLeft.x), @floatToInt(c_int, e.topLeft.y),
                 @floatToInt(c_int, e.width),
                 @floatToInt(c_int, e.fontSize), @floatToInt(c_int, e.lineHeight), e.letterSpacing,
-                &hexColor[0], hexColor.len, &e.fontFamily[0], e.fontFamily.len
+                &hexColor[0], hexColor.len, &e.fontFamily[0], e.fontFamily.len,
+                &textAlign[0], textAlign.len
             );
         }
     }
