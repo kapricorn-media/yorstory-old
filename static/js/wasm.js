@@ -7,36 +7,45 @@ let _canvas = null;
 let _currentHeight = null;
 let _loadTextureJobs = [];
 
-function queueLoadTextureJob(width, height, chunkSize, textureId, image, i, loaded) {
-    _loadTextureJobs.push({
+function createLoadTextureJob(width, height, chunkSize, textureId, pngData, i, loaded) {
+    return {
         width: width,
         height: height,
         chunkSize: chunkSize,
         textureId: textureId,
-        image: image,
+        pngData: pngData,
         i: i,
         loaded: loaded,
-    });
+    };
 }
 
-function doLoadTextureJob(width, height, chunkSize, textureId, image, i, loaded) {
-    const chunkSizeRows = Math.round(chunkSize / width);
+function queueLoadTextureJob(width, height, chunkSize, textureId, pngData, i, loaded) {
+    _loadTextureJobs.push(createLoadTextureJob(width, height, chunkSize, textureId, pngData, i, loaded));
+}
 
-    const level = 0;
-    const xOffset = 0;
-    const yOffset = height - chunkSizeRows * i - image.height;
-    const srcFormat = gl.RGBA;
-    const srcType = gl.UNSIGNED_BYTE;
+function doLoadTextureJob(job) {
+        console.log(job);
+    const image = new Image();
+    image.onload = function() {
+        const chunkSizeRows = Math.round(job.chunkSize / job.width);
 
-    const texture = _glTextures[textureId];
-    gl.bindTexture(gl.TEXTURE_2D, texture);
-    gl.texSubImage2D(gl.TEXTURE_2D, level, xOffset, yOffset, srcFormat, srcType, image);
+        const level = 0;
+        const xOffset = 0;
+        const yOffset = job.height - chunkSizeRows * job.i - image.height;
+        const srcFormat = gl.RGBA;
+        const srcType = gl.UNSIGNED_BYTE;
 
-    loaded[i] = true;
-    const allLoaded = loaded.every(function(el) { return el; });
-    if (allLoaded) {
-        _wasmInstance.exports.onTextureLoaded(textureId, width, height);
-    }
+        const texture = _glTextures[job.textureId];
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.texSubImage2D(gl.TEXTURE_2D, level, xOffset, yOffset, srcFormat, srcType, image);
+
+        job.loaded[job.i] = true;
+        const allLoaded = job.loaded.every(function(el) { return el; });
+        if (allLoaded) {
+            _wasmInstance.exports.onTextureLoaded(job.textureId, job.width, job.height);
+        }
+    };
+    image.src = uint8ArrayToImageSrc(job.pngData);
 }
 
 function doNextLoadTextureJob() {
@@ -44,7 +53,7 @@ function doNextLoadTextureJob() {
     if (!job) {
         return;
     }
-    doLoadTextureJob(job.width, job.height, job.chunkSize, job.textureId, job.image, job.i, job.loaded);
+    doLoadTextureJob(job);
 }
 
 function consoleMessage(isError, messagePtr, messageLen) {
@@ -191,49 +200,6 @@ function linkShaderProgram(vertexShaderId, fragmentShaderId) {
     return _glPrograms.length - 1;
 };
 
-function queueTextureLoadDirect(url, textureId, width, height)
-{
-    const image = new Image();
-    image.onload = function() {
-        if (width != image.width || height != image.height) {
-            console.error("mismatched image dimensions");
-        }
-
-        const texture = _glTextures[textureId];
-        gl.bindTexture(gl.TEXTURE_2D, texture);
-        const level = 0;
-        const xOffset = 0;
-        const yOffset = 0;
-        const srcFormat = gl.RGBA;
-        const srcType = gl.UNSIGNED_BYTE;
-        gl.texSubImage2D(gl.TEXTURE_2D, level, xOffset, yOffset, srcFormat, srcType, image);
-
-        _wasmInstance.exports.onTextureLoaded(textureId, width, height);
-    };
-    image.src = url;
-}
-
-function queueTextureLoadChunked(url, textureId, width, height, chunkSize)
-{
-    if (chunkSize % width !== 0) {
-        console.error("chunk size is not a multiple of image width");
-        return;
-    }
-
-    const n = Math.ceil((width * height) / chunkSize);
-    const loaded = new Array(n).fill(false);
-
-    for (let i = 0; i < n; i++) {
-        const uri = `/webgl_png_chunk?path=${url}&index=${i}`;
-
-        const image = new Image();
-        image.onload = function() {
-            queueLoadTextureJob(width, height, chunkSize, textureId, image, i, loaded);
-        };
-        image.src = uri;
-    }
-}
-
 function createTexture(width, height, wrap, filter) {
     const textureId = env.glCreateTexture();
     const texture = _glTextures[textureId];
@@ -254,6 +220,27 @@ function createTexture(width, height, wrap, filter) {
     return textureId;
 }
 
+function initBufferIt(buffer)
+{
+    return {
+        index: 0,
+        array: new Uint8Array(buffer),
+    };
+}
+
+function readBigEndianU64(bufferIt)
+{
+    if (bufferIt.index + 8 > bufferIt.array.length) {
+        throw "BE U64 out of bounds";
+    }
+    let value = 0;
+    for (let i = 0; i < 8; i++) {
+        value += bufferIt.array[bufferIt.index + i] * (1 << ((7 - i) * 8));
+    }
+    bufferIt.index += 8;
+    return value;
+}
+
 function loadTexture(textureId, imgUrlPtr, imgUrlLen, wrap, filter) {
     const imgUrl = readCharStr(imgUrlPtr, imgUrlLen);
     const chunkSizeMax = 512 * 1024;
@@ -262,7 +249,7 @@ function loadTexture(textureId, imgUrlPtr, imgUrlLen, wrap, filter) {
     gl.bindTexture(gl.TEXTURE_2D, texture);
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
 
-    const uri = `/webgl_png?path=${imgUrl}&chunkSizeMax=${chunkSizeMax}`;
+    const uri = `/webgl_png?path=${imgUrl}`;
     httpGet(uri, function(status, data) {
         if (status !== 200) {
             console.log(`webgl_png failed with status ${status} for URL ${imgUrl}`);
@@ -270,10 +257,17 @@ function loadTexture(textureId, imgUrlPtr, imgUrlLen, wrap, filter) {
             return;
         }
 
-        const metadata = JSON.parse(data);
-        const width = metadata.width;
-        const height = metadata.height;
-        const chunkSize = metadata.chunkSize;
+        const it = initBufferIt(data);
+        const width = readBigEndianU64(it);
+        const height = readBigEndianU64(it);
+        const chunkSize = readBigEndianU64(it);
+        const numChunks = readBigEndianU64(it);
+
+        if (chunkSize % width !== 0) {
+            console.error("chunk size is not a multiple of image width");
+            return;
+        }
+
         const level = 0;
         const internalFormat = gl.RGBA;
         const border = 0;
@@ -288,61 +282,14 @@ function loadTexture(textureId, imgUrlPtr, imgUrlLen, wrap, filter) {
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, filter);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, filter);
 
-        if (chunkSize === 0) {
-            queueTextureLoadDirect(imgUrl, textureId, width, height);
-        } else {
-            queueTextureLoadChunked(imgUrl, textureId, width, height, chunkSize);
+        const loaded = new Array(numChunks).fill(false);
+        for (let i = 0; i < numChunks; i++) {
+            const chunkLen = readBigEndianU64(it);
+            const chunkData = it.array.subarray(it.index, it.index + chunkLen);
+            it.index += chunkLen;
+            queueLoadTextureJob(width, height, chunkSize, textureId, chunkData, i, loaded);
         }
     });
-};
-
-function createAndLoadTexture(imgUrlPtr, imgUrlLen, wrap, filter) {
-    const imgUrl = readCharStr(imgUrlPtr, imgUrlLen);
-    const chunkSizeMax = 512 * 1024;
-
-    const textureId = env.glCreateTexture();
-    const texture = _glTextures[textureId];
-    gl.bindTexture(gl.TEXTURE_2D, texture);
-    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
-
-    const level = 0;
-    const internalFormat = gl.RGBA;
-    const tempWidth = 1;
-    const tempHeight = 1;
-    const border = 0;
-    const srcFormat = gl.RGBA;
-    const srcType = gl.UNSIGNED_BYTE;
-    const tempPixels = new Uint8Array([255, 255, 255, 255]);
-    gl.texImage2D(gl.TEXTURE_2D, level, internalFormat, tempWidth, tempHeight, border, srcFormat, srcType, tempPixels);
-
-    const uri = `/webgl_png?path=${imgUrl}&chunkSizeMax=${chunkSizeMax}`;
-    httpGet(uri, function(status, data) {
-        if (status !== 200) {
-            console.log("webgl_png failed");
-            return;
-        }
-
-        const metadata = JSON.parse(data);
-        const width = metadata.width;
-        const height = metadata.height;
-        const chunkSize = metadata.chunkSize;
-
-        const pixels = new Uint8Array(width * height * 4);
-        gl.bindTexture(gl.TEXTURE_2D, texture);
-        gl.texImage2D(gl.TEXTURE_2D, level, internalFormat, width, height, border, srcFormat, srcType, pixels);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrap);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, wrap);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, filter);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, filter);
-
-        if (chunkSize === 0) {
-            queueTextureLoadDirect(imgUrl, textureId, width, height);
-        } else {
-            queueTextureLoadChunked(imgUrl, textureId, width, height, chunkSize);
-        }
-    });
-
-    return textureId;
 };
 
 function bindNullFramebuffer() {
@@ -364,7 +311,6 @@ const env = {
     // GL derived functions
     compileShader,
     linkShaderProgram,
-    createAndLoadTexture,
     createTexture,
     loadTexture,
     bindNullFramebuffer

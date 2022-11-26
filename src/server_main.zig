@@ -15,6 +15,8 @@ const portfolio = @import("portfolio.zig");
 const WASM_PATH = if (config.DEBUG) "zig-out/yorstory.wasm" else "yorstory.wasm";
 const SERVER_IP = "0.0.0.0";
 
+const CHUNK_SIZE_MAX = if (config.DEBUG) 1024 * 1024 * 1024 else 512 * 1024;
+
 pub const log_level: std.log.Level = switch (builtin.mode) {
     .Debug => .debug,
     .ReleaseSafe => .info,
@@ -23,75 +25,6 @@ pub const log_level: std.log.Level = switch (builtin.mode) {
 };
 
 const ServerCallbackError = server.Writer.Error || error {InternalServerError};
-
-const ChunkedPngData = struct {
-    size: m.Vec2i,
-    channels: u8,
-    chunkSize: usize,
-    chunkData: [][]const u8
-};
-
-const ChunkedPngStore = struct {
-    allocator: std.mem.Allocator,
-    mutex: std.Thread.Mutex,
-    map: std.StringHashMap(ChunkedPngData),
-
-    const Self = @This();
-
-    pub fn init(allocator: std.mem.Allocator) Self
-    {
-        return Self {
-            .allocator = allocator,
-            .mutex = std.Thread.Mutex{},
-            .map = std.StringHashMap(ChunkedPngData).init(allocator),
-        };
-    }
-
-    pub fn deinit(self: *Self) void
-    {
-        self.map.deinit();
-    }
-
-    pub fn get(self: *Self, path: []const u8) ?ChunkedPngData
-    {
-        self.mutex.lock();
-        defer self.mutex.unlock();
-        return self.map.get(path);
-    }
-
-    pub fn put(self: *Self, path: []const u8, data: ChunkedPngData) !void
-    {
-        self.mutex.lock();
-        defer self.mutex.unlock();
-        try self.map.put(path, data);
-    }
-};
-
-const ServerState = struct {
-    allocator: std.mem.Allocator,
-
-    chunkedPngStore: ChunkedPngStore,
-    chunkedPngLoadMutex: std.Thread.Mutex,
-
-    port: u16,
-
-    const Self = @This();
-
-    pub fn init(allocator: std.mem.Allocator, port: u16) Self
-    {
-        return Self {
-            .allocator = allocator,
-            .chunkedPngStore = ChunkedPngStore.init(allocator),
-            .chunkedPngLoadMutex = std.Thread.Mutex{},
-            .port = port,
-        };
-    }
-
-    pub fn deinit(self: *Self) void
-    {
-        self.chunkedPngStore.deinit();
-    }
-};
 
 fn calculateChunkSize(imageSize: m.Vec2i, chunkSizeMax: usize) usize
 {
@@ -134,129 +67,170 @@ fn stbCallback(context: ?*anyopaque, data: ?*anyopaque, size: c_int) callconv(.C
     };
 }
 
-fn handleWebglPngRequest(state: *ServerState, path: []const u8, chunkSizeMax: usize, writer: server.Writer) !void
+fn pngToChunkedFormat(pngData: []const u8, chunkSizeMax: usize, allocator: std.mem.Allocator) ![]const u8
 {
-    var arenaAllocator = std.heap.ArenaAllocator.init(state.allocator);
-    defer arenaAllocator.deinit();
-    const allocator = arenaAllocator.allocator();
+    // PNG file -> pixel data (stb_image)
+    var width: c_int = undefined;
+    var height: c_int = undefined;
+    var channels: c_int = undefined;
+    var d = stb.stbi_load_from_memory(&pngData[0], @intCast(c_int, pngData.len), &width, &height, &channels, 0);
+    if (d == null) {
+        return error.stbReadFail;
+    }
+    defer stb.stbi_image_free(d);
 
-    const data = state.chunkedPngStore.get(path) orelse blk: {
-        // mutex here avoids crazy memory usage spikes at the cost of slowness
-        state.chunkedPngLoadMutex.lock();
-        defer state.chunkedPngLoadMutex.unlock();
+    const imageSize = m.Vec2i.init(width, height);
+    const chunkSize = calculateChunkSize(imageSize, chunkSizeMax);
 
-        // Read file data
-        const fullPath = try std.mem.concat(allocator, u8, &[_][]const u8 {"static", path});
-        const cwd = std.fs.cwd();
-        // TODO unsafe!!!
-        const file = cwd.openFile(fullPath, .{}) catch |err| switch (err) {
-            error.FileNotFound => {
-                try server.writeCode(writer, ._404);
-                try server.writeEndHeader(writer);
-                return;
-            },
-            else => return err,
-        };
-        defer file.close();
-        const fileData = try file.readToEndAlloc(allocator, 1024 * 1024 * 1024);
+    var outBuf = std.ArrayList(u8).init(allocator);
+    defer outBuf.deinit();
 
-        // PNG file -> pixel data (stb_image)
-        var width: c_int = undefined;
-        var height: c_int = undefined;
-        var channels: c_int = undefined;
-        var d = stb.stbi_load_from_memory(&fileData[0], @intCast(c_int, fileData.len), &width, &height, &channels, 0);
-        if (d == null) {
-            return error.stbReadFail;
-        }
-        defer stb.stbi_image_free(d);
+    const sizeType = u64;
+    var widthBytes = try outBuf.addManyAsArray(@sizeOf(sizeType));
+    std.mem.writeIntBig(sizeType, widthBytes, @intCast(sizeType, imageSize.x));
+    var heightBytes = try outBuf.addManyAsArray(@sizeOf(sizeType));
+    std.mem.writeIntBig(sizeType, heightBytes, @intCast(sizeType, imageSize.y));
+    var chunkSizeBytes = try outBuf.addManyAsArray(@sizeOf(sizeType));
+    std.mem.writeIntBig(sizeType, chunkSizeBytes, chunkSize);
+    std.log.info("{}x{}", .{imageSize.x, imageSize.y});
 
-        // Start filling out PNG data struct
-        const imageSize = m.Vec2i.init(width, height);
-        const chunkSize = calculateChunkSize(imageSize, chunkSizeMax);
+    if (chunkSize != 0) {
         const channelsU8 = @intCast(u8, channels);
         const dataSizePixels = @intCast(usize, imageSize.x * imageSize.y);
         const dataSizeBytes = dataSizePixels * channelsU8;
-        var pngData = ChunkedPngData{
-            .size = imageSize,
-            .channels = channelsU8,
-            .chunkSize = chunkSize,
-            .chunkData = undefined,
-        };
 
-        if (chunkSize != 0) {
-            // Generate chunked PNG data
-            const pixelData = d[0..dataSizeBytes];
+        // Generate chunked PNG data
+        const pixelData = d[0..dataSizeBytes];
 
-            var pngDataBuf = std.ArrayList(u8).init(allocator);
-            defer pngDataBuf.deinit();
+        var pngDataBuf = std.ArrayList(u8).init(allocator);
+        defer pngDataBuf.deinit();
 
-            const imageSizeXUsize = @intCast(usize, imageSize.x);
-            if (chunkSize % imageSizeXUsize != 0) {
-                return error.ChunkSizeBadModulo;
-            }
-            const chunkRows = chunkSize / imageSizeXUsize;
-            const n = integerCeilingDivide(dataSizePixels, chunkSize);
-
-            pngData.chunkData = try state.allocator.alloc([]const u8, n);
-
-            var i: usize = 0;
-            while (i < n) : (i += 1) {
-                const rowStart = chunkRows * i;
-                const rowEnd = std.math.min(chunkRows * (i + 1), imageSize.y);
-                std.debug.assert(rowEnd > rowStart);
-                const rows = rowEnd - rowStart;
-
-                const chunkStart = rowStart * imageSizeXUsize * channelsU8;
-                const chunkEnd = rowEnd * imageSizeXUsize * channelsU8;
-                const chunkBytes = pixelData[chunkStart..chunkEnd];
-
-                pngDataBuf.clearRetainingCapacity();
-                var cbData = StbCallbackData {
-                    .fail = false,
-                    .writer = pngDataBuf.writer(),
-                };
-                const pngStride = imageSizeXUsize * channelsU8;
-                const writeResult = stb.stbi_write_png_to_func(stbCallback, &cbData, imageSize.x, @intCast(c_int, rows), channels, &chunkBytes[0], @intCast(c_int, pngStride));
-                if (writeResult == 0) {
-                    return error.stbWriteFail;
-                }
-
-                pngData.chunkData[i] = try state.allocator.dupe(u8, pngDataBuf.items);
-            }
+        const imageSizeXUsize = @intCast(usize, imageSize.x);
+        if (chunkSize % imageSizeXUsize != 0) {
+            return error.ChunkSizeBadModulo;
         }
+        const chunkRows = chunkSize / imageSizeXUsize;
+        const n = integerCeilingDivide(dataSizePixels, chunkSize);
 
-        const pathDupe = try state.allocator.dupe(u8, path);
-        try state.chunkedPngStore.put(pathDupe, pngData);
-        break :blk pngData;
-    };
+        var numChunksBytes = try outBuf.addManyAsArray(@sizeOf(sizeType));
+        std.mem.writeIntBig(sizeType, numChunksBytes, n);
 
-    const response = try std.fmt.allocPrint(allocator, "{{\"width\":{},\"height\":{},\"chunkSize\":{}}}", .{data.size.x, data.size.y, data.chunkSize});
-    try server.writeCode(writer, ._200);
-    try server.writeContentLength(writer, response.len);
-    try server.writeContentType(writer, .ApplicationJson);
-    try server.writeEndHeader(writer);
-    try writer.writeAll(response);
+        var i: usize = 0;
+        while (i < n) : (i += 1) {
+            const rowStart = chunkRows * i;
+            const rowEnd = std.math.min(chunkRows * (i + 1), imageSize.y);
+            std.debug.assert(rowEnd > rowStart);
+            const rows = rowEnd - rowStart;
+
+            const chunkStart = rowStart * imageSizeXUsize * channelsU8;
+            const chunkEnd = rowEnd * imageSizeXUsize * channelsU8;
+            const chunkBytes = pixelData[chunkStart..chunkEnd];
+
+            pngDataBuf.clearRetainingCapacity();
+            var cbData = StbCallbackData {
+                .fail = false,
+                .writer = pngDataBuf.writer(),
+            };
+            const pngStride = imageSizeXUsize * channelsU8;
+            const writeResult = stb.stbi_write_png_to_func(stbCallback, &cbData, imageSize.x, @intCast(c_int, rows), channels, &chunkBytes[0], @intCast(c_int, pngStride));
+            if (writeResult == 0) {
+                return error.stbWriteFail;
+            }
+
+            var chunkLenBytes = try outBuf.addManyAsArray(@sizeOf(sizeType));
+            std.mem.writeIntBig(sizeType, chunkLenBytes, pngDataBuf.items.len);
+            try outBuf.appendSlice(pngDataBuf.items);
+        }
+    } else {
+        var numChunksBytes = try outBuf.addManyAsArray(@sizeOf(sizeType));
+        std.mem.writeIntBig(sizeType, numChunksBytes, 1);
+        var chunkLenBytes = try outBuf.addManyAsArray(@sizeOf(sizeType));
+        std.mem.writeIntBig(sizeType, chunkLenBytes, pngData.len);
+        try outBuf.appendSlice(pngData);
+    }
+
+    return outBuf.toOwnedSlice();
 }
 
-fn handleWebglPngTileRequest(state: *ServerState, path: []const u8, index: usize, writer: server.Writer) !void
-{
-    const data = state.chunkedPngStore.get(path) orelse {
-        return error.TileRequestNoPngStore;
-    };
+const ChunkedPngStore = struct {
+    allocator: std.mem.Allocator,
+    map: std.BufMap,
 
-    if (data.chunkSize == 0) {
-        return error.TileRequestOnUnchunked;
-    }
-    if (index >= data.chunkData.len) {
-        return error.TileIndexOutOfBounds;
-    }
-    const chunkData = data.chunkData[index];
+    const Self = @This();
 
-    try server.writeCode(writer, ._200);
-    try server.writeContentLength(writer, chunkData.len);
-    try server.writeEndHeader(writer);
-    try writer.writeAll(chunkData);
-}
+    pub fn init(allocator: std.mem.Allocator) !Self
+    {
+        var self = Self {
+            .allocator = allocator,
+            .map = std.BufMap.init(allocator),
+        };
+        try self.loadImages();
+        return self;
+    }
+
+    pub fn deinit(self: *Self) void
+    {
+        self.map.deinit();
+    }
+
+    pub fn loadImages(self: *Self) !void
+    {
+        const dirPath = "static/images";
+        const cwd = std.fs.cwd();
+        var dir = try cwd.openDir(dirPath, .{});
+        defer dir.close();
+
+        var dirIterable = try cwd.openIterableDir(dirPath, .{});
+        defer dirIterable.close();
+
+        var walker = try dirIterable.walk(self.allocator);
+        defer walker.deinit();
+        while (try walker.next()) |entry| {
+            if (entry.kind != .File) {
+                continue;
+            }
+
+            std.log.info("loading {s}", .{entry.path});
+
+            var arenaAllocator = std.heap.ArenaAllocator.init(self.allocator);
+            defer arenaAllocator.deinit();
+            const allocator = arenaAllocator.allocator();
+
+            // Read file data
+            const file = try dir.openFile(entry.path, .{});
+            defer file.close();
+            const fileData = try file.readToEndAlloc(allocator, 1024 * 1024 * 1024);
+            const chunked = try pngToChunkedFormat(fileData, CHUNK_SIZE_MAX, allocator);
+            const uri = try std.fmt.allocPrint(allocator, "/images/{s}", .{entry.path});
+            try self.map.put(uri, chunked);
+            std.log.info("- done ({}K -> {}K)", .{fileData.len / 1024, chunked.len / 1024});
+        }
+    }
+};
+
+const ServerState = struct {
+    allocator: std.mem.Allocator,
+
+    chunkedPngStore: ChunkedPngStore,
+
+    port: u16,
+
+    const Self = @This();
+
+    pub fn init(allocator: std.mem.Allocator, port: u16) !Self
+    {
+        return Self {
+            .allocator = allocator,
+            .chunkedPngStore = try ChunkedPngStore.init(allocator),
+            .port = port,
+        };
+    }
+
+    pub fn deinit(self: *Self) void
+    {
+        self.chunkedPngStore.deinit();
+    }
+};
 
 fn serverCallback(
     state: *ServerState,
@@ -276,30 +250,7 @@ fn serverCallback(
             } else if (std.mem.eql(u8, request.uri, "/png_test")) {
                 try server.writeFileResponse(writer, "static/images/sticker-main.png", allocator);
             } else if (std.mem.eql(u8, request.uri, "/webgl_png")) {
-                if (request.queryParams.len != 2) {
-                    try server.writeCode(writer, ._400);
-                    try server.writeEndHeader(writer);
-                    return;
-                }
-
-                const path = request.queryParams[0];
-                if (!std.mem.eql(u8, path.name, "path")) {
-                    try server.writeCode(writer, ._400);
-                    try server.writeEndHeader(writer);
-                    return;
-                }
-                const chunkSizeMaxP = request.queryParams[1];
-                if (!std.mem.eql(u8, chunkSizeMaxP.name, "chunkSizeMax")) {
-                    try server.writeCode(writer, ._400);
-                    try server.writeEndHeader(writer);
-                    return;
-                }
-                const chunkSizeMax = try std.fmt.parseUnsigned(usize, chunkSizeMaxP.value, 10);
-
-                try handleWebglPngRequest(state, path.value, chunkSizeMax, writer);
-                return;
-            } else if (std.mem.eql(u8, request.uri, "/webgl_png_chunk")) {
-                if (request.queryParams.len != 2) {
+                if (request.queryParams.len != 1) {
                     try server.writeCode(writer, ._400);
                     try server.writeEndHeader(writer);
                     return;
@@ -312,15 +263,16 @@ fn serverCallback(
                     return;
                 }
 
-                const indexP = request.queryParams[1];
-                if (!std.mem.eql(u8, indexP.name, "index")) {
-                    try server.writeCode(writer, ._400);
+                const data = state.chunkedPngStore.map.get(path.value) orelse {
+                    try server.writeCode(writer, ._404);
                     try server.writeEndHeader(writer);
                     return;
-                }
-                const index = try std.fmt.parseUnsigned(usize, indexP.value, 10);
+                };
+                try server.writeCode(writer, ._200);
+                try server.writeContentLength(writer, data.len);
+                try server.writeEndHeader(writer);
+                try writer.writeAll(data);
 
-                try handleWebglPngTileRequest(state, path.value, index, writer);
                 return;
             }
 
@@ -430,7 +382,7 @@ pub fn main() !void {
         };
     }
 
-    var state = ServerState.init(allocator, port);
+    var state = try ServerState.init(allocator, port);
     defer state.deinit();
 
     var s: server.Server(*ServerState) = undefined;

@@ -31,14 +31,18 @@ function httpPost(url, data, callback)
     };
 }
 
-function arrayBufferToBase64(arrayBuffer)
+function uint8ArrayToBase64(array)
 {
-    return btoa(String.fromCharCode.apply(null, new Uint8Array(arrayBuffer)));
+    let str = "";
+    for (let i = 0; i < array.length; i++) {
+        str += String.fromCharCode(array[i]);
+    }
+    return btoa(str);
 }
 
-function arrayBufferToImageSrc(arrayBuffer)
+function uint8ArrayToImageSrc(array)
 {
-    return "data:image/png;base64," + arrayBufferToBase64(arrayBuffer);
+    return "data:image/png;base64," + uint8ArrayToBase64(array);
 }
 
 let _loadedImages = {};
