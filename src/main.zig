@@ -14,6 +14,15 @@ const defaultTextureFilter = w.GL_LINEAR;
 const refSize = m.Vec2.init(3840, 2000);
 const gridRefSize = 74;
 
+const DEPTH_UI_ABOVEALL = 0.0;
+const DEPTH_UI_OVER2 = 0.2;
+const DEPTH_UI_OVER1 = 0.4;
+const DEPTH_UI_GENERIC = 0.5;
+const DEPTH_LANDINGIMAGE = 0.6;
+const DEPTH_LANDINGBACKGROUND = 0.7;
+const DEPTH_GRIDIMAGE = 0.6;
+const DEPTH_UI_BELOWALL = 1.0;
+
 const Memory = struct {
     persistent: [128 * 1024]u8 align(8),
     transient: [64 * 1024]u8 align(8),
@@ -476,7 +485,7 @@ const GridImage = struct {
     goToUri: ?[]const u8,
 };
 
-fn drawImageGrid(images: []const GridImage, itemsPerRow: usize, topLeft: m.Vec2, width: f32, spacing: f32, fontSize: f32, fontColor: m.Vec4, state: *State, scrollY: f32, mouseHoverGlobal: *bool,renderQueue: *render.RenderQueue, callback: *const fn(*State, GridImage) void) f32
+fn drawImageGrid(images: []const GridImage, itemsPerRow: usize, topLeft: m.Vec2, width: f32, spacing: f32, fontSize: f32, fontColor: m.Vec4, state: *State, scrollY: f32, mouseHoverGlobal: *bool,renderQueue: *render.RenderQueue, callback: *const fn(*State, GridImage, usize) void) f32
 {
     const itemWidth = (width - spacing * (@intToFloat(f32, itemsPerRow) - 1)) / @intToFloat(f32, itemsPerRow);
     const itemSize = m.Vec2.init(itemWidth, itemWidth * 0.5);
@@ -493,7 +502,7 @@ fn drawImageGrid(images: []const GridImage, itemsPerRow: usize, topLeft: m.Vec2,
             if (tex.loaded()) {
                 const cornerRadius = spacing * 2;
                 renderQueue.quadTex(
-                    itemPos, itemSize, 0, cornerRadius, tex.id, m.Vec4.one
+                    itemPos, itemSize, DEPTH_GRIDIMAGE, cornerRadius, tex.id, m.Vec4.one
                 );
             }
         } else {
@@ -516,7 +525,7 @@ fn drawImageGrid(images: []const GridImage, itemsPerRow: usize, topLeft: m.Vec2,
         }
 
         if (updateButton(itemPos, itemSize, state.mouseState, scrollY, mouseHoverGlobal)) {
-            callback(state, img);
+            callback(state, img, i);
         }
     }
 
@@ -594,6 +603,7 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
 {
     const screenSizeI = m.Vec2i.init(@intCast(i32, width), @intCast(i32, height));
     const screenSizeF = m.Vec2.initFromVec2i(screenSizeI);
+    const scrollYF = @intToFloat(f32, scrollY);
 
     var state = _memory.getState();
     defer {
@@ -603,19 +613,17 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
         state.mouseState.numClickEvents = 0;
     }
 
-    var tempAllocatorObj = _memory.getTransientAllocator();
-    const tempAllocator = tempAllocatorObj.allocator();
-
-    var renderQueue = render.RenderQueue.init(tempAllocator);
-
-    const scrollYF = @intToFloat(f32, scrollY);
-
     const mousePosF = m.Vec2.initFromVec2i(state.mouseState.pos);
     var mouseHoverGlobal = false;
 
     const deltaMs = if (state.timestampMsPrev > 0) (timestampMs - state.timestampMsPrev) else 0;
     const deltaS = @intToFloat(f32, deltaMs) / 1000.0;
     _ = deltaS;
+
+    var tempAllocatorObj = _memory.getTransientAllocator();
+    const tempAllocator = tempAllocatorObj.allocator();
+
+    var renderQueue = render.RenderQueue.init(tempAllocator);
 
     if (!m.Vec2i.eql(state.screenSizePrev, screenSizeI)) {
         std.log.info("resetting screen framebuffer", .{});
@@ -657,6 +665,10 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
     w.glBindFramebuffer(w.GL_FRAMEBUFFER, state.fb);
 
     w.glClear(w.GL_COLOR_BUFFER_BIT | w.GL_DEPTH_BUFFER_BIT);
+
+    const aspect = screenSizeF.x / screenSizeF.y;
+    const isVertical = aspect <= 1.0;
+    _ = isVertical; // TODO
 
     // const colorWhite = m.Vec4.init(1.0, 1.0, 1.0, 1.0);
     const colorBlack = m.Vec4.init(0.0, 0.0, 0.0, 1.0);
@@ -761,11 +773,11 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
                 if (activeParallaxSet) |parallaxSet| {
                     switch (parallaxSet.bgColor) {
                         .Color => |color| {
-                            renderQueue.quad(landingImagePos, landingImageSize, 1.0, 0, color);
+                            renderQueue.quad(landingImagePos, landingImageSize, DEPTH_LANDINGBACKGROUND, 0, color);
                         },
                         .Gradient => |gradient| {
                             renderQueue.quadGradient(
-                                landingImagePos, landingImageSize, 1.0, 0,
+                                landingImagePos, landingImageSize, DEPTH_LANDINGBACKGROUND, 0,
                                 gradient.colorTop, gradient.colorTop,
                                 gradient.colorBottom, gradient.colorBottom);
                         },
@@ -784,7 +796,7 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
                             landingImagePos.y
                         );
                         const imgSize = m.Vec2.init(textureSize.x, landingImageSize.y);
-                        renderQueue.quadTex(imgPos, imgSize, 0.5, 0.0, textureData.id, m.Vec4.one);
+                        renderQueue.quadTex(imgPos, imgSize, DEPTH_LANDINGIMAGE, 0.0, textureData.id, m.Vec4.one);
                     }
                 } else {
                     allLandingAssetsLoaded = false;
@@ -801,7 +813,7 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
                         landingImagePos.y
                     );
                     const imgSize = m.Vec2.init(textureSize.x, landingImageSize.y);
-                    renderQueue.quadTex(imgPos, imgSize, 1.0, 0.0, landingTex.id, m.Vec4.one);
+                    renderQueue.quadTex(imgPos, imgSize, DEPTH_LANDINGIMAGE, 0.0, landingTex.id, m.Vec4.one);
                 } else {
                     allLandingAssetsLoaded = false;
                 }
@@ -828,7 +840,7 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
         const uvOriginTL = m.Vec2.init(0, 0);
         const uvSizeTL = m.Vec2.init(1, 1);
         renderQueue.quadTexUvOffset(
-            posTL, decalSize, 0, 0, uvOriginTL, uvSizeTL, decalTopLeft.id, colorUi
+            posTL, decalSize, DEPTH_UI_GENERIC, 0, uvOriginTL, uvSizeTL, decalTopLeft.id, colorUi
         );
 
         const posTR = m.Vec2.init(
@@ -838,7 +850,7 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
         const uvOriginTR = m.Vec2.init(1, 0);
         const uvSizeTR = m.Vec2.init(-1, 1);
         renderQueue.quadTexUvOffset(
-            posTR, decalSize, 0, 0, uvOriginTR, uvSizeTR, decalTopLeft.id, colorUi
+            posTR, decalSize, DEPTH_UI_GENERIC, 0, uvOriginTR, uvSizeTR, decalTopLeft.id, colorUi
         );
 
         const posBL = m.Vec2.init(
@@ -848,7 +860,7 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
         const uvOriginBL = m.Vec2.init(0, 1);
         const uvSizeBL = m.Vec2.init(1, -1);
         renderQueue.quadTexUvOffset(
-            posBL, decalSize, 0, 0, uvOriginBL, uvSizeBL, decalTopLeft.id, colorUi
+            posBL, decalSize, DEPTH_UI_GENERIC, 0, uvOriginBL, uvSizeBL, decalTopLeft.id, colorUi
         );
 
         const posBR = m.Vec2.init(
@@ -858,7 +870,7 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
         const uvOriginBR = m.Vec2.init(1, 1);
         const uvSizeBR = m.Vec2.init(-1, -1);
         renderQueue.quadTexUvOffset(
-            posBR, decalSize, 0, 0, uvOriginBR, uvSizeBR, decalTopLeft.id, colorUi
+            posBR, decalSize, DEPTH_UI_GENERIC, 0, uvOriginBR, uvSizeBR, decalTopLeft.id, colorUi
         );
 
         // content page, 2 start
@@ -867,14 +879,14 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
             screenSizeF.y + gridSize * 2,
         );
         renderQueue.quadTexUvOffset(
-            posContentTL, decalSize, 0, 0, uvOriginTL, uvSizeTL, decalTopLeft.id, colorUi
+            posContentTL, decalSize, DEPTH_UI_GENERIC, 0, uvOriginTL, uvSizeTL, decalTopLeft.id, colorUi
         );
         const posContentTR = m.Vec2.init(
             screenSizeF.x - marginX - decalMargin - decalSize.x,
             screenSizeF.y + gridSize * 2,
         );
         renderQueue.quadTexUvOffset(
-            posContentTR, decalSize, 0, 0, uvOriginTR, uvSizeTR, decalTopLeft.id, colorUi
+            posContentTR, decalSize, DEPTH_UI_GENERIC, 0, uvOriginTR, uvSizeTR, decalTopLeft.id, colorUi
         );
     }
 
@@ -895,7 +907,7 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
                 gridSize * 5,
             );
             renderQueue.quadTex(
-                iconPos, iconSizeF, 0, 0, textureData.id, colorUi
+                iconPos, iconSizeF, DEPTH_UI_GENERIC, 0, textureData.id, colorUi
             );
             if (updateButton(iconPos, iconSizeF, state.mouseState, scrollYF, &mouseHoverGlobal)) {
                 const uri = switch (iconTexture) {
@@ -922,7 +934,7 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
             }
         };
         renderQueue.quadTex(
-            stickerPos, stickerSize, 0, 0, stickerMain.id, colorSticker
+            stickerPos, stickerSize, DEPTH_UI_GENERIC, 0, stickerMain.id, colorSticker
         );
 
         // sticker (shiny)
@@ -931,7 +943,7 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
             screenSizeF.x - marginX - gridSize * 5.0 - stickerShinySize.x,
             gridSize * 5.0
         );
-        renderQueue.quadTex(stickerShinyPos, stickerShinySize, 0, 0, stickerShiny.id, m.Vec4.one);
+        renderQueue.quadTex(stickerShinyPos, stickerShinySize, DEPTH_UI_GENERIC, 0, stickerShiny.id, m.Vec4.one);
     } else {
         // show loading indicator, if that is loaded
         if (stickerCircle.loaded() and loadingGlyphs.loaded()) {
@@ -940,14 +952,14 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
                 screenSizeF.x / 2.0 - circleSize.x / 2.0,
                 screenSizeF.y / 2.0 - circleSize.y / 2.0 - gridSize * 1,
             );
-            renderQueue.quadTex(circlePos, circleSize, 0.1, 0, stickerCircle.id, colorUi);
+            renderQueue.quadTex(circlePos, circleSize, DEPTH_UI_GENERIC, 0, stickerCircle.id, colorUi);
 
             const glyphsSize = getTextureScaledSize(loadingGlyphs.size, screenSizeF);
             const glyphsPos = m.Vec2.init(
                 screenSizeF.x / 2.0 - glyphsSize.x / 2.0,
                 screenSizeF.y / 2.0 - glyphsSize.y / 2.0 + gridSize * 1,
             );
-            renderQueue.quadTex(glyphsPos, glyphsSize, 0.1, 0, loadingGlyphs.id, colorUi);
+            renderQueue.quadTex(glyphsPos, glyphsSize, DEPTH_UI_GENERIC, 0, loadingGlyphs.id, colorUi);
 
             var i: i32 = 0;
             while (i < 3) : (i += 1) {
@@ -957,7 +969,7 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
                     screenSizeF.x / 2.0 - dotSize.x / 2.0 - spacing * @intToFloat(f32, i - 1),
                     screenSizeF.y / 2.0 - dotSize.y / 2.0 - gridSize * 1,
                 );
-                renderQueue.quad(dotOrigin, dotSize, 0, 0, colorBlack);
+                renderQueue.quad(dotOrigin, dotSize, DEPTH_UI_GENERIC - 0.01, 0, colorBlack);
             }
         }
     }
@@ -968,13 +980,13 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
         screenSizeF.x - marginX * 2 - gridSize * 2,
         screenSizeF.y - gridSize * 3,
     );
-    renderQueue.roundedFrame(m.Vec2.zero, screenSizeF, 0, framePos, frameSize, gridSize, colorBlack);
+    renderQueue.roundedFrame(m.Vec2.zero, screenSizeF, DEPTH_UI_OVER1, framePos, frameSize, gridSize, colorBlack);
 
     // ==== BELOW LANDING IMAGE ====
 
     const separatorLinePos = m.Vec2.init(gridSize + marginX, screenSizeF.y);
     const separatorLineSize = m.Vec2.init(screenSizeF.x - marginX * 2 - gridSize * 2, 1);
-    renderQueue.quad(separatorLinePos, separatorLineSize, 0, 0, colorUi);
+    renderQueue.quad(separatorLinePos, separatorLineSize, DEPTH_UI_GENERIC, 0, colorUi);
 
     const lineHeight = fontTextSize * 1.5;
     var sectionSize: f32 = 0;
@@ -990,7 +1002,7 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
                     (screenSizeF.x - wasSize.x) / 2,
                     screenSizeF.y + gridSize * 5
                 );
-                renderQueue.quadTex(wasPos, wasSize, 0.5, 0, weAreStorytellers.id, colorUi);
+                renderQueue.quadTex(wasPos, wasSize, DEPTH_UI_GENERIC, 0, weAreStorytellers.id, colorUi);
 
                 const eyeSize = getTextureScaledSize(stickerCircle.size, screenSizeF);
                 const eyePos = m.Vec2.init(
@@ -998,15 +1010,15 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
                     screenSizeF.y + gridSize * 6.2
                 );
                 const eyeStickerColor = m.Vec4.init(116.0 / 255.0, 19.0 / 255.0, 179.0 / 255.0, 1.0);
-                renderQueue.quadTex(eyePos, eyeSize, 0.4, 0, stickerCircle.id, eyeStickerColor);
-                renderQueue.quadTex(eyePos, eyeSize, 0.3, 0, symbolEye.id, colorUi);
+                renderQueue.quadTex(eyePos, eyeSize, DEPTH_UI_GENERIC - 0.01, 0, stickerCircle.id, eyeStickerColor);
+                renderQueue.quadTex(eyePos, eyeSize, DEPTH_UI_GENERIC - 0.02, 0, symbolEye.id, colorUi);
 
                 const logosSize = getTextureScaledSize(logosAll.size, screenSizeF);
                 const logosPos = m.Vec2.init(
                     (screenSizeF.x - logosSize.x) / 2,
                     screenSizeF.y + gridSize * 18
                 );
-                renderQueue.quadTex(logosPos, logosSize, 0, 0, logosAll.id, colorUi);
+                renderQueue.quadTex(logosPos, logosSize, DEPTH_UI_GENERIC, 0, logosAll.id, colorUi);
             }
 
             const textSubPos = m.Vec2.init(marginX + gridSize * 5.5, screenSizeF.y + gridSize * 14.5);
@@ -1101,16 +1113,16 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
     );
 
     const CB = struct {
-        fn home(theState: *State, image: GridImage) void
+        fn home(theState: *State, image: GridImage, index: usize) void
         {
-            _ = theState;
+            _ = theState; _ = index;
 
             if (image.goToUri) |uri| {
                 ww.setUri(uri);
             }
         }
 
-        fn entry(theState: *State, image: GridImage) void
+        fn entry(theState: *State, image: GridImage, index: usize) void
         {
             _ = image;
 
@@ -1119,7 +1131,7 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
                 return;
             }
             if (theState.pageData.Entry.galleryImageIndex == null) {
-                // theState.pageData.Entry.galleryImageIndex = 0;
+                theState.pageData.Entry.galleryImageIndex = index;
             }
         }
     };
@@ -1143,7 +1155,7 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
             );
             if (stickerCircle.loaded()) {
                 renderQueue.quadTex(
-                    numberPos, numberSize, 0, 0, stickerCircle.id, colorRedSticker
+                    numberPos, numberSize, DEPTH_UI_GENERIC, 0, stickerCircle.id, colorRedSticker
                 );
             }
             const numStr = std.fmt.allocPrint(tempAllocator, "{}", .{i + 1}) catch unreachable;
@@ -1230,13 +1242,14 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
         const entryData = state.pageData.Entry;
         if (entryData.galleryImageIndex) |ind| {
             _ = ind;
+            std.log.info("hihihi", .{});
             const pos = m.Vec2.init(0.0, scrollYF);
-            renderQueue.quad(pos, screenSizeF, 0, 0, m.Vec4.init(0.0, 0.0, 0.0, 0.5));
+            renderQueue.quad(pos, screenSizeF, DEPTH_UI_OVER2, 0, m.Vec4.init(0.0, 0.0, 0.0, 0.5));
         }
     }
 
     if (state.debug) {
-        renderQueue.quad(m.Vec2.init(0, baseY), m.Vec2.init(screenSizeF.x, 1), 0, 0, m.Vec4.one);
+        renderQueue.quad(m.Vec2.init(0, baseY), m.Vec2.init(screenSizeF.x, 1), DEPTH_UI_ABOVEALL, 0, m.Vec4.one);
     }
 
     renderQueue.renderShapes(state.renderState, screenSizeF, scrollYF);
@@ -1275,9 +1288,9 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
             const iF = @intToFloat(f32, i);
             const color = if (@rem(i, 2) == 0) colorGrid else colorGridHalf;
             const posTop = m.Vec2.init(0, screenSizeF.y - halfGridSize * iF);
-            state.renderState.quadState.drawQuad(posTop, sizeH, 0, 0, color, screenSizeF);
+            state.renderState.quadState.drawQuad(posTop, sizeH, DEPTH_UI_ABOVEALL, 0, color, screenSizeF);
             const posBottom = m.Vec2.init(0, halfGridSize * iF);
-            state.renderState.quadState.drawQuad(posBottom, sizeH, 0, 0, color, screenSizeF);
+            state.renderState.quadState.drawQuad(posBottom, sizeH, DEPTH_UI_ABOVEALL, 0, color, screenSizeF);
         }
 
         const nV = 40;
@@ -1287,9 +1300,9 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
             const iF = @intToFloat(f32, i);
             const color = if (@rem(i, 2) == 0) colorGrid else colorGridHalf;
             const posLeft = m.Vec2.init(marginX + halfGridSize * iF, 0);
-            state.renderState.quadState.drawQuad(posLeft, sizeV, 0, 0, color, screenSizeF);
+            state.renderState.quadState.drawQuad(posLeft, sizeV, DEPTH_UI_ABOVEALL, 0, color, screenSizeF);
             const posRight = m.Vec2.init(-marginX + screenSizeF.x - halfGridSize * iF, 0);
-            state.renderState.quadState.drawQuad(posRight, sizeV, 0, 0, color, screenSizeF);
+            state.renderState.quadState.drawQuad(posRight, sizeV, DEPTH_UI_ABOVEALL, 0, color, screenSizeF);
         }
     }
 

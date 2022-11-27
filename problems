@@ -9,6 +9,7 @@ MEDIUM
 - mobile
 - smarter should-redraw logic
 - release mode crash
+- lag on Chrome (getTextureData? memcpy??)
 
 LOW
 - animation of loading dots
