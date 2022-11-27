@@ -772,11 +772,13 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
             if (state.assets.getTextureData(.{.DynamicUrl = pf.landing})) |landingTex| {
                 if (allLandingAssetsLoaded and landingTex.loaded()) {
                     renderQueue.quadTex(landingImagePos, landingImageSize, 1.0, landingTex.id, m.Vec4.one);
+                } else {
+                    allLandingAssetsLoaded = false;
                 }
             } else {
                 allLandingAssetsLoaded = false;
                 _ = state.assets.register(.{.DynamicUrl = pf.landing},
-                    pf.landing, defaultTextureWrap, defaultTextureFilter, 9
+                    pf.landing, defaultTextureWrap, defaultTextureFilter, 5
                 ) catch |err| {
                     std.log.err("register failed for {s} error {}", .{pf.landing, err});
                 };

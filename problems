@@ -1,12 +1,15 @@
 CRITICAL
 
-MEDIUM
+HIGH
+- rounded corners
 - gallery
+
+MEDIUM
 - mobile
 - smarter should-redraw logic
 - release mode crash
 
 LOW
-- rounded corners
+- animation of loading dots
 - film grain
-- finish sticker customization (emojis)
+- LUT
