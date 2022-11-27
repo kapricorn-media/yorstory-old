@@ -168,6 +168,7 @@ function setUri(uriPtr, uriLen) {
 
 const _glBuffers = [];
 const _glFramebuffers = [];
+const _glRenderbuffers = [];
 const _glPrograms = [];
 const _glShaders = [];
 const _glTextures = [];
@@ -336,8 +337,8 @@ function fillGlFunctions(env)
         _glBuffers.push(gl.createBuffer());
         return _glBuffers.length - 1;
     };
-    env.glBindBuffer = function(type, bufferId) {
-        gl.bindBuffer(type, _glBuffers[bufferId]);
+    env.glBindBuffer = function(type, id) {
+        gl.bindBuffer(type, _glBuffers[id]);
     };
     env.glBufferData = function(type, dataPtr, count, drawType) {
         const floats = new Float32Array(_wasmInstance.exports.memory.buffer, dataPtr, count);
@@ -348,19 +349,30 @@ function fillGlFunctions(env)
         _glFramebuffers.push(gl.createFramebuffer());
         return _glFramebuffers.length - 1;
     };
-    env.glBindFramebuffer = function(framebufferType, framebufferId) {
-        gl.bindFramebuffer(framebufferType, _glFramebuffers[framebufferId]);
+    env.glBindFramebuffer = function(type, id) {
+        gl.bindFramebuffer(type, _glFramebuffers[id]);
     };
-    env.glFramebufferTexture2D = function(framebufferType, attachmentPoint, textureType, textureId, level) {
-        gl.framebufferTexture2D(framebufferType, attachmentPoint, textureType, _glTextures[textureId], level);
+    env.glFramebufferTexture2D = function(type, attachment, textureType, textureId, level) {
+        gl.framebufferTexture2D(type, attachment, textureType, _glTextures[textureId], level);
+    };
+    env.glFramebufferRenderbuffer = function(type, attachment, renderbufferTarget, renderbufferId) {
+        gl.framebufferRenderbuffer(type, attachment, renderbufferTarget, _glRenderbuffers[renderbufferId]);
+    };
+
+    env.glCreateRenderbuffer = function() {
+        _glRenderbuffers.push(gl.createRenderbuffer());
+        return _glRenderbuffers.length - 1;
+    };
+    env.glBindRenderbuffer = function(type, id) {
+        gl.bindRenderbuffer(type, _glRenderbuffers[id]);
     };
 
     env.glCreateTexture = function() {
         _glTextures.push(gl.createTexture());
         return _glTextures.length - 1;
     };
-    env.glBindTexture = function(textureType, textureId) {
-        gl.bindTexture(textureType, _glTextures[textureId]);
+    env.glBindTexture = function(type, id) {
+        gl.bindTexture(type, _glTextures[id]);
     };
 
     env.glUseProgram = function(programId) {

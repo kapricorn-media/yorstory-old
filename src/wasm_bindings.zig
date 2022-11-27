@@ -47,6 +47,11 @@ pub extern fn glUniform4fv(_: c_int, _: f32, _: f32, _: f32, _: f32) void;
 pub extern fn glCreateFramebuffer() c_uint;
 pub extern fn glBindFramebuffer(_: c_uint, _: c_uint) void;
 pub extern fn glFramebufferTexture2D(_: c_uint, _: c_uint, _: c_uint, _: c_uint, _: c_uint) void;
+pub extern fn glFramebufferRenderbuffer(_: c_uint, _: c_uint, _: c_uint, _: c_uint) void;
+
+pub extern fn glCreateRenderbuffer() c_uint;
+pub extern fn glBindRenderbuffer(_: c_uint, _: c_uint) void;
+pub extern fn glRenderbufferStorage(_: c_uint, _: c_uint, _: c_int, _: c_int) void;
 
 pub extern fn glCreateBuffer() c_uint;
 pub extern fn glBindBuffer(_: c_uint, _: c_uint) void;
@@ -92,8 +97,12 @@ pub const GL_NEAREST: c_uint = 9728;
 pub const GL_LINEAR: c_uint = 9729;
 
 pub const GL_COLOR_ATTACHMENT0: c_uint = 36064;
+pub const GL_DEPTH_ATTACHMENT: c_uint = 36096;
 
 pub const GL_FRAMEBUFFER: c_uint = 36160;
+pub const GL_RENDERBUFFER: c_uint = 36161;
+
+pub const GL_DEPTH_COMPONENT16: c_uint = 33189;
 
 pub fn log(
     comptime message_level: std.log.Level,

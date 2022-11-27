@@ -74,6 +74,7 @@ const Texture = enum(usize) {
     IconHome,
     IconPortfolio,
     IconWork,
+    LoadingGlyphs,
     Logo343,
     LogoMicrosoft,
     LogosAll,
@@ -291,6 +292,7 @@ const State = struct {
 
     renderState: render.RenderState,
     fbTexture: c_uint,
+    fbDepthRenderbuffer: c_uint,
     fb: c_uint,
 
     assets: assets.Assets(Texture, 256),
@@ -333,6 +335,7 @@ const State = struct {
 
             .renderState = try render.RenderState.init(),
             .fbTexture = 0,
+            .fbDepthRenderbuffer = 0,
             .fb = 0,
 
             .assets = assets.Assets(Texture, 256).init(fbAllocator.allocator()),
@@ -350,53 +353,51 @@ const State = struct {
             .debug = false,
         };
 
+        _ = try self.assets.register(.{ .Static = Texture.StickerCircle },
+            "/images/sticker-circle.png", defaultTextureWrap, defaultTextureFilter, 2
+        );
+        _ = try self.assets.register(.{ .Static = Texture.LoadingGlyphs },
+            "/images/loading-glyphs.png", defaultTextureWrap, defaultTextureFilter, 2
+        );
+
         _ = try self.assets.register(.{ .Static = Texture.DecalTopLeft },
-            "/images/decal-topleft.png", defaultTextureWrap, defaultTextureFilter, 0
+            "/images/decal-topleft.png", defaultTextureWrap, defaultTextureFilter, 5
         );
         _ = try self.assets.register(.{ .Static = Texture.IconContact },
-            "/images/icon-contact.png", defaultTextureWrap, defaultTextureFilter, 0
+            "/images/icon-contact.png", defaultTextureWrap, defaultTextureFilter, 5
         );
         _ = try self.assets.register(.{ .Static = Texture.IconHome },
-            "/images/icon-home.png", defaultTextureWrap, defaultTextureFilter, 0
+            "/images/icon-home.png", defaultTextureWrap, defaultTextureFilter, 5
         );
         _ = try self.assets.register(.{ .Static = Texture.IconPortfolio },
-            "/images/icon-portfolio.png", defaultTextureWrap, defaultTextureFilter, 0
+            "/images/icon-portfolio.png", defaultTextureWrap, defaultTextureFilter, 5
         );
         _ = try self.assets.register(.{ .Static = Texture.IconWork },
-            "/images/icon-work.png", defaultTextureWrap, defaultTextureFilter, 0
-        );
-        // _ = try self.assets.register(.{ .Static = Texture.Logo343 },
-        //     "/images/logo-343.png", defaultTextureWrap, defaultTextureFilter, 1
-        // );
-        // _ = try self.assets.register(.{ .Static = Texture.LogoMicrosoft },
-        //     "/images/logo-microsoft.png", defaultTextureWrap, defaultTextureFilter, 1
-        // );
-        _ = try self.assets.register(.{ .Static = Texture.StickerCircle },
-            "/images/sticker-circle.png", defaultTextureWrap, defaultTextureFilter, 1
+            "/images/icon-work.png", defaultTextureWrap, defaultTextureFilter, 5
         );
         _ = try self.assets.register(.{ .Static = Texture.StickerShiny },
-            "/images/sticker-shiny.png", defaultTextureWrap, defaultTextureFilter, 1
+            "/images/sticker-shiny.png", defaultTextureWrap, defaultTextureFilter, 5
         );
 
 
         switch (self.pageData) {
             .Home => {
                 _ = try self.assets.register(.{ .Static = Texture.LogosAll },
-                    "/images/logos-all.png", defaultTextureWrap, defaultTextureFilter, 1
+                    "/images/logos-all.png", defaultTextureWrap, defaultTextureFilter, 8
                 );
                 _ = try self.assets.register(.{ .Static = Texture.StickerMainHome },
-                    "/images/sticker-main.png", defaultTextureWrap, defaultTextureFilter, 1
+                    "/images/sticker-main.png", defaultTextureWrap, defaultTextureFilter, 5
                 );
                 _ = try self.assets.register(.{ .Static = Texture.SymbolEye },
-                    "/images/symbol-eye.png", defaultTextureWrap, defaultTextureFilter, 1
+                    "/images/symbol-eye.png", defaultTextureWrap, defaultTextureFilter, 8
                 );
                 _ = try self.assets.register(.{ .Static = Texture.WeAreStorytellers },
-                    "/images/we-are-storytellers.png", defaultTextureWrap, defaultTextureFilter, 1
+                    "/images/we-are-storytellers.png", defaultTextureWrap, defaultTextureFilter, 8
                 );
             },
             .Entry => {
                 _ = try self.assets.register(.{ .Static = Texture.StickerMainHalo },
-                    "/images/HALO/sticker-main.png", defaultTextureWrap, defaultTextureFilter, 1
+                    "/images/HALO/sticker-main.png", defaultTextureWrap, defaultTextureFilter, 5
                 );
             },
         }
@@ -440,7 +441,7 @@ fn buttonToClickType(button: c_int) ClickType
     };
 }
 
-fn tryLoadAndGetParallaxSet(state: *State, index: usize) ?ParallaxSet
+fn tryLoadAndGetParallaxSet(state: *State, index: usize, priority: u32) ?ParallaxSet
 {
     if (index >= state.parallaxImageSets.len) {
         return null;
@@ -462,7 +463,7 @@ fn tryLoadAndGetParallaxSet(state: *State, index: usize) ?ParallaxSet
         } else {
             loaded = false;
             parallaxImage.assetId = state.assets.register(.{ .DynamicUrl = parallaxImage.url },
-                parallaxImage.url, defaultTextureWrap, defaultTextureFilter, 2
+                parallaxImage.url, defaultTextureWrap, defaultTextureFilter, priority
             ) catch |err| {
                 std.log.err("register texture error {}", .{err});
                 break;
@@ -500,7 +501,7 @@ fn drawImageGrid(images: []const GridImage, itemsPerRow: usize, topLeft: m.Vec2,
             }
         } else {
             _ = state.assets.register(.{ .DynamicUrl = img.uri},
-                img.uri, defaultTextureWrap, defaultTextureFilter, 2
+                img.uri, defaultTextureWrap, defaultTextureFilter, 9
             ) catch |err| {
                 std.log.err("failed to register {s}, err {}", .{img.uri, err});
                 return 0;
@@ -617,13 +618,20 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
 
     const deltaMs = if (state.timestampMsPrev > 0) (timestampMs - state.timestampMsPrev) else 0;
     const deltaS = @intToFloat(f32, deltaMs) / 1000.0;
+    _ = deltaS;
 
     if (!m.Vec2i.eql(state.screenSizePrev, screenSizeI)) {
         std.log.info("resetting screen framebuffer", .{});
         state.fbTexture = w.createTexture(screenSizeI.x, screenSizeI.y, defaultTextureWrap, w.GL_NEAREST);
+
         state.fb = w.glCreateFramebuffer();
         w.glBindFramebuffer(w.GL_FRAMEBUFFER, state.fb);
         w.glFramebufferTexture2D(w.GL_FRAMEBUFFER, w.GL_COLOR_ATTACHMENT0, w.GL_TEXTURE_2D, state.fbTexture, 0);
+
+        state.fbDepthRenderbuffer = w.glCreateRenderbuffer();
+        w.glBindRenderbuffer(w.GL_RENDERBUFFER, state.fbDepthRenderbuffer);
+        w.glRenderbufferStorage(w.GL_RENDERBUFFER, w.GL_DEPTH_COMPONENT16, screenSizeI.x, screenSizeI.y);
+        w.glFramebufferRenderbuffer(w.GL_FRAMEBUFFER, w.GL_DEPTH_ATTACHMENT, w.GL_RENDERBUFFER, state.fbDepthRenderbuffer);
     }
 
     if (state.scrollYPrev != scrollY) {
@@ -649,8 +657,7 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
 
     w.glBindFramebuffer(w.GL_FRAMEBUFFER, state.fb);
 
-    // w.glClear(w.GL_COLOR_BUFFER_BIT | w.GL_DEPTH_BUFFER_BIT);
-    w.glClear(w.GL_COLOR_BUFFER_BIT);
+    w.glClear(w.GL_COLOR_BUFFER_BIT | w.GL_DEPTH_BUFFER_BIT);
 
     // const colorWhite = m.Vec4.init(1.0, 1.0, 1.0, 1.0);
     const colorBlack = m.Vec4.init(0.0, 0.0, 0.0, 1.0);
@@ -663,6 +670,33 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
 
     // ==== LANDING IMAGE ====
 
+    // get landing UI elements to see if they are loaded
+    const iconTextures = [_]Texture {
+        Texture.IconHome,
+        Texture.IconPortfolio,
+        Texture.IconWork,
+        Texture.IconContact,
+    };
+    var allIconsLoaded = true;
+    for (iconTextures) |iconTexture| {
+        if (!state.assets.getStaticTextureData(iconTexture).loaded()) {
+            allIconsLoaded = false;
+            break;
+        }
+    }
+
+    const decalTopLeft = state.assets.getStaticTextureData(Texture.DecalTopLeft);
+    const texture = blk: {
+        switch (state.pageData) {
+            .Home => break :blk Texture.StickerMainHome,
+            .Entry => break :blk Texture.StickerMainHalo,
+        }
+    };
+    const stickerMain = state.assets.getStaticTextureData(texture);
+    const stickerShiny = state.assets.getStaticTextureData(Texture.StickerShiny);
+
+    var allLandingAssetsLoaded = allIconsLoaded and decalTopLeft.loaded() and stickerMain.loaded() and stickerShiny.loaded();
+
     const landingImagePos = m.Vec2.init(
         marginX + gridSize * 1,
         gridSize * 1
@@ -674,12 +708,12 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
     switch (state.pageData) {
         .Home => {
             // Determine whether the active parallax set is loaded
-            var activeParallaxSet = tryLoadAndGetParallaxSet(state, state.activeParallaxSetIndex);
+            var activeParallaxSet = tryLoadAndGetParallaxSet(state, state.activeParallaxSetIndex, 5);
             const parallaxSetSwapSeconds = 6;
             if (activeParallaxSet) |_| {
                 state.parallaxIdleTimeMs += deltaMs;
                 const nextSetIndex = (state.activeParallaxSetIndex + 1) % state.parallaxImageSets.len;
-                var nextParallaxSet = tryLoadAndGetParallaxSet(state, nextSetIndex);
+                var nextParallaxSet = tryLoadAndGetParallaxSet(state, nextSetIndex, 20);
                 if (nextParallaxSet) |_| {
                     if (state.parallaxIdleTimeMs >= parallaxSetSwapSeconds * 1000) {
                         state.parallaxIdleTimeMs = 0;
@@ -687,7 +721,7 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
                         activeParallaxSet = nextParallaxSet;
                     } else {
                         for (state.parallaxImageSets) |_, i| {
-                            if (tryLoadAndGetParallaxSet(state, i) == null) {
+                            if (tryLoadAndGetParallaxSet(state, i, 20) == null) {
                                 break;
                             }
                         }
@@ -697,58 +731,52 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
 
             const targetParallaxTX = mousePosF.x / screenSizeF.x * 2.0 - 1.0; // -1 to 1
             state.parallaxTX = targetParallaxTX;
-            _ = deltaS;
-            // const parallaxTXMaxSpeed = 10.0;
-            // const parallaxTXMaxDelta = parallaxTXMaxSpeed * deltaS;
-            // const parallaxTXDelta = targetParallaxTX - state.parallaxTX;
-            // if (std.math.fabs(parallaxTXDelta) > 0.01) {
-            //     state.parallaxTX += std.math.clamp(
-            //         parallaxTXDelta, -parallaxTXMaxDelta, parallaxTXMaxDelta
-            //     );
-            // }
 
-            if (activeParallaxSet) |parallaxSet| {
-                switch (parallaxSet.bgColor) {
-                    .Color => |color| {
-                        renderQueue.quad(landingImagePos, landingImageSize, 1.0, color);
-                    },
-                    .Gradient => |gradient| {
-                        renderQueue.quadGradient(
-                            landingImagePos, landingImageSize, 1.0,
-                            gradient.colorTop, gradient.colorTop,
-                            gradient.colorBottom, gradient.colorBottom);
-                    },
+            if (allLandingAssetsLoaded) {
+                if (activeParallaxSet) |parallaxSet| {
+                    switch (parallaxSet.bgColor) {
+                        .Color => |color| {
+                            renderQueue.quad(landingImagePos, landingImageSize, 1.0, color);
+                        },
+                        .Gradient => |gradient| {
+                            renderQueue.quadGradient(
+                                landingImagePos, landingImageSize, 1.0,
+                                gradient.colorTop, gradient.colorTop,
+                                gradient.colorBottom, gradient.colorBottom);
+                        },
+                    }
+
+                    for (parallaxSet.images) |parallaxImage| {
+                        const assetId = parallaxImage.assetId orelse continue;
+                        const textureData = state.assets.getTextureData(.{.DynamicId = assetId}) orelse continue;
+                        if (!textureData.loaded()) continue;
+
+                        const textureSizeF = m.Vec2.initFromVec2i(textureData.size);
+                        const scaledWidth = landingImageSize.y * textureSizeF.x / textureSizeF.y;
+                        const parallaxOffsetX = state.parallaxTX * parallaxMotionMax * parallaxImage.factor;
+
+                        const imgPos = m.Vec2.init(
+                            screenSizeF.x / 2.0 - scaledWidth / 2.0 + parallaxOffsetX,
+                            landingImagePos.y
+                        );
+                        const imgSize = m.Vec2.init(scaledWidth, landingImageSize.y);
+                        renderQueue.quadTex(imgPos, imgSize, 0.5, textureData.id, m.Vec4.one);
+                    }
+                } else {
+                    allLandingAssetsLoaded = false;
                 }
-
-                for (parallaxSet.images) |parallaxImage| {
-                    const assetId = parallaxImage.assetId orelse continue;
-                    const textureData = state.assets.getTextureData(.{.DynamicId = assetId}) orelse continue;
-                    if (!textureData.loaded()) continue;
-
-                    const textureSizeF = m.Vec2.initFromVec2i(textureData.size);
-                    const scaledWidth = landingImageSize.y * textureSizeF.x / textureSizeF.y;
-                    const parallaxOffsetX = state.parallaxTX * parallaxMotionMax * parallaxImage.factor;
-
-                    const imgPos = m.Vec2.init(
-                        screenSizeF.x / 2.0 - scaledWidth / 2.0 + parallaxOffsetX,
-                        landingImagePos.y
-                    );
-                    const imgSize = m.Vec2.init(scaledWidth, landingImageSize.y);
-                    renderQueue.quadTex(imgPos, imgSize, 0.5, textureData.id, m.Vec4.one);
-                }
-            } else {
-                // render temp thingy
             }
         },
         .Entry => |entryData| {
             const pf = portfolio.PORTFOLIO_LIST[entryData.portfolioIndex];
             if (state.assets.getTextureData(.{.DynamicUrl = pf.landing})) |landingTex| {
-                if (landingTex.loaded()) {
+                if (allLandingAssetsLoaded and landingTex.loaded()) {
                     renderQueue.quadTex(landingImagePos, landingImageSize, 1.0, landingTex.id, m.Vec4.one);
                 }
             } else {
+                allLandingAssetsLoaded = false;
                 _ = state.assets.register(.{.DynamicUrl = pf.landing},
-                    pf.landing, defaultTextureWrap, defaultTextureFilter, 1
+                    pf.landing, defaultTextureWrap, defaultTextureFilter, 9
                 ) catch |err| {
                     std.log.err("register failed for {s} error {}", .{pf.landing, err});
                 };
@@ -756,21 +784,10 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
         },
     }
 
-    const iconTextures = [_]Texture {
-        Texture.IconHome,
-        Texture.IconPortfolio,
-        Texture.IconWork,
-        Texture.IconContact,
-    };
-    var allLoaded = true;
-    for (iconTextures) |iconTexture| {
-        if (!state.assets.getStaticTextureData(iconTexture).loaded()) {
-            allLoaded = false;
-            break;
-        }
-    }
+    const stickerCircle = state.assets.getStaticTextureData(Texture.StickerCircle);
+    const loadingGlyphs = state.assets.getStaticTextureData(Texture.LoadingGlyphs);
 
-    if (allLoaded) {
+    if (allLandingAssetsLoaded) {
         for (iconTextures) |iconTexture, i| {
             const textureData = state.assets.getStaticTextureData(iconTexture);
 
@@ -794,10 +811,7 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
                 ww.setUri(uri);
             }
         }
-    }
 
-    const decalTopLeft = state.assets.getStaticTextureData(Texture.DecalTopLeft);
-    if (decalTopLeft.loaded()) {
         // landing page, four corners
         const decalSize = m.Vec2.init(gridSize * 5, gridSize * 5);
         const decalMargin = gridSize * 2;
@@ -842,6 +856,24 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
             posBR, decalSize, 0, uvOriginBR, uvSizeBR, decalTopLeft.id, colorUi
         );
 
+        // sticker (main)
+        const stickerSize = getTextureScaledSize(stickerMain.size, screenSizeF);
+        const stickerPos = m.Vec2.init(
+            marginX + gridSize * 5.0,
+            screenSizeF.y - gridSize * 6 - stickerSize.y
+        );
+        renderQueue.quadTex(
+            stickerPos, stickerSize, 0, stickerMain.id, colorUi
+        );
+
+        // sticker (shiny)
+        const stickerShinySize = getTextureScaledSize(stickerShiny.size, screenSizeF);
+        const stickerShinyPos = m.Vec2.init(
+            screenSizeF.x - marginX - gridSize * 5.0 - stickerShinySize.x,
+            gridSize * 5.0
+        );
+        renderQueue.quadTex(stickerShinyPos, stickerShinySize, 0, stickerShiny.id, m.Vec4.one);
+
         // content page, 2 start
         const posContentTL = m.Vec2.init(
             marginX + decalMargin,
@@ -857,38 +889,37 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
         renderQueue.quadTexUvOffset(
             posContentTR, decalSize, 0, uvOriginTR, uvSizeTR, decalTopLeft.id, colorUi
         );
-    }
+    } else {
+        // show loading indicator, if that is loaded
+        if (stickerCircle.loaded() and loadingGlyphs.loaded()) {
+            const circleSize = getTextureScaledSize(stickerCircle.size, screenSizeF);
+            const circlePos = m.Vec2.init(
+                screenSizeF.x / 2.0 - circleSize.x / 2.0,
+                screenSizeF.y / 2.0 - circleSize.y / 2.0 - gridSize * 1,
+            );
+            renderQueue.quadTex(circlePos, circleSize, 0.1, stickerCircle.id, colorUi);
 
-    // sticker (main)
-    const texture = blk: {
-        switch (state.pageData) {
-            .Home => break :blk Texture.StickerMainHome,
-            .Entry => break :blk Texture.StickerMainHalo,
+            const glyphsSize = getTextureScaledSize(loadingGlyphs.size, screenSizeF);
+            const glyphsPos = m.Vec2.init(
+                screenSizeF.x / 2.0 - glyphsSize.x / 2.0,
+                screenSizeF.y / 2.0 - glyphsSize.y / 2.0 + gridSize * 1,
+            );
+            renderQueue.quadTex(glyphsPos, glyphsSize, 0.1, loadingGlyphs.id, colorUi);
+
+            var i: i32 = 0;
+            while (i < 3) : (i += 1) {
+                const spacing = gridSize * 0.28;
+                const dotSize = m.Vec2.init(gridSize * 0.16, gridSize * 0.16);
+                const dotOrigin = m.Vec2.init(
+                    screenSizeF.x / 2.0 - dotSize.x / 2.0 - spacing * @intToFloat(f32, i - 1),
+                    screenSizeF.y / 2.0 - dotSize.y / 2.0 - gridSize * 1,
+                );
+                renderQueue.quad(dotOrigin, dotSize, 0, colorBlack);
+            }
         }
-    };
-    const stickerMain = state.assets.getStaticTextureData(texture);
-    if (stickerMain.loaded()) {
-        const stickerSize = getTextureScaledSize(stickerMain.size, screenSizeF);
-        const stickerPos = m.Vec2.init(
-            marginX + gridSize * 5.0,
-            screenSizeF.y - gridSize * 6 - stickerSize.y
-        );
-        renderQueue.quadTex(
-            stickerPos, stickerSize, 0, stickerMain.id, colorUi
-        );
     }
 
-    // sticker (shiny)
-    const stickerShiny = state.assets.getStaticTextureData(Texture.StickerShiny);
-    if (stickerShiny.loaded()) {
-        const stickerShinySize = getTextureScaledSize(stickerShiny.size, screenSizeF);
-        const stickerShinyPos = m.Vec2.init(
-            screenSizeF.x - marginX - gridSize * 5.0 - stickerShinySize.x,
-            gridSize * 5.0
-        );
-        renderQueue.quadTex(stickerShinyPos, stickerShinySize, 0, stickerShiny.id, m.Vec4.one);
-    }
-
+    // rounded black frame
     const framePos = m.Vec2.init(marginX + gridSize * 1, gridSize * 1);
     const frameSize = m.Vec2.init(
         screenSizeF.x - marginX * 2 - gridSize * 2,
@@ -902,20 +933,6 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
     const separatorLineSize = m.Vec2.init(screenSizeF.x - marginX * 2 - gridSize * 2, 1);
     renderQueue.quad(separatorLinePos, separatorLineSize, 0, colorUi);
 
-    // sub-landing text
-    // const textSubLineHeight = fontStickerSize;
-    // const textSubPos = m.Vec2.init(
-    //     marginX,
-    //     screenSizeF.y
-    // );
-    // renderQueue.textBox(
-    //     "We are Storytellers.",
-    //     textSubPos, screenSizeF.x - marginX * 2,
-    //     fontStickerSize, textSubLineHeight, 0.0,
-    //     colorUi, "HelveticaMedium", .Center
-    // );
-
-    const stickerCircle = state.assets.getStaticTextureData(Texture.StickerCircle);
     const lineHeight = fontTextSize * 1.5;
     var sectionSize: f32 = 0;
     switch (state.pageData) {
