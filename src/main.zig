@@ -1242,7 +1242,6 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
         const entryData = state.pageData.Entry;
         if (entryData.galleryImageIndex) |ind| {
             _ = ind;
-            std.log.info("hihihi", .{});
             const pos = m.Vec2.init(0.0, scrollYF);
             renderQueue.quad(pos, screenSizeF, DEPTH_UI_OVER2, 0, m.Vec4.init(0.0, 0.0, 0.0, 0.5));
         }
