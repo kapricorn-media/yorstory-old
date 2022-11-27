@@ -24,7 +24,6 @@ function queueLoadTextureJob(width, height, chunkSize, textureId, pngData, i, lo
 }
 
 function doLoadTextureJob(job) {
-        console.log(job);
     const image = new Image();
     image.onload = function() {
         const chunkSizeRows = Math.round(job.chunkSize / job.width);
