@@ -20,7 +20,7 @@ void main()
         v_frameSize / 2.0,
         u_cornerRadius
     );
-    float smoothedAlpha = smoothstep(0.0, edgeSoftness * 2.0, distance);
+    float smoothedAlpha = 1.0 - smoothstep(0.0, edgeSoftness * 2.0, distance);
 
     gl_FragColor = texture2D(u_sampler, v_uv) * u_color;
     gl_FragColor.a *= smoothedAlpha;

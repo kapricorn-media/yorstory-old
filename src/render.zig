@@ -365,7 +365,7 @@ const QuadTextureState = struct {
         w.glUniform2fv(self.offsetUvUniLoc, uvOffset.x, uvOffset.y);
         w.glUniform2fv(self.scaleUvUniLoc, uvScale.x, uvScale.y);
         w.glUniform4fv(self.colorUniLoc, color.x, color.y, color.z, color.w);
-        w.glUniform1fv(self.cornerRadiusUniLoc, 25.0);
+        w.glUniform1fv(self.cornerRadiusUniLoc, 0.0);
 
         w.glActiveTexture(w.GL_TEXTURE0);
         w.glBindTexture(w.GL_TEXTURE_2D, texture);
