@@ -5,14 +5,12 @@ HIGH
 - text instead of icons? (home, contact, etc)
 
 MEDIUM
-- rounded corners on gallery pics (rects & textured rects)
+- lively details (react on hover, fade in as you scroll, etc)
 - mobile
-- project landing image scales horizontally
 - smarter should-redraw logic
 - release mode crash
 
 LOW
-- lively details (react on hover, fade in as you scroll, etc)
 - animation of loading dots
 - film grain
 - LUT

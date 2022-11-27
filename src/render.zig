@@ -83,6 +83,12 @@ fn sizeToNdc(comptime T: type, size: T, canvas: T) T
     }
 }
 
+fn getUniformLocation(programId: c_uint, uniformName: []const u8) !c_int
+{
+    const loc = w.glGetUniformLocation(programId, &uniformName[0], uniformName.len);
+    return if (loc == -1) error.MissingUniformLoc else loc;
+}
+
 const QuadState = struct {
     positionBuffer: c_uint,
     uvBuffer: c_uint,
@@ -92,12 +98,14 @@ const QuadState = struct {
     positionAttrLoc: c_int,
     uvAttrLoc: c_int,
 
-    offsetPosUniLoc: c_int,
-    scalePosUniLoc: c_int,
+    posPixelsDepthUniLoc: c_int,
+    sizePixelsUniLoc: c_int,
+    screenSizeUniLoc: c_int,
     colorTLUniLoc: c_int,
     colorTRUniLoc: c_int,
     colorBLUniLoc: c_int,
     colorBRUniLoc: c_int,
+    cornerRadiusUniLoc: c_int,
 
     const vert = @embedFile("shaders/quad.vert");
     const frag = @embedFile("shaders/quad.frag");
@@ -131,37 +139,6 @@ const QuadState = struct {
             return error.MissingAttrLoc;
         }
 
-        const u_offsetPos = "u_offsetPos";
-        const offsetPosUniLoc = w.glGetUniformLocation(programId, &u_offsetPos[0], u_offsetPos.len);
-        if (offsetPosUniLoc == -1) {
-            return error.MissingUniformLoc;
-        }
-        const u_scalePos = "u_scalePos";
-        const scalePosUniLoc = w.glGetUniformLocation(programId, &u_scalePos[0], u_scalePos.len);
-        if (scalePosUniLoc == -1) {
-            return error.MissingUniformLoc;
-        }
-        const u_colorTL = "u_colorTL";
-        const colorTLUniLoc = w.glGetUniformLocation(programId, &u_colorTL[0], u_colorTL.len);
-        if (colorTLUniLoc == -1) {
-            return error.MissingUniformLoc;
-        }
-        const u_colorTR = "u_colorTR";
-        const colorTRUniLoc = w.glGetUniformLocation(programId, &u_colorTR[0], u_colorTR.len);
-        if (colorTRUniLoc == -1) {
-            return error.MissingUniformLoc;
-        }
-        const u_colorBL= "u_colorBL";
-        const colorBLUniLoc = w.glGetUniformLocation(programId, &u_colorBL[0], u_colorBL.len);
-        if (colorBLUniLoc == -1) {
-            return error.MissingUniformLoc;
-        }
-        const u_colorBR = "u_colorBR";
-        const colorBRUniLoc = w.glGetUniformLocation(programId, &u_colorBR[0], u_colorBR.len);
-        if (colorBRUniLoc == -1) {
-            return error.MissingUniformLoc;
-        }
-
         return Self {
             .positionBuffer = positionBuffer,
             .uvBuffer = uvBuffer,
@@ -171,24 +148,28 @@ const QuadState = struct {
             .positionAttrLoc = positionAttrLoc,
             .uvAttrLoc = uvAttrLoc,
 
-            .offsetPosUniLoc = offsetPosUniLoc,
-            .scalePosUniLoc = scalePosUniLoc,
-            .colorTLUniLoc = colorTLUniLoc,
-            .colorTRUniLoc = colorTRUniLoc,
-            .colorBLUniLoc = colorBLUniLoc,
-            .colorBRUniLoc = colorBRUniLoc,
+            .posPixelsDepthUniLoc = try getUniformLocation(programId, "u_posPixelsDepth"),
+            .sizePixelsUniLoc = try getUniformLocation(programId, "u_sizePixels"),
+            .screenSizeUniLoc = try getUniformLocation(programId, "u_screenSize"),
+            .colorTLUniLoc = try getUniformLocation(programId, "u_colorTL"),
+            .colorTRUniLoc = try getUniformLocation(programId, "u_colorTR"),
+            .colorBLUniLoc = try getUniformLocation(programId, "u_colorBL"),
+            .colorBRUniLoc = try getUniformLocation(programId, "u_colorBR"),
+            .cornerRadiusUniLoc = try getUniformLocation(programId, "u_cornerRadius"),
         };
     }
 
-    pub fn drawQuadNdc(
+    pub fn drawQuadGradient(
         self: Self,
-        posNdc: m.Vec2,
-        scaleNdc: m.Vec2,
+        posPixels: m.Vec2,
+        scalePixels: m.Vec2,
         depth: f32,
+        cornerRadius: f32,
         colorTL: m.Vec4,
         colorTR: m.Vec4,
         colorBL: m.Vec4,
-        colorBR: m.Vec4) void
+        colorBR: m.Vec4,
+        screenSize: m.Vec2) void
     {
         w.glUseProgram(self.programId);
 
@@ -199,30 +180,16 @@ const QuadState = struct {
         w.glBindBuffer(w.GL_ARRAY_BUFFER, self.uvBuffer);
         w.glVertexAttribPointer(@intCast(c_uint, self.uvAttrLoc), 2, w.GL_f32, 0, 0, 0);
 
-        w.glUniform3fv(self.offsetPosUniLoc, posNdc.x, posNdc.y, depth);
-        w.glUniform2fv(self.scalePosUniLoc, scaleNdc.x, scaleNdc.y);
+        w.glUniform3fv(self.posPixelsDepthUniLoc, posPixels.x, posPixels.y, depth);
+        w.glUniform2fv(self.sizePixelsUniLoc, scalePixels.x, scalePixels.y);
+        w.glUniform2fv(self.screenSizeUniLoc, screenSize.x, screenSize.y);
         w.glUniform4fv(self.colorTLUniLoc, colorTL.x, colorTL.y, colorTL.z, colorTL.w);
         w.glUniform4fv(self.colorTRUniLoc, colorTR.x, colorTR.y, colorTR.z, colorTR.w);
         w.glUniform4fv(self.colorBLUniLoc, colorBL.x, colorBL.y, colorBL.z, colorBL.w);
         w.glUniform4fv(self.colorBRUniLoc, colorBR.x, colorBR.y, colorBR.z, colorBR.w);
+        w.glUniform1fv(self.cornerRadiusUniLoc, cornerRadius);
 
         w.glDrawArrays(w.GL_TRIANGLES, 0, POS_UNIT_SQUARE.len);
-    }
-
-    pub fn drawQuadGradient(
-        self: Self,
-        posPixels: m.Vec2,
-        scalePixels: m.Vec2,
-        depth: f32,
-        colorTL: m.Vec4,
-        colorTR: m.Vec4,
-        colorBL: m.Vec4,
-        colorBR: m.Vec4,
-        screenSize: m.Vec2) void
-    {
-        const posNdc = posToNdc(m.Vec2, posPixels, screenSize);
-        const scaleNdc = sizeToNdc(m.Vec2, scalePixels, screenSize);
-        self.drawQuadNdc(posNdc, scaleNdc, depth, colorTL, colorTR, colorBL, colorBR);
     }
 
     pub fn drawQuad(
@@ -230,10 +197,11 @@ const QuadState = struct {
         posPixels: m.Vec2,
         scalePixels: m.Vec2,
         depth: f32,
+        cornerRadius: f32,
         color: m.Vec4,
         screenSize: m.Vec2) void
     {
-        self.drawQuadGradient(posPixels, scalePixels, depth, color, color, color, color, screenSize);
+        self.drawQuadGradient(posPixels, scalePixels, depth, cornerRadius, color, color, color, color, screenSize);
     }
 };
 
@@ -246,8 +214,9 @@ const QuadTextureState = struct {
     positionAttrLoc: c_int,
     uvAttrLoc: c_int,
 
-    offsetPosUniLoc: c_int,
-    scalePosUniLoc: c_int,
+    posPixelsDepthUniLoc: c_int,
+    sizePixelsUniLoc: c_int,
+    screenSizeUniLoc: c_int,
     offsetUvUniLoc: c_int,
     scaleUvUniLoc: c_int,
     samplerUniLoc: c_int,
@@ -286,42 +255,6 @@ const QuadTextureState = struct {
             return error.MissingAttrLoc;
         }
 
-        const u_offsetPos = "u_offsetPos";
-        const offsetPosUniLoc = w.glGetUniformLocation(programId, &u_offsetPos[0], u_offsetPos.len);
-        if (offsetPosUniLoc == -1) {
-            return error.MissingUniformLoc;
-        }
-        const u_scalePos = "u_scalePos";
-        const scalePosUniLoc = w.glGetUniformLocation(programId, &u_scalePos[0], u_scalePos.len);
-        if (scalePosUniLoc == -1) {
-            return error.MissingUniformLoc;
-        }
-        const u_offsetUv = "u_offsetUv";
-        const offsetUvUniLoc = w.glGetUniformLocation(programId, &u_offsetUv[0], u_offsetUv.len);
-        if (offsetUvUniLoc == -1) {
-            return error.MissingUniformLoc;
-        }
-        const u_scaleUv = "u_scaleUv";
-        const scaleUvUniLoc = w.glGetUniformLocation(programId, &u_scaleUv[0], u_scaleUv.len);
-        if (scaleUvUniLoc == -1) {
-            return error.MissingUniformLoc;
-        }
-        const u_sampler = "u_sampler";
-        const samplerUniLoc = w.glGetUniformLocation(programId, &u_sampler[0], u_sampler.len);
-        if (samplerUniLoc == -1) {
-            return error.MissingUniformLoc;
-        }
-        const u_color = "u_color";
-        const colorUniLoc = w.glGetUniformLocation(programId, &u_color[0], u_color.len);
-        if (colorUniLoc == -1) {
-            return error.MissingUniformLoc;
-        }
-        const u_cornerRadius = "u_cornerRadius";
-        const cornerRadiusUniLoc = w.glGetUniformLocation(programId, &u_cornerRadius[0], u_cornerRadius.len);
-        if (cornerRadiusUniLoc == -1) {
-            return error.MissingUniformLoc;
-        }
-
         return Self {
             .positionBuffer = positionBuffer,
             .uvBuffer = uvBuffer,
@@ -331,25 +264,28 @@ const QuadTextureState = struct {
             .positionAttrLoc = positionAttrLoc,
             .uvAttrLoc = uvAttrLoc,
 
-            .offsetPosUniLoc = offsetPosUniLoc,
-            .scalePosUniLoc = scalePosUniLoc,
-            .offsetUvUniLoc = offsetUvUniLoc,
-            .scaleUvUniLoc = scaleUvUniLoc,
-            .samplerUniLoc = samplerUniLoc,
-            .colorUniLoc = colorUniLoc,
-            .cornerRadiusUniLoc = cornerRadiusUniLoc,
+            .posPixelsDepthUniLoc = try getUniformLocation(programId, "u_posPixelsDepth"),
+            .sizePixelsUniLoc = try getUniformLocation(programId, "u_sizePixels"),
+            .screenSizeUniLoc = try getUniformLocation(programId, "u_screenSize"),
+            .offsetUvUniLoc = try getUniformLocation(programId, "u_offsetUv"),
+            .scaleUvUniLoc = try getUniformLocation(programId, "u_scaleUv"),
+            .samplerUniLoc = try getUniformLocation(programId, "u_sampler"),
+            .colorUniLoc = try getUniformLocation(programId, "u_color"),
+            .cornerRadiusUniLoc = try getUniformLocation(programId, "u_cornerRadius"),
         };
     }
 
-    pub fn drawQuadNdc(
+    pub fn drawQuadUvOffset(
         self: Self,
-        posNdc: m.Vec2,
-        scaleNdc: m.Vec2,
+        posPixels: m.Vec2,
+        scalePixels: m.Vec2,
         depth: f32,
+        cornerRadius: f32,
         uvOffset: m.Vec2,
         uvScale: m.Vec2,
         texture: c_uint,
-        color: m.Vec4) void
+        color: m.Vec4,
+        screenSize: m.Vec2) void
     {
         w.glUseProgram(self.programId);
 
@@ -360,12 +296,13 @@ const QuadTextureState = struct {
         w.glBindBuffer(w.GL_ARRAY_BUFFER, self.uvBuffer);
         w.glVertexAttribPointer(@intCast(c_uint, self.uvAttrLoc), 2, w.GL_f32, 0, 0, 0);
 
-        w.glUniform3fv(self.offsetPosUniLoc, posNdc.x, posNdc.y, depth);
-        w.glUniform2fv(self.scalePosUniLoc, scaleNdc.x, scaleNdc.y);
+        w.glUniform3fv(self.posPixelsDepthUniLoc, posPixels.x, posPixels.y, depth);
+        w.glUniform2fv(self.sizePixelsUniLoc, scalePixels.x, scalePixels.y);
+        w.glUniform2fv(self.screenSizeUniLoc, screenSize.x, screenSize.y);
         w.glUniform2fv(self.offsetUvUniLoc, uvOffset.x, uvOffset.y);
         w.glUniform2fv(self.scaleUvUniLoc, uvScale.x, uvScale.y);
         w.glUniform4fv(self.colorUniLoc, color.x, color.y, color.z, color.w);
-        w.glUniform1fv(self.cornerRadiusUniLoc, 0.0);
+        w.glUniform1fv(self.cornerRadiusUniLoc, cornerRadius);
 
         w.glActiveTexture(w.GL_TEXTURE0);
         w.glBindTexture(w.GL_TEXTURE_2D, texture);
@@ -374,33 +311,18 @@ const QuadTextureState = struct {
         w.glDrawArrays(w.GL_TRIANGLES, 0, POS_UNIT_SQUARE.len);
     }
 
-    pub fn drawQuadUvOffset(
-        self: Self,
-        posPixels: m.Vec2,
-        scalePixels: m.Vec2,
-        depth: f32,
-        uvOffset: m.Vec2,
-        uvScale: m.Vec2,
-        texture: c_uint,
-        color: m.Vec4,
-        screenSize: m.Vec2) void
-    {
-        const posNdc = posToNdc(m.Vec2, posPixels, screenSize);
-        const scaleNdc = sizeToNdc(m.Vec2, scalePixels, screenSize);
-        self.drawQuadNdc(posNdc, scaleNdc, depth, uvOffset, uvScale, texture, color);
-    }
-
     pub fn drawQuad(
         self: Self,
         posPixels: m.Vec2,
         scalePixels: m.Vec2,
         depth: f32,
+        cornerRadius: f32,
         texture: c_uint,
         color: m.Vec4,
         screenSize: m.Vec2) void
     {
         self.drawQuadUvOffset(
-            posPixels, scalePixels, depth, m.Vec2.zero, m.Vec2.one, texture, color, screenSize
+            posPixels, scalePixels, depth, cornerRadius, m.Vec2.zero, m.Vec2.one, texture, color, screenSize
         );
     }
 };
@@ -443,42 +365,6 @@ const RoundedFrameState = struct {
             return error.MissingAttrLoc;
         }
 
-        const u_offsetPos = "u_offsetPos";
-        const offsetPosUniLoc = w.glGetUniformLocation(programId, &u_offsetPos[0], u_offsetPos.len);
-        if (offsetPosUniLoc == -1) {
-            return error.MissingUniformLoc;
-        }
-        const u_scalePos = "u_scalePos";
-        const scalePosUniLoc = w.glGetUniformLocation(programId, &u_scalePos[0], u_scalePos.len);
-        if (scalePosUniLoc == -1) {
-            return error.MissingUniformLoc;
-        }
-        const u_framePos = "u_framePos";
-        const framePosUniLoc = w.glGetUniformLocation(programId, &u_framePos[0], u_framePos.len);
-        if (framePosUniLoc == -1) {
-            return error.MissingUniformLoc;
-        }
-        const u_frameSize = "u_frameSize";
-        const frameSizeUniLoc = w.glGetUniformLocation(programId, &u_frameSize[0], u_frameSize.len);
-        if (frameSizeUniLoc == -1) {
-            return error.MissingUniformLoc;
-        }
-        const u_cornerRadius = "u_cornerRadius";
-        const cornerRadiusUniLoc = w.glGetUniformLocation(programId, &u_cornerRadius[0], u_cornerRadius.len);
-        if (cornerRadiusUniLoc == -1) {
-            return error.MissingUniformLoc;
-        }
-        const u_color = "u_color";
-        const colorUniLoc = w.glGetUniformLocation(programId, &u_color[0], u_color.len);
-        if (colorUniLoc == -1) {
-            return error.MissingUniformLoc;
-        }
-        const u_screenSize = "u_screenSize";
-        const screenSizeUniLoc = w.glGetUniformLocation(programId, &u_screenSize[0], u_screenSize.len);
-        if (screenSizeUniLoc == -1) {
-            return error.MissingUniformLoc;
-        }
-
         return Self {
             .positionBuffer = positionBuffer,
 
@@ -486,13 +372,13 @@ const RoundedFrameState = struct {
 
             .positionAttrLoc = positionAttrLoc,
 
-            .offsetPosUniLoc = offsetPosUniLoc,
-            .scalePosUniLoc = scalePosUniLoc,
-            .framePosUniLoc = framePosUniLoc,
-            .frameSizeUniLoc = frameSizeUniLoc,
-            .cornerRadiusUniLoc = cornerRadiusUniLoc,
-            .colorUniLoc = colorUniLoc,
-            .screenSizeUniLoc = screenSizeUniLoc,
+            .offsetPosUniLoc = try getUniformLocation(programId, "u_offsetPos"),
+            .scalePosUniLoc = try getUniformLocation(programId, "u_scalePos"),
+            .framePosUniLoc = try getUniformLocation(programId, "u_framePos"),
+            .frameSizeUniLoc = try getUniformLocation(programId, "u_frameSize"),
+            .cornerRadiusUniLoc = try getUniformLocation(programId, "u_cornerRadius"),
+            .colorUniLoc = try getUniformLocation(programId, "u_color"),
+            .screenSizeUniLoc = try getUniformLocation(programId, "u_screenSize"),
         };
     }
 
@@ -676,6 +562,7 @@ const RenderEntryQuad = struct {
     topLeft: m.Vec2,
     size: m.Vec2,
     depth: f32,
+    cornerRadius: f32,
     colorTL: m.Vec4,
     colorTR: m.Vec4,
     colorBL: m.Vec4,
@@ -686,6 +573,7 @@ const RenderEntryQuadTex = struct {
     topLeft: m.Vec2,
     size: m.Vec2,
     depth: f32,
+    cornerRadius: f32,
     uvOffset: m.Vec2,
     uvScale: m.Vec2,
     textureId: c_uint,
@@ -761,12 +649,13 @@ pub const RenderQueue = struct
         self.textBoxes.deinit();
     }
 
-    pub fn quadGradient(self: *Self, topLeft: m.Vec2, size: m.Vec2, depth: f32, colorTL: m.Vec4, colorTR: m.Vec4, colorBL: m.Vec4, colorBR: m.Vec4) void
+    pub fn quadGradient(self: *Self, topLeft: m.Vec2, size: m.Vec2, depth: f32, cornerRadius: f32, colorTL: m.Vec4, colorTR: m.Vec4, colorBL: m.Vec4, colorBR: m.Vec4) void
     {
         (self.quads.addOne() catch return).* = RenderEntryQuad {
             .topLeft = topLeft,
             .size = size,
             .depth = depth,
+            .cornerRadius = cornerRadius,
             .colorTL = colorTL,
             .colorTR = colorTR,
             .colorBL = colorBL,
@@ -774,17 +663,18 @@ pub const RenderQueue = struct
         };
     }
 
-    pub fn quad(self: *Self, topLeft: m.Vec2, size: m.Vec2, depth: f32, color: m.Vec4) void
+    pub fn quad(self: *Self, topLeft: m.Vec2, size: m.Vec2, depth: f32, cornerRadius: f32, color: m.Vec4) void
     {
-        self.quadGradient(topLeft, size, depth, color, color, color, color);
+        self.quadGradient(topLeft, size, depth, cornerRadius, color, color, color, color);
     }
 
-    pub fn quadTexUvOffset(self: *Self, topLeft: m.Vec2, size: m.Vec2, depth: f32, uvOffset: m.Vec2, uvScale: m.Vec2, textureId: c_uint, color: m.Vec4) void
+    pub fn quadTexUvOffset(self: *Self, topLeft: m.Vec2, size: m.Vec2, depth: f32, cornerRadius: f32, uvOffset: m.Vec2, uvScale: m.Vec2, textureId: c_uint, color: m.Vec4) void
     {
         (self.quadTexs.addOne() catch return).* = RenderEntryQuadTex {
             .topLeft = topLeft,
             .size = size,
             .depth = depth,
+            .cornerRadius = cornerRadius,
             .uvOffset = uvOffset,
             .uvScale = uvScale,
             .textureId = textureId,
@@ -792,9 +682,9 @@ pub const RenderQueue = struct
         };
     }
 
-    pub fn quadTex(self: *Self, topLeft: m.Vec2, size: m.Vec2, depth: f32, textureId: c_uint, color: m.Vec4) void
+    pub fn quadTex(self: *Self, topLeft: m.Vec2, size: m.Vec2, depth: f32, cornerRadius: f32, textureId: c_uint, color: m.Vec4) void
     {
-        self.quadTexUvOffset(topLeft, size, depth, m.Vec2.zero, m.Vec2.one, textureId, color);
+        self.quadTexUvOffset(topLeft, size, depth, cornerRadius, m.Vec2.zero, m.Vec2.one, textureId, color);
     }
 
     pub fn roundedFrame(self: *Self, topLeft: m.Vec2, size: m.Vec2, depth: f32, frameTopLeft: m.Vec2, frameSize: m.Vec2, cornerRadius: f32, color: m.Vec4) void
@@ -841,11 +731,11 @@ pub const RenderQueue = struct
     {
         for (self.quads.items) |e| {
             const posBottomLeft = posTopLeftToBottomLeft(e.topLeft, e.size, screenSize, scrollY);
-            renderState.quadState.drawQuadGradient(posBottomLeft, e.size, e.depth, e.colorTL, e.colorTR, e.colorBL, e.colorBR, screenSize);
+            renderState.quadState.drawQuadGradient(posBottomLeft, e.size, e.depth, e.cornerRadius, e.colorTL, e.colorTR, e.colorBL, e.colorBR, screenSize);
         }
         for (self.quadTexs.items) |e| {
             const posBottomLeft = posTopLeftToBottomLeft(e.topLeft, e.size, screenSize, scrollY);
-            renderState.quadTexState.drawQuadUvOffset(posBottomLeft, e.size, e.depth, e.uvOffset, e.uvScale, e.textureId, e.color, screenSize);
+            renderState.quadTexState.drawQuadUvOffset(posBottomLeft, e.size, e.depth, e.cornerRadius, e.uvOffset, e.uvScale, e.textureId, e.color, screenSize);
         }
         for (self.roundedFrames.items) |e| {
             const posBottomLeft = posTopLeftToBottomLeft(e.topLeft, e.size, screenSize, scrollY);

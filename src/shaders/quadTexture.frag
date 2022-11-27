@@ -1,7 +1,7 @@
 precision mediump float;
 
-varying highp vec2 v_framePos;
-varying highp vec2 v_frameSize;
+varying highp vec2 v_posPixels;
+varying highp vec2 v_sizePixels;
 varying highp vec2 v_uv;
 
 uniform sampler2D u_sampler;
@@ -16,8 +16,8 @@ void main()
 {
     float edgeSoftness = 1.0;
     float distance = roundedBoxSDF(
-        gl_FragCoord.xy - v_framePos - v_frameSize / 2.0,
-        v_frameSize / 2.0,
+        gl_FragCoord.xy - v_posPixels - v_sizePixels / 2.0,
+        v_sizePixels / 2.0,
         u_cornerRadius
     );
     float smoothedAlpha = 1.0 - smoothstep(0.0, edgeSoftness * 2.0, distance);
