@@ -252,6 +252,7 @@ const QuadTextureState = struct {
     scaleUvUniLoc: c_int,
     samplerUniLoc: c_int,
     colorUniLoc: c_int,
+    cornerRadiusUniLoc: c_int,
 
     const vert = @embedFile("shaders/quadTexture.vert");
     const frag = @embedFile("shaders/quadTexture.frag");
@@ -315,6 +316,11 @@ const QuadTextureState = struct {
         if (colorUniLoc == -1) {
             return error.MissingUniformLoc;
         }
+        const u_cornerRadius = "u_cornerRadius";
+        const cornerRadiusUniLoc = w.glGetUniformLocation(programId, &u_cornerRadius[0], u_cornerRadius.len);
+        if (cornerRadiusUniLoc == -1) {
+            return error.MissingUniformLoc;
+        }
 
         return Self {
             .positionBuffer = positionBuffer,
@@ -331,6 +337,7 @@ const QuadTextureState = struct {
             .scaleUvUniLoc = scaleUvUniLoc,
             .samplerUniLoc = samplerUniLoc,
             .colorUniLoc = colorUniLoc,
+            .cornerRadiusUniLoc = cornerRadiusUniLoc,
         };
     }
 
@@ -358,6 +365,7 @@ const QuadTextureState = struct {
         w.glUniform2fv(self.offsetUvUniLoc, uvOffset.x, uvOffset.y);
         w.glUniform2fv(self.scaleUvUniLoc, uvScale.x, uvScale.y);
         w.glUniform4fv(self.colorUniLoc, color.x, color.y, color.z, color.w);
+        w.glUniform1fv(self.cornerRadiusUniLoc, 25.0);
 
         w.glActiveTexture(w.GL_TEXTURE0);
         w.glBindTexture(w.GL_TEXTURE_2D, texture);

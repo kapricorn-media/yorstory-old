@@ -9,16 +9,19 @@ uniform float u_cornerRadius;
 uniform vec4 u_color;
 uniform vec2 u_screenSize;
 
-bool insideBox(vec2 p, vec2 origin, vec2 size)
-{
-    return p.x >= origin.x && p.x <= origin.x + size.x && p.y >= origin.y && p.y <= origin.y + size.y;
+float roundedBoxSDF(vec2 center, vec2 size, float radius) {
+    return length(max(abs(center) - size + radius, 0.0)) - radius;
 }
 
 void main()
 {
-    vec4 color = u_color;
-    if (insideBox(gl_FragCoord.xy, u_framePos, u_frameSize)) {
-        color.a = 0.0;
-    }
-    gl_FragColor = color;
+    float edgeSoftness = 1.0;
+    float distance = roundedBoxSDF(
+        gl_FragCoord.xy - u_framePos - u_frameSize / 2.0,
+        u_frameSize / 2.0,
+        u_cornerRadius
+    );
+    float smoothedAlpha = smoothstep(0.0, edgeSoftness * 2.0, distance);
+
+    gl_FragColor = vec4(u_color.rgb, u_color.a * smoothedAlpha);
 }

@@ -1,3 +1,5 @@
+const m = @import("math.zig");
+
 pub const Subproject = struct {
     name: []const u8,
     description: []const u8,
@@ -9,6 +11,9 @@ pub const Portfolio = struct {
     uri: []const u8,
     cover: []const u8,
     landing: []const u8,
+    sticker: []const u8,
+    colorUi: m.Vec4,
+    colorSticker: m.Vec4,
     subprojects: []const Subproject,
 };
 
@@ -18,6 +23,9 @@ pub const PORTFOLIO_LIST = [_]Portfolio {
         .uri = "/halo",
         .cover = "/images/HALO/attachbeam2/5.png",
         .landing = "/images/HALO/landing.png",
+        .sticker = "/images/HALO/sticker-main.png",
+        .colorUi = m.Vec4.init(0.0, 220.0 / 255.0, 164.0 / 255.0, 1.0),
+        .colorSticker = m.Vec4.init(0.0, 220.0 / 255.0, 164.0 / 255.0, 1.0),
         .subprojects = &[_]Subproject {
             .{
                 .name = "ATTACH BEAM",
@@ -157,10 +165,50 @@ pub const PORTFOLIO_LIST = [_]Portfolio {
         },
     },
     .{
+        .title = "Marvel: Contest of Champions",
+        .uri = "/marvel-contest-of-champions",
+        .cover = "/images/marvel/all/Mad_Titan_0025_26.png",
+        .landing = "/images/HALO/landing.png",
+        .sticker = "/images/marvel/sticker-main.png",
+        .colorUi = m.Vec4.init(165.0 / 255.0, 56.0 / 255.0, 1.0, 1.0),
+        .colorSticker = m.Vec4.one,
+        .subprojects = &[_]Subproject {
+            .{
+                .name = " ",
+                .description = "By attaching a tether to an opponent, the player is able to deliver a series of devastating pulses to further damage their enemy.",
+                .images = &[_][]const u8{
+                    "/images/marvel/all/Mad_Titan_0000_01.png",
+                    "/images/marvel/all/Mad_Titan_0001_02.png",
+                    "/images/marvel/all/Mad_Titan_0002_03.png",
+                    "/images/marvel/all/Mad_Titan_0003_04.png",
+                    "/images/marvel/all/Mad_Titan_0004_05.png",
+                    "/images/marvel/all/Mad_Titan_0005_06.png",
+                    "/images/marvel/all/Mad_Titan_0006_07.png",
+                    "/images/marvel/all/Mad_Titan_0007_08.png",
+                    "/images/marvel/all/Mad_Titan_0008_09.png",
+                    "/images/marvel/all/Mad_Titan_0009_10.png",
+                    "/images/marvel/all/Mad_Titan_0010_11.png",
+                    "/images/marvel/all/Mad_Titan_0011_12.png",
+                    "/images/marvel/all/Mad_Titan_0012_13.png",
+                    "/images/marvel/all/Mad_Titan_0013_14.png",
+                    "/images/marvel/all/Mad_Titan_0014_15.png",
+                    "/images/marvel/all/Mad_Titan_0015_16.png",
+                    "/images/marvel/all/Mad_Titan_0016_17.png",
+                    "/images/marvel/all/Mad_Titan_0017_18.png",
+                    "/images/marvel/all/Mad_Titan_0018_19.png",
+                    "/images/marvel/all/Mad_Titan_0019_20.png",
+                },
+            },
+        },
+    },
+    .{
         .title = "Wandering Earth II",
         .uri = "/wandering-earth-ii",
         .cover = "/images/404.png",
         .landing = "/images/404.png",
+        .sticker = "/images/404.png",
+        .colorUi = m.Vec4.one,
+        .colorSticker = m.Vec4.one,
         .subprojects = &[_]Subproject {},
     },
     .{
@@ -168,6 +216,9 @@ pub const PORTFOLIO_LIST = [_]Portfolio {
         .uri = "/project-x",
         .cover = "/images/404.png",
         .landing = "/images/404.png",
+        .sticker = "/images/404.png",
+        .colorUi = m.Vec4.one,
+        .colorSticker = m.Vec4.one,
         .subprojects = &[_]Subproject {},
     },
     .{
@@ -175,6 +226,9 @@ pub const PORTFOLIO_LIST = [_]Portfolio {
         .uri = "/the-project",
         .cover = "/images/404.png",
         .landing = "/images/404.png",
+        .sticker = "/images/404.png",
+        .colorUi = m.Vec4.one,
+        .colorSticker = m.Vec4.one,
         .subprojects = &[_]Subproject {},
     },
     .{
@@ -182,6 +236,9 @@ pub const PORTFOLIO_LIST = [_]Portfolio {
         .uri = "/project-y",
         .cover = "/images/404.png",
         .landing = "/images/404.png",
+        .sticker = "/images/404.png",
+        .colorUi = m.Vec4.one,
+        .colorSticker = m.Vec4.one,
         .subprojects = &[_]Subproject {},
     },
     .{
@@ -189,13 +246,9 @@ pub const PORTFOLIO_LIST = [_]Portfolio {
         .uri = "/123456",
         .cover = "/images/404.png",
         .landing = "/images/404.png",
+        .sticker = "/images/404.png",
+        .colorUi = m.Vec4.one,
+        .colorSticker = m.Vec4.one,
         .subprojects = &[_]Subproject {},
     },
-    .{
-        .title = "Lorem ipsum",
-        .uri = "/lorem-ipsum",
-        .cover = "/images/404.png",
-        .landing = "/images/404.png",
-        .subprojects = &[_]Subproject {},
-    }
 };

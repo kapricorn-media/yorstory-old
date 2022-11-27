@@ -84,7 +84,6 @@ const Texture = enum(usize) {
     WeAreStorytellers,
 
     StickerMainHome,
-    StickerMainHalo,
 };
 
 // return true when pressed
@@ -396,9 +395,6 @@ const State = struct {
                 );
             },
             .Entry => {
-                _ = try self.assets.register(.{ .Static = Texture.StickerMainHalo },
-                    "/images/HALO/sticker-main.png", defaultTextureWrap, defaultTextureFilter, 5
-                );
             },
         }
 
@@ -661,9 +657,17 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
 
     // const colorWhite = m.Vec4.init(1.0, 1.0, 1.0, 1.0);
     const colorBlack = m.Vec4.init(0.0, 0.0, 0.0, 1.0);
-    const colorUi = switch (state.pageData) {
-        .Home => m.Vec4.init(234.0 / 255.0, 1.0, 0.0, 1.0),
-        .Entry => m.Vec4.init(0.0, 220.0 / 255.0, 164.0 / 255.0, 1.0),
+    const colorYellowHome = m.Vec4.init(234.0 / 255.0, 1.0, 0.0, 1.0);
+    const colorUi = blk: {
+        switch (state.pageData) {
+            .Home => {
+                break :blk colorYellowHome;
+            },
+            .Entry => |entryData| {
+                const pf = portfolio.PORTFOLIO_LIST[entryData.portfolioIndex];
+                break :blk pf.colorUi;
+            },
+        }
     };
     const colorRedSticker = m.Vec4.init(234.0 / 255.0, 65.0 / 255.0, 0.0, 1.0);
     const parallaxMotionMax = screenSizeF.x / 8.0;
@@ -686,13 +690,31 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
     }
 
     const decalTopLeft = state.assets.getStaticTextureData(Texture.DecalTopLeft);
-    const texture = blk: {
+    const stickerMain = blk: {
         switch (state.pageData) {
-            .Home => break :blk Texture.StickerMainHome,
-            .Entry => break :blk Texture.StickerMainHalo,
+            .Home => break :blk state.assets.getStaticTextureData(Texture.StickerMainHome),
+            .Entry => |entryData| {
+                const pf = portfolio.PORTFOLIO_LIST[entryData.portfolioIndex];
+                if (state.assets.getTextureData(.{.DynamicUrl = pf.sticker})) |tex| {
+                    break :blk tex;
+                } else {
+                    _ = state.assets.register(.{ .DynamicUrl = pf.sticker},
+                        pf.sticker, defaultTextureWrap, defaultTextureFilter, 5
+                    ) catch |err| {
+                        std.log.err("failed to register {s}, err {}", .{pf.sticker, err});
+                        return 0;
+                    };
+
+                    if (state.assets.getTextureData(.{.DynamicUrl = pf.sticker})) |tex| {
+                        break :blk tex;
+                    } else {
+                        std.log.err("no texture data after register for {s}", .{pf.sticker});
+                        return 0;
+                    }
+                }
+            },
         }
     };
-    const stickerMain = state.assets.getStaticTextureData(texture);
     const stickerShiny = state.assets.getStaticTextureData(Texture.StickerShiny);
 
     var allLandingAssetsLoaded = allIconsLoaded and decalTopLeft.loaded() and stickerMain.loaded() and stickerShiny.loaded();
@@ -864,8 +886,17 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
             marginX + gridSize * 5.0,
             screenSizeF.y - gridSize * 6 - stickerSize.y
         );
+        const colorSticker = blk: {
+            switch (state.pageData) {
+                .Home => break :blk colorUi,
+                .Entry => |entryData| {
+                    const pf = portfolio.PORTFOLIO_LIST[entryData.portfolioIndex];
+                    break :blk pf.colorSticker;
+                },
+            }
+        };
         renderQueue.quadTex(
-            stickerPos, stickerSize, 0, stickerMain.id, colorUi
+            stickerPos, stickerSize, 0, stickerMain.id, colorSticker
         );
 
         // sticker (shiny)
@@ -925,9 +956,9 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
     const framePos = m.Vec2.init(marginX + gridSize * 1, gridSize * 1);
     const frameSize = m.Vec2.init(
         screenSizeF.x - marginX * 2 - gridSize * 2,
-        screenSizeF.y - gridSize * 3 + scrollYF,
+        screenSizeF.y - gridSize * 3,
     );
-    renderQueue.roundedFrame(m.Vec2.zero, screenSizeF, 0, framePos, frameSize, 0.0, colorBlack);
+    renderQueue.roundedFrame(m.Vec2.zero, screenSizeF, 0, framePos, frameSize, gridSize, colorBlack);
 
     // ==== BELOW LANDING IMAGE ====
 

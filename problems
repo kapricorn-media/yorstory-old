@@ -1,11 +1,12 @@
 CRITICAL
 
 HIGH
-- rounded corners
 - gallery
 
 MEDIUM
+- rounded corners on gallery pics (rects & textured rects)
 - mobile
+- project landing image scales horizontally
 - smarter should-redraw logic
 - release mode crash
 
