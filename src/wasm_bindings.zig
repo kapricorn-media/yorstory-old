@@ -5,6 +5,7 @@ pub extern fn consoleMessage(isError: bool, messagePtr: *const u8, messageLen: c
 
 // browser / DOM
 pub extern fn clearAllText() void;
+pub extern fn setAllTextOpacity(opacity: f32) void;
 pub extern fn addTextLine(
     textPtr: *const u8, textLen: c_uint,
     left: c_int, baselineFromTop: c_int, fontSize: c_int, letterSpacing: f32,

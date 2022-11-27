@@ -1132,6 +1132,7 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
             }
             if (theState.pageData.Entry.galleryImageIndex == null) {
                 theState.pageData.Entry.galleryImageIndex = index;
+                w.setAllTextOpacity(0.0);
             }
         }
     };
@@ -1243,7 +1244,7 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
         if (entryData.galleryImageIndex) |ind| {
             _ = ind;
             const pos = m.Vec2.init(0.0, scrollYF);
-            renderQueue.quad(pos, screenSizeF, DEPTH_UI_OVER2, 0, m.Vec4.init(0.0, 0.0, 0.0, 0.5));
+            renderQueue.quad(pos, screenSizeF, DEPTH_UI_OVER2, 0, m.Vec4.init(0.0, 0.0, 0.0, 1.0));
         }
     }
 

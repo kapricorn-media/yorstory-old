@@ -87,11 +87,14 @@ function writeCharStr(ptr, len, toWrite) {
 };
 
 function clearAllText() {
-    Array.from(document.getElementsByClassName("_wasmTextOuter")).forEach(function(el) {
+    Array.from(document.getElementsByClassName("_wasmTextAll")).forEach(function(el) {
         el.remove();
     });
-    Array.from(document.getElementsByClassName("_wasmTextBox")).forEach(function(el) {
-        el.remove();
+}
+
+function setAllTextOpacity(opacity) {
+    Array.from(document.getElementsByClassName("_wasmTextAll")).forEach(function(el) {
+        el.style.opacity = opacity;
     });
 }
 
@@ -109,6 +112,7 @@ function addTextLine(
     const fontFamily = readCharStr(fontFamilyPtr, fontFamilyLen);
 
     const outer = document.createElement("div");
+    outer.classList.add("_wasmTextAll");
     outer.classList.add("_wasmTextOuter");
     outer.style.left = px(left - getTextLeftGap(fontSize));
     outer.style.top = px(baselineFromTop - fontSize);
@@ -140,6 +144,7 @@ function addTextBox(
     const textAlign = readCharStr(textAlignPtr, textAlignLen);
 
     const div = document.createElement("div");
+    div.classList.add("_wasmTextAll");
     div.classList.add("_wasmTextBox");
     div.style.left = px(left - getTextLeftGap(fontSize));
     div.style.top = px(top);
@@ -304,6 +309,7 @@ const env = {
 
     // browser / DOM functions
     clearAllText,
+    setAllTextOpacity,
     addTextLine,
     addTextBox,
     setCursor,
