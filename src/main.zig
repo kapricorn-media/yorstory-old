@@ -358,10 +358,10 @@ const State = struct {
         _ = try self.assets.register(.{ .Static = Texture.LoadingGlyphs },
             "/images/loading-glyphs.png", defaultTextureWrap, defaultTextureFilter, 2
         );
-
         _ = try self.assets.register(.{ .Static = Texture.DecalTopLeft },
-            "/images/decal-topleft.png", defaultTextureWrap, defaultTextureFilter, 5
+            "/images/decal-topleft.png", defaultTextureWrap, defaultTextureFilter, 2
         );
+
         _ = try self.assets.register(.{ .Static = Texture.IconContact },
             "/images/icon-contact.png", defaultTextureWrap, defaultTextureFilter, 5
         );
@@ -808,34 +808,7 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
         },
     }
 
-    const stickerCircle = state.assets.getStaticTextureData(Texture.StickerCircle);
-    const loadingGlyphs = state.assets.getStaticTextureData(Texture.LoadingGlyphs);
-
-    if (allLandingAssetsLoaded) {
-        for (iconTextures) |iconTexture, i| {
-            const textureData = state.assets.getStaticTextureData(iconTexture);
-
-            const iF = @intToFloat(f32, i);
-            const iconSizeF = m.Vec2.init(
-                gridSize * 2.162,
-                gridSize * 2.162,
-            );
-            const iconPos = m.Vec2.init(
-                marginX + gridSize * 5 + gridSize * 2.5 * iF,
-                gridSize * 5,
-            );
-            renderQueue.quadTex(
-                iconPos, iconSizeF, 0.0, textureData.id, colorUi
-            );
-            if (updateButton(iconPos, iconSizeF, state.mouseState, scrollYF, &mouseHoverGlobal)) {
-                const uri = switch (iconTexture) {
-                    .IconHome => "/",
-                    else => continue,
-                };
-                ww.setUri(uri);
-            }
-        }
-
+    if (decalTopLeft.loaded()) {
         // landing page, four corners
         const decalSize = m.Vec2.init(gridSize * 5, gridSize * 5);
         const decalMargin = gridSize * 2;
@@ -880,6 +853,51 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
             posBR, decalSize, 0, uvOriginBR, uvSizeBR, decalTopLeft.id, colorUi
         );
 
+        // content page, 2 start
+        const posContentTL = m.Vec2.init(
+            marginX + decalMargin,
+            screenSizeF.y + gridSize * 2,
+        );
+        renderQueue.quadTexUvOffset(
+            posContentTL, decalSize, 0, uvOriginTL, uvSizeTL, decalTopLeft.id, colorUi
+        );
+        const posContentTR = m.Vec2.init(
+            screenSizeF.x - marginX - decalMargin - decalSize.x,
+            screenSizeF.y + gridSize * 2,
+        );
+        renderQueue.quadTexUvOffset(
+            posContentTR, decalSize, 0, uvOriginTR, uvSizeTR, decalTopLeft.id, colorUi
+        );
+    }
+
+    const stickerCircle = state.assets.getStaticTextureData(Texture.StickerCircle);
+    const loadingGlyphs = state.assets.getStaticTextureData(Texture.LoadingGlyphs);
+
+    if (allLandingAssetsLoaded) {
+        for (iconTextures) |iconTexture, i| {
+            const textureData = state.assets.getStaticTextureData(iconTexture);
+
+            const iF = @intToFloat(f32, i);
+            const iconSizeF = m.Vec2.init(
+                gridSize * 2.162,
+                gridSize * 2.162,
+            );
+            const iconPos = m.Vec2.init(
+                marginX + gridSize * 5 + gridSize * 2.5 * iF,
+                gridSize * 5,
+            );
+            renderQueue.quadTex(
+                iconPos, iconSizeF, 0.0, textureData.id, colorUi
+            );
+            if (updateButton(iconPos, iconSizeF, state.mouseState, scrollYF, &mouseHoverGlobal)) {
+                const uri = switch (iconTexture) {
+                    .IconHome => "/",
+                    else => continue,
+                };
+                ww.setUri(uri);
+            }
+        }
+
         // sticker (main)
         const stickerSize = getTextureScaledSize(stickerMain.size, screenSizeF);
         const stickerPos = m.Vec2.init(
@@ -906,22 +924,6 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
             gridSize * 5.0
         );
         renderQueue.quadTex(stickerShinyPos, stickerShinySize, 0, stickerShiny.id, m.Vec4.one);
-
-        // content page, 2 start
-        const posContentTL = m.Vec2.init(
-            marginX + decalMargin,
-            screenSizeF.y + gridSize * 2,
-        );
-        renderQueue.quadTexUvOffset(
-            posContentTL, decalSize, 0, uvOriginTL, uvSizeTL, decalTopLeft.id, colorUi
-        );
-        const posContentTR = m.Vec2.init(
-            screenSizeF.x - marginX - decalMargin - decalSize.x,
-            screenSizeF.y + gridSize * 2,
-        );
-        renderQueue.quadTexUvOffset(
-            posContentTR, decalSize, 0, uvOriginTR, uvSizeTR, decalTopLeft.id, colorUi
-        );
     } else {
         // show loading indicator, if that is loaded
         if (stickerCircle.loaded() and loadingGlyphs.loaded()) {

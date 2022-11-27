@@ -1,7 +1,9 @@
 CRITICAL
 
 HIGH
+- numbers in project page are not centered
 - gallery
+- text instead of icons? (home, contact, etc)
 
 MEDIUM
 - rounded corners on gallery pics (rects & textured rects)
@@ -11,6 +13,7 @@ MEDIUM
 - release mode crash
 
 LOW
+- lively details (react on hover, fade in as you scroll, etc)
 - animation of loading dots
 - film grain
 - LUT
