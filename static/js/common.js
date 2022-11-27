@@ -31,18 +31,22 @@ function httpPost(url, data, callback)
     };
 }
 
-function uint8ArrayToBase64(array)
+function uint8ArrayToBase64Async(array, callback)
 {
-    let str = "";
-    for (let i = 0; i < array.length; i++) {
-        str += String.fromCharCode(array[i]);
-    }
-    return btoa(str);
+    var blob = new Blob([array], {type: 'application/octet-binary'});
+    var reader = new FileReader();
+    reader.onload = function(evt) {
+        var dataurl = evt.target.result;
+        callback(dataurl.substr(dataurl.indexOf(',') + 1));
+    };
+    reader.readAsDataURL(blob);
 }
 
-function uint8ArrayToImageSrc(array)
+function uint8ArrayToImageSrcAsync(array, callback)
 {
-    return "data:image/png;base64," + uint8ArrayToBase64(array);
+    uint8ArrayToBase64Async(array, function(base64) {
+        callback("data:image/png;base64," + base64);
+    });
 }
 
 let _loadedImages = {};

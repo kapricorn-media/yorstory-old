@@ -773,15 +773,14 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
                         const textureData = state.assets.getTextureData(.{.DynamicId = assetId}) orelse continue;
                         if (!textureData.loaded()) continue;
 
-                        const textureSizeF = m.Vec2.initFromVec2i(textureData.size);
-                        const scaledWidth = landingImageSize.y * textureSizeF.x / textureSizeF.y;
+                        const textureSize = getTextureScaledSize(textureData.size, screenSizeF);
                         const parallaxOffsetX = state.parallaxTX * parallaxMotionMax * parallaxImage.factor;
 
                         const imgPos = m.Vec2.init(
-                            screenSizeF.x / 2.0 - scaledWidth / 2.0 + parallaxOffsetX,
+                            screenSizeF.x / 2.0 - textureSize.x / 2.0 + parallaxOffsetX,
                             landingImagePos.y
                         );
-                        const imgSize = m.Vec2.init(scaledWidth, landingImageSize.y);
+                        const imgSize = m.Vec2.init(textureSize.x, landingImageSize.y);
                         renderQueue.quadTex(imgPos, imgSize, 0.5, textureData.id, m.Vec4.one);
                     }
                 } else {
@@ -793,7 +792,13 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
             const pf = portfolio.PORTFOLIO_LIST[entryData.portfolioIndex];
             if (state.assets.getTextureData(.{.DynamicUrl = pf.landing})) |landingTex| {
                 if (allLandingAssetsLoaded and landingTex.loaded()) {
-                    renderQueue.quadTex(landingImagePos, landingImageSize, 1.0, landingTex.id, m.Vec4.one);
+                    const textureSize = getTextureScaledSize(landingTex.size, screenSizeF);
+                    const imgPos = m.Vec2.init(
+                        screenSizeF.x / 2.0 - textureSize.x / 2.0,
+                        landingImagePos.y
+                    );
+                    const imgSize = m.Vec2.init(textureSize.x, landingImageSize.y);
+                    renderQueue.quadTex(imgPos, imgSize, 1.0, landingTex.id, m.Vec4.one);
                 } else {
                     allLandingAssetsLoaded = false;
                 }
@@ -1127,6 +1132,7 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
         const x = marginX + gridSize * 5.5;
         var y = baseY + gridSize * 9;
         for (pf.subprojects) |sub, i| {
+            const numberSizeIsh = gridSize * 2.16;
             const numberSize = getTextureScaledSize(stickerCircle.size, screenSizeF);
             const numberPos = m.Vec2.init(
                 marginX + gridSize * 2.5,
@@ -1139,11 +1145,13 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
             }
             const numStr = std.fmt.allocPrint(tempAllocator, "{}", .{i + 1}) catch unreachable;
             const numberTextPos = m.Vec2.init(
-                numberPos.x + gridSize * 0.05,
+                numberPos.x + gridSize * 0.1,
                 numberPos.y + gridSize * 0.1
             );
+            const numberLineHeight = numberSizeIsh;
             renderQueue.textBox(
-                numStr, numberTextPos, gridSize * 2.16, fontStickerSize, fontStickerSize, 0.0, colorBlack, "HelveticaBold", .Center
+                numStr, numberTextPos, numberSizeIsh, fontStickerSize, numberLineHeight, 0.0,
+                colorBlack, "HelveticaBold", .Center
             );
 
             renderQueue.textLine(

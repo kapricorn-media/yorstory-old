@@ -1,7 +1,6 @@
 CRITICAL
 
 HIGH
-- numbers in project page are not centered
 - gallery
 - text instead of icons? (home, contact, etc)
 
@@ -17,3 +16,4 @@ LOW
 - animation of loading dots
 - film grain
 - LUT
+- numbers in project page are weird

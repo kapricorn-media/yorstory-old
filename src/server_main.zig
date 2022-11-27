@@ -69,15 +69,16 @@ fn stbCallback(context: ?*anyopaque, data: ?*anyopaque, size: c_int) callconv(.C
 
 fn pngToChunkedFormat(pngData: []const u8, chunkSizeMax: usize, allocator: std.mem.Allocator) ![]const u8
 {
+    const pngDataLenInt = @intCast(c_int, pngData.len);
+
     // PNG file -> pixel data (stb_image)
     var width: c_int = undefined;
     var height: c_int = undefined;
     var channels: c_int = undefined;
-    var d = stb.stbi_load_from_memory(&pngData[0], @intCast(c_int, pngData.len), &width, &height, &channels, 0);
-    if (d == null) {
-        return error.stbReadFail;
+    var result = stb.stbi_info_from_memory(&pngData[0], pngDataLenInt, &width, &height, &channels);
+    if (result != 1) {
+        return error.stbiInfoFail;
     }
-    defer stb.stbi_image_free(d);
 
     const imageSize = m.Vec2i.init(width, height);
     const chunkSize = calculateChunkSize(imageSize, chunkSizeMax);
@@ -95,6 +96,12 @@ fn pngToChunkedFormat(pngData: []const u8, chunkSizeMax: usize, allocator: std.m
     std.log.info("{}x{}", .{imageSize.x, imageSize.y});
 
     if (chunkSize != 0) {
+        var d = stb.stbi_load_from_memory(&pngData[0], @intCast(c_int, pngData.len), &width, &height, &channels, 0);
+        if (d == null) {
+            return error.stbReadFail;
+        }
+        defer stb.stbi_image_free(d);
+
         const channelsU8 = @intCast(u8, channels);
         const dataSizePixels = @intCast(usize, imageSize.x * imageSize.y);
         const dataSizeBytes = dataSizePixels * channelsU8;

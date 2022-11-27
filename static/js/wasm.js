@@ -44,7 +44,9 @@ function doLoadTextureJob(job) {
             _wasmInstance.exports.onTextureLoaded(job.textureId, job.width, job.height);
         }
     };
-    image.src = uint8ArrayToImageSrc(job.pngData);
+    uint8ArrayToImageSrcAsync(job.pngData, function(src) {
+        image.src = src;
+    });
 }
 
 function doNextLoadTextureJob() {
@@ -471,7 +473,7 @@ function wasmInit(wasmUri, memoryBytes)
         const dummyBackground = document.getElementById("dummyBackground");
 
         function step(timestamp) {
-            doNextLoadTextureJob();
+            doNextLoadTextureJob(); // TODO make fancier?
 
             const scrollY = window.scrollY;
             const totalHeight = onAnimationFrame(_canvas.width, _canvas.height, scrollY, timestamp);
