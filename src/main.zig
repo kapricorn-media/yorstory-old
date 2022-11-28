@@ -594,7 +594,16 @@ export fn onKeyDown(keyCode: c_int) void
 
     var state = _memory.getState();
 
-    if (keyCode == 71) {
+    const keyCodeEscape = 27;
+    const keyCodeG = 71;
+
+    if (keyCode == keyCodeEscape) {
+        if (state.pageData == .Entry and state.pageData.Entry.galleryImageIndex != null) {
+            state.pageData.Entry.galleryImageIndex = null;
+            w.setAllTextOpacity(1.0);
+        }
+    }
+    if (keyCode == keyCodeG) {
         state.debug = !state.debug;
     }
 }
