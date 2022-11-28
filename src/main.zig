@@ -1307,7 +1307,26 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
         }
 
         yMax = y + gridSize * 1;
+    }
 
+    // video embed
+    switch (state.pageData) {
+        .Home => {},
+        .Entry => |entryData| {
+            const pf = portfolio.PORTFOLIO_LIST[entryData.portfolioIndex];
+
+            if (pf.youtubeId) |youtubeId| {
+                const embedWidth = screenSizeF.x - marginX * 2 - gridSize * 5.5 * 2;
+                const embedSize = m.Vec2.init(embedWidth, embedWidth / 2.0);
+                const embedPos = m.Vec2.init(marginX + gridSize * 5.5, yMax);
+                renderQueue.embedYoutube(embedPos, embedSize, youtubeId);
+                yMax += embedSize.y + gridSize * 4;
+            }
+        },
+    }
+
+    // projects
+    if (state.pageData == .Entry) {
         const opos = m.Vec2.init(
             marginX + gridSize * 5.5,
             yMax,
@@ -1321,7 +1340,6 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
         yMax += gridSize * 2;
     }
 
-    // projects
     var images = std.ArrayList(GridImage).init(tempAllocator);
     for (portfolio.PORTFOLIO_LIST) |pf, i| {
         if (state.pageData == .Entry and state.pageData.Entry.portfolioIndex == i) {
@@ -1398,6 +1416,8 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
         std.log.info("resize, clearing text", .{});
         w.clearAllText();
         renderQueue.renderText();
+        w.clearAllEmbeds();
+        renderQueue.renderEmbeds();
     }
 
     // TODO don't do all the time

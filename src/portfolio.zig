@@ -14,6 +14,7 @@ pub const Portfolio = struct {
     sticker: []const u8,
     colorUi: m.Vec4,
     colorSticker: m.Vec4,
+    youtubeId: ?[]const u8,
     subprojects: []const Subproject,
 };
 
@@ -26,6 +27,7 @@ pub const PORTFOLIO_LIST = [_]Portfolio {
         .sticker = "/images/HALO/sticker-main.png",
         .colorUi = m.Vec4.init(0.0, 220.0 / 255.0, 164.0 / 255.0, 1.0),
         .colorSticker = m.Vec4.init(0.0, 220.0 / 255.0, 164.0 / 255.0, 1.0),
+        .youtubeId = null,
         .subprojects = &[_]Subproject {
             .{
                 .name = "ATTACH BEAM",
@@ -172,6 +174,7 @@ pub const PORTFOLIO_LIST = [_]Portfolio {
         .sticker = "/images/marvel/sticker-main.png",
         .colorUi = m.Vec4.init(165.0 / 255.0, 56.0 / 255.0, 1.0, 1.0),
         .colorSticker = m.Vec4.init(165.0 / 255.0, 56.0 / 255.0, 1.0, 1.0),
+        .youtubeId = "Bilb5i7tCk0",
         .subprojects = &[_]Subproject {
             .{
                 .name = " ",

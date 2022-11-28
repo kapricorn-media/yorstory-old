@@ -17,6 +17,10 @@ pub extern fn addTextBox(
     hexColorPtr: *const u8, hexColorLen: c_uint,
     fontFamilyPtr: *const u8, fontFamilyLen: c_uint,
     textAlignPtr: *const u8, textAlignLen: c_uint) void;
+
+pub extern fn clearAllEmbeds() void;
+pub extern fn addYoutubeEmbed(left: c_int, top: c_int, width: c_int, height: c_int, youtubeIdPtr: *const u8, youtubeIdLen: c_uint) void;
+
 pub extern fn setCursor(cursorPtr: *const u8, cursorLen: c_uint) void;
 pub extern fn getUri(outUriPtr: *u8, outUriLen: c_uint) c_uint;
 pub extern fn setUri(uriPtr: *const u8, uriLen: c_uint) void;

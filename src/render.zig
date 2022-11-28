@@ -611,6 +611,12 @@ const RenderEntryTextBox = struct {
     textAlign: TextAlign,
 };
 
+const RenderEntryYoutubeEmbed = struct {
+    topLeft: m.Vec2,
+    size: m.Vec2,
+    youtubeId: []const u8,
+};
+
 fn posTopLeftToBottomLeft(pos: m.Vec2, size: m.Vec2, screenSize: m.Vec2, scrollY: f32) m.Vec2
 {
     return m.Vec2.init(
@@ -626,6 +632,7 @@ pub const RenderQueue = struct
     roundedFrames: std.ArrayList(RenderEntryRoundedFrame),
     textLines: std.ArrayList(RenderEntryTextLine),
     textBoxes: std.ArrayList(RenderEntryTextBox),
+    youtubeEmbeds: std.ArrayList(RenderEntryYoutubeEmbed),
 
     const Self = @This();
 
@@ -637,6 +644,7 @@ pub const RenderQueue = struct
             .roundedFrames = std.ArrayList(RenderEntryRoundedFrame).init(allocator),
             .textLines = std.ArrayList(RenderEntryTextLine).init(allocator),
             .textBoxes = std.ArrayList(RenderEntryTextBox).init(allocator),
+            .youtubeEmbeds = std.ArrayList(RenderEntryYoutubeEmbed).init(allocator),
         };
     }
 
@@ -647,6 +655,7 @@ pub const RenderQueue = struct
         self.roundedFrames.deinit();
         self.textLines.deinit();
         self.textBoxes.deinit();
+        self.youtubeEmbeds.deinit();
     }
 
     pub fn quadGradient(self: *Self, topLeft: m.Vec2, size: m.Vec2, depth: f32, cornerRadius: f32, colorTL: m.Vec4, colorTR: m.Vec4, colorBL: m.Vec4, colorBR: m.Vec4) void
@@ -727,6 +736,15 @@ pub const RenderQueue = struct
         };
     }
 
+    pub fn embedYoutube(self: *Self, topLeft: m.Vec2, size: m.Vec2, youtubeId: []const u8) void
+    {
+        (self.youtubeEmbeds.addOne() catch return).* = RenderEntryYoutubeEmbed {
+            .topLeft = topLeft,
+            .size = size,
+            .youtubeId = youtubeId,
+        };
+    }
+
     pub fn renderShapes(self: Self, renderState: RenderState, screenSize: m.Vec2, scrollY: f32) void
     {
         for (self.quads.items) |e| {
@@ -768,6 +786,17 @@ pub const RenderQueue = struct
                 @floatToInt(c_int, e.fontSize), @floatToInt(c_int, e.lineHeight), e.letterSpacing,
                 &hexColor[0], hexColor.len, &e.fontFamily[0], e.fontFamily.len,
                 &textAlign[0], textAlign.len
+            );
+        }
+    }
+
+    pub fn renderEmbeds(self: Self) void
+    {
+        for (self.youtubeEmbeds.items) |e| {
+            w.addYoutubeEmbed(
+                @floatToInt(c_int, e.topLeft.x), @floatToInt(c_int, e.topLeft.y),
+                @floatToInt(c_int, e.size.x), @floatToInt(c_int, e.size.y),
+                &e.youtubeId[0], e.youtubeId.len
             );
         }
     }

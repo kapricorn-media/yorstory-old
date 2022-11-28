@@ -159,6 +159,38 @@ function addTextBox(
     document.getElementById("dummyBackground").appendChild(div);
 }
 
+function clearAllEmbeds()
+{
+    Array.from(document.getElementsByClassName("_wasmEmbedAll")).forEach(function(el) {
+        el.remove();
+    });
+}
+
+function addYoutubeEmbed(left, top, width, height, youtubeIdPtr, youtubeIdLen)
+{
+    const youtubeId = readCharStr(youtubeIdPtr, youtubeIdLen);
+
+    const div = document.createElement("div");
+    div.classList.add("_wasmTextAll");
+    div.classList.add("_wasmYoutubeEmbed");
+    div.style.left = px(left);
+    div.style.top = px(top);
+    div.style.width = px(width);
+    div.style.height = px(height);
+
+    const iframe = document.createElement("iframe");
+    iframe.style.width = "100%";
+    iframe.style.height = "100%";
+    iframe.src = "https://www.youtube.com/embed/" + youtubeId;
+    iframe.title = "YouTube video player";
+    iframe.frameborder = "0";
+    iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture";
+    iframe.allowFullscreen = true;
+
+    div.appendChild(iframe);
+    document.getElementById("dummyBackground").appendChild(div);
+}
+
 function setCursor(cursorPtr, cursorLen) {
     const cursor = readCharStr(cursorPtr, cursorLen);
     document.body.style.cursor = cursor;
@@ -312,6 +344,8 @@ const env = {
     setAllTextOpacity,
     addTextLine,
     addTextBox,
+    clearAllEmbeds,
+    addYoutubeEmbed,
     setCursor,
     getUri,
     setUri,
