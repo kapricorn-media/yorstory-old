@@ -759,7 +759,7 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
     const gridSize = std.math.round(gridRefSize / refSize.y * screenSizeF.y);
 
     const marginX = blk: {
-        const maxLandingImageAspect = 2.0;
+        const maxLandingImageAspect = 2.15;
         const landingImageSize = m.Vec2.init(
             screenSizeF.x - gridSize * 2.0,
             screenSizeF.y - gridSize * 3.0
