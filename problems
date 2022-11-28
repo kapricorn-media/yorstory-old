@@ -1,7 +1,6 @@
 CRITICAL
 
 HIGH
-- gallery
 - text instead of icons? (home, contact, etc)
 
 MEDIUM
@@ -10,6 +9,7 @@ MEDIUM
 - smarter should-redraw logic
 - release mode crash
 - lag on Chrome (getTextureData? memcpy??)
+- better UI for gallery
 
 LOW
 - animation of loading dots

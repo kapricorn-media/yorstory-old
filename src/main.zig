@@ -252,13 +252,86 @@ const MouseState = struct {
     numClickEvents: usize,
     clickEvents: [64]ClickEvent,
 
-    pub fn init() MouseState
+    const Self = @This();
+
+    fn init() Self
     {
-        return MouseState {
+        return Self {
             .pos = m.Vec2i.zero,
             .numClickEvents = 0,
             .clickEvents = undefined,
         };
+    }
+
+    fn clear(self: *Self) void
+    {
+        self.numClickEvents = 0;
+    }
+
+    fn addClickEvent(self: *Self, pos: m.Vec2i, clickType: ClickType, down: bool) void
+    {
+        const i = self.numClickEvents;
+        if (i >= self.clickEvents.len) {
+            return;
+        }
+
+        self.clickEvents[i] = ClickEvent {
+            .pos = pos,
+            .clickType = clickType,
+            .down = down,
+        };
+        self.numClickEvents += 1;
+    }
+};
+
+const KeyEvent = struct {
+    keyCode: i32,
+    down: bool,
+};
+
+const KeyboardState = struct {
+    numKeyEvents: usize,
+    keyEvents: [64]KeyEvent,
+
+    const Self = @This();
+
+    fn init() Self
+    {
+        return Self {
+            .numKeyEvents = 0,
+            .keyEvents = undefined,
+        };
+    }
+
+    fn clear(self: *Self) void
+    {
+        self.numKeyEvents = 0;
+    }
+
+    fn addKeyEvent(self: *Self, keyCode: i32, down: bool) void
+    {
+        const i = self.numKeyEvents;
+        if (i >= self.keyEvents.len) {
+            return;
+        }
+
+        self.keyEvents[i] = KeyEvent {
+            .keyCode = keyCode,
+            .down = down,
+        };
+        self.numKeyEvents += 1;
+    }
+
+    fn keyDown(self: Self, keyCode: i32) bool
+    {
+        const keyEvents = self.keyEvents[0..self.numKeyEvents];
+        var latestDown = false;
+        for (keyEvents) |e| {
+            if (e.keyCode == keyCode) {
+                latestDown = e.down;
+            }
+        }
+        return latestDown;
     }
 };
 
@@ -310,6 +383,7 @@ const State = struct {
     scrollYPrev: c_int,
     timestampMsPrev: c_int,
     mouseState: MouseState,
+    keyboardState: KeyboardState,
     activeParallaxSetIndex: usize,
     parallaxImageSets: []ParallaxSet,
     parallaxTX: f32,
@@ -353,6 +427,7 @@ const State = struct {
             .scrollYPrev = -1,
             .timestampMsPrev = 0,
             .mouseState = MouseState.init(),
+            .keyboardState = KeyboardState.init(),
             .activeParallaxSetIndex = PARALLAX_SET_INDEX_START,
             .parallaxImageSets = try initParallaxSets(fbAllocator.allocator()),
             .parallaxTX = 0,
@@ -421,21 +496,6 @@ const State = struct {
     }
 };
 
-fn addClickEvent(mouseState: *MouseState, pos: m.Vec2i, clickType: ClickType, down: bool) void
-{
-    const i = mouseState.numClickEvents;
-    if (i >= mouseState.clickEvents.len) {
-        return;
-    }
-
-    mouseState.clickEvents[i] = ClickEvent{
-        .pos = pos,
-        .clickType = clickType,
-        .down = down,
-    };
-    mouseState.numClickEvents += 1;
-}
-
 fn buttonToClickType(button: c_int) ClickType
 {
     return switch (button) {
@@ -485,7 +545,7 @@ const GridImage = struct {
     goToUri: ?[]const u8,
 };
 
-fn drawImageGrid(images: []const GridImage, itemsPerRow: usize, topLeft: m.Vec2, width: f32, spacing: f32, fontSize: f32, fontColor: m.Vec4, state: *State, scrollY: f32, mouseHoverGlobal: *bool,renderQueue: *render.RenderQueue, callback: *const fn(*State, GridImage, usize) void) f32
+fn drawImageGrid(images: []const GridImage, indexOffset: usize, itemsPerRow: usize, topLeft: m.Vec2, width: f32, spacing: f32, fontSize: f32, fontColor: m.Vec4, state: *State, scrollY: f32, mouseHoverGlobal: *bool,renderQueue: *render.RenderQueue, callback: *const fn(*State, GridImage, usize) void) f32
 {
     const itemWidth = (width - spacing * (@intToFloat(f32, itemsPerRow) - 1)) / @intToFloat(f32, itemsPerRow);
     const itemSize = m.Vec2.init(itemWidth, itemWidth * 0.5);
@@ -525,7 +585,7 @@ fn drawImageGrid(images: []const GridImage, itemsPerRow: usize, topLeft: m.Vec2,
         }
 
         if (updateButton(itemPos, itemSize, state.mouseState, scrollY, mouseHoverGlobal)) {
-            callback(state, img, i);
+            callback(state, img, indexOffset + i);
         }
     }
 
@@ -538,6 +598,33 @@ fn getTextureScaledSize(size: m.Vec2i, screenSize: m.Vec2) m.Vec2
     const sizeF = m.Vec2.initFromVec2i(size);
     const scaleFactor = screenSize.y / refSize.y;
     return m.Vec2.multScalar(sizeF, scaleFactor);
+}
+
+fn getImageCount(entryData: anytype) usize
+{
+    const pf = portfolio.PORTFOLIO_LIST[entryData.portfolioIndex];
+    var i: usize = 0;
+    for (pf.subprojects) |sub| {
+        for (sub.images) |_| {
+            i += 1;
+        }
+    }
+    return i;
+}
+
+fn getImageUrlFromIndex(entryData: anytype, index: usize) ?[]const u8
+{
+    const pf = portfolio.PORTFOLIO_LIST[entryData.portfolioIndex];
+    var i: usize = 0;
+    for (pf.subprojects) |sub| {
+        for (sub.images) |img| {
+            if (i == index) {
+                return img;
+            }
+            i += 1;
+        }
+    }
+    return null;
 }
 
 export fn onInit() void
@@ -574,38 +661,20 @@ export fn onMouseMove(x: c_int, y: c_int) void
 
 export fn onMouseDown(button: c_int, x: c_int, y: c_int) void
 {
-    std.log.info("onMouseDown {} ({},{})", .{button, x, y});
-
     var state = _memory.getState();
-    addClickEvent(&state.mouseState, m.Vec2i.init(x, y), buttonToClickType(button), true);
+    state.mouseState.addClickEvent(m.Vec2i.init(x, y), buttonToClickType(button), true);
 }
 
 export fn onMouseUp(button: c_int, x: c_int, y: c_int) void
 {
-    std.log.info("onMouseUp {} ({},{})", .{button, x, y});
-
     var state = _memory.getState();
-    addClickEvent(&state.mouseState, m.Vec2i.init(x, y), buttonToClickType(button), false);
+    state.mouseState.addClickEvent(m.Vec2i.init(x, y), buttonToClickType(button), false);
 }
 
 export fn onKeyDown(keyCode: c_int) void
 {
-    std.log.info("onKeyDown: {}", .{keyCode});
-
     var state = _memory.getState();
-
-    const keyCodeEscape = 27;
-    const keyCodeG = 71;
-
-    if (keyCode == keyCodeEscape) {
-        if (state.pageData == .Entry and state.pageData.Entry.galleryImageIndex != null) {
-            state.pageData.Entry.galleryImageIndex = null;
-            w.setAllTextOpacity(1.0);
-        }
-    }
-    if (keyCode == keyCodeG) {
-        state.debug = !state.debug;
-    }
+    state.keyboardState.addKeyEvent(keyCode, true);
 }
 
 export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestampMs: c_int) c_int
@@ -619,7 +688,35 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
         state.timestampMsPrev = timestampMs;
         state.scrollYPrev = scrollY;
         state.screenSizePrev = screenSizeI;
-        state.mouseState.numClickEvents = 0;
+        state.mouseState.clear();
+        state.keyboardState.clear();
+    }
+
+    const keyCodeEscape = 27;
+    const keyCodeArrowLeft = 37;
+    const keyCodeArrowRight = 39;
+    const keyCodeG = 71;
+
+    if (state.pageData == .Entry and state.pageData.Entry.galleryImageIndex != null) {
+        const imageCount = getImageCount(state.pageData.Entry);
+        if (state.keyboardState.keyDown(keyCodeEscape)) {
+            state.pageData.Entry.galleryImageIndex = null;
+            w.setAllTextOpacity(1.0);
+        } else if (state.keyboardState.keyDown(keyCodeArrowLeft)) {
+            if (state.pageData.Entry.galleryImageIndex.? == 0) {
+                state.pageData.Entry.galleryImageIndex.? = imageCount - 1;
+            } else {
+                state.pageData.Entry.galleryImageIndex.? -= 1;
+            }
+        } else if (state.keyboardState.keyDown(keyCodeArrowRight)) {
+            state.pageData.Entry.galleryImageIndex.? += 1;
+            if (state.pageData.Entry.galleryImageIndex.? >= imageCount) {
+                state.pageData.Entry.galleryImageIndex.? = 0;
+            }
+        }
+    }
+    if (state.keyboardState.keyDown(keyCodeG)) {
+        state.debug = !state.debug;
     }
 
     const mousePosF = m.Vec2.initFromVec2i(state.mouseState.pos);
@@ -1156,6 +1253,7 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
 
         const x = marginX + gridSize * 5.5;
         var y = baseY + gridSize * 9;
+        var indexOffset: usize = 0; // TODO eh...
         for (pf.subprojects) |sub, i| {
             const numberSizeIsh = gridSize * 2.16;
             const numberSize = getTextureScaledSize(stickerCircle.size, screenSizeF);
@@ -1203,8 +1301,9 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
             const itemsPerRow = 6;
             const topLeft = m.Vec2.init(x, y);
             const spacing = gridSize * 0.25;
-            y += drawImageGrid(images.items, itemsPerRow, topLeft, contentSubWidth, spacing, fontTextSize, colorUi, state, scrollYF, &mouseHoverGlobal, &renderQueue, CB.entry);
+            y += drawImageGrid(images.items, indexOffset, itemsPerRow, topLeft, contentSubWidth, spacing, fontTextSize, colorUi, state, scrollYF, &mouseHoverGlobal, &renderQueue, CB.entry);
             y += gridSize * 3;
+            indexOffset += sub.images.len;
         }
 
         yMax = y + gridSize * 1;
@@ -1244,16 +1343,49 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
         yMax,
     );
     const spacing = gridSize * 0.25;
-    const y = drawImageGrid(images.items, itemsPerRow, topLeft, contentSubWidth, spacing, fontTextSize, colorUi, state, scrollYF, &mouseHoverGlobal, &renderQueue, CB.home);
+    const y = drawImageGrid(images.items, 0, itemsPerRow, topLeft, contentSubWidth, spacing, fontTextSize, colorUi, state, scrollYF, &mouseHoverGlobal, &renderQueue, CB.home);
 
     yMax += y + gridSize * 3;
 
     if (state.pageData == .Entry) {
         const entryData = state.pageData.Entry;
         if (entryData.galleryImageIndex) |ind| {
-            _ = ind;
             const pos = m.Vec2.init(0.0, scrollYF);
             renderQueue.quad(pos, screenSizeF, DEPTH_UI_OVER2, 0, m.Vec4.init(0.0, 0.0, 0.0, 1.0));
+
+            if (getImageUrlFromIndex(entryData, ind)) |imageUrl| {
+                std.log.info("{s}", .{imageUrl});
+                if (state.assets.getTextureData(.{.DynamicUrl = imageUrl})) |imageTex| {
+                    if (imageTex.loaded()) {
+                        const imageRefSizeF = m.Vec2.initFromVec2i(imageTex.size);
+                        const targetHeight = screenSizeF.y - gridSize * 4.0;
+                        const imageSize = m.Vec2.init(
+                            targetHeight / imageRefSizeF.y * imageRefSizeF.x,
+                            targetHeight
+                        );
+                        const imagePos = m.Vec2.init(
+                            (screenSizeF.x - imageSize.x) / 2.0,
+                            scrollYF + gridSize * 2.0
+                        );
+                        // const imagePos = m.Vec2.add(pos, m.Vec2.init(gridSize, gridSize));
+                        renderQueue.quadTex(imagePos, imageSize, DEPTH_UI_OVER2 - 0.01, 0, imageTex.id, m.Vec4.one);
+
+                        const clickEvents = state.mouseState.clickEvents[0..state.mouseState.numClickEvents];
+                        for (clickEvents) |e| {
+                            if (e.clickType == .Left and e.down) {
+                                const posF = m.Vec2.initFromVec2i(e.pos);
+                                if (posF.x < (screenSizeF.x - imageSize.x) / 2.0
+                                    or posF.x > (screenSizeF.x + imageSize.x) / 2.0
+                                    or posF.y < (gridSize * 2.0)
+                                    or posF.y > (screenSizeF.y - gridSize * 2.0)) {
+                                    state.pageData.Entry.galleryImageIndex = null;
+                                    w.setAllTextOpacity(1.0);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 
