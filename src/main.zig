@@ -78,11 +78,12 @@ pub fn log(
 }
 
 const Texture = enum(usize) {
+    CategoriesText,
     DecalTopLeft,
-    IconContact,
-    IconHome,
-    IconPortfolio,
-    IconWork,
+    // IconContact,
+    // IconHome,
+    // IconPortfolio,
+    // IconWork,
     LoadingGlyphs,
     Logo343,
     LogoMicrosoft,
@@ -446,18 +447,22 @@ const State = struct {
             "/images/decal-topleft.png", defaultTextureWrap, defaultTextureFilter, 2
         );
 
-        _ = try self.assets.register(.{ .Static = Texture.IconContact },
-            "/images/icon-contact.png", defaultTextureWrap, defaultTextureFilter, 5
+        _ = try self.assets.register(.{ .Static = Texture.CategoriesText },
+            "/images/categories-text.png", defaultTextureWrap, defaultTextureFilter, 5
         );
-        _ = try self.assets.register(.{ .Static = Texture.IconHome },
-            "/images/icon-home.png", defaultTextureWrap, defaultTextureFilter, 5
-        );
-        _ = try self.assets.register(.{ .Static = Texture.IconPortfolio },
-            "/images/icon-portfolio.png", defaultTextureWrap, defaultTextureFilter, 5
-        );
-        _ = try self.assets.register(.{ .Static = Texture.IconWork },
-            "/images/icon-work.png", defaultTextureWrap, defaultTextureFilter, 5
-        );
+
+        // _ = try self.assets.register(.{ .Static = Texture.IconContact },
+        //     "/images/icon-contact.png", defaultTextureWrap, defaultTextureFilter, 5
+        // );
+        // _ = try self.assets.register(.{ .Static = Texture.IconHome },
+        //     "/images/icon-home.png", defaultTextureWrap, defaultTextureFilter, 5
+        // );
+        // _ = try self.assets.register(.{ .Static = Texture.IconPortfolio },
+        //     "/images/icon-portfolio.png", defaultTextureWrap, defaultTextureFilter, 5
+        // );
+        // _ = try self.assets.register(.{ .Static = Texture.IconWork },
+        //     "/images/icon-work.png", defaultTextureWrap, defaultTextureFilter, 5
+        // );
         _ = try self.assets.register(.{ .Static = Texture.StickerShiny },
             "/images/sticker-shiny.png", defaultTextureWrap, defaultTextureFilter, 5
         );
@@ -796,19 +801,20 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
     // ==== LANDING IMAGE ====
 
     // get landing UI elements to see if they are loaded
-    const iconTextures = [_]Texture {
-        Texture.IconHome,
-        Texture.IconPortfolio,
-        Texture.IconWork,
-        Texture.IconContact,
-    };
+    // const iconTextures = [_]Texture {
+    //     Texture.IconHome,
+    //     Texture.IconPortfolio,
+    //     Texture.IconWork,
+    //     Texture.IconContact,
+    // };
     var allIconsLoaded = true;
-    for (iconTextures) |iconTexture| {
-        if (!state.assets.getStaticTextureData(iconTexture).loaded()) {
-            allIconsLoaded = false;
-            break;
-        }
-    }
+    const categoriesText = state.assets.getStaticTextureData(Texture.CategoriesText);
+    // for (iconTextures) |iconTexture| {
+    //     if (!state.assets.getStaticTextureData(iconTexture).loaded()) {
+    //         allIconsLoaded = false;
+    //         break;
+    //     }
+    // }
 
     const decalTopLeft = state.assets.getStaticTextureData(Texture.DecalTopLeft);
     const stickerMain = blk: {
@@ -838,7 +844,7 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
     };
     const stickerShiny = state.assets.getStaticTextureData(Texture.StickerShiny);
 
-    var allLandingAssetsLoaded = allIconsLoaded and decalTopLeft.loaded() and stickerMain.loaded() and stickerShiny.loaded();
+    var allLandingAssetsLoaded = allIconsLoaded and categoriesText.loaded() and decalTopLeft.loaded() and stickerMain.loaded() and stickerShiny.loaded();
 
     const landingImagePos = m.Vec2.init(
         marginX + gridSize * 1,
@@ -1000,29 +1006,42 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
     const loadingGlyphs = state.assets.getStaticTextureData(Texture.LoadingGlyphs);
 
     if (allLandingAssetsLoaded) {
-        for (iconTextures) |iconTexture, i| {
-            const textureData = state.assets.getStaticTextureData(iconTexture);
-
-            const iF = @intToFloat(f32, i);
-            const iconSizeF = m.Vec2.init(
-                gridSize * 2.162,
-                gridSize * 2.162,
-            );
-            const iconPos = m.Vec2.init(
-                marginX + gridSize * 5 + gridSize * 2.5 * iF,
+        if (categoriesText.loaded()) {
+            const categoriesSize = getTextureScaledSize(categoriesText.size, screenSizeF);
+            const categoriesPos = m.Vec2.init(
+                marginX + gridSize * 5,
                 gridSize * 5,
             );
-            renderQueue.quadTex(
-                iconPos, iconSizeF, DEPTH_UI_GENERIC, 0, textureData.id, colorUi
-            );
-            if (updateButton(iconPos, iconSizeF, state.mouseState, scrollYF, &mouseHoverGlobal)) {
-                const uri = switch (iconTexture) {
-                    .IconHome => "/",
-                    else => continue,
-                };
-                ww.setUri(uri);
+            renderQueue.quadTex(categoriesPos, categoriesSize, DEPTH_UI_GENERIC, 0, categoriesText.id, colorUi);
+
+            const homeSize = m.Vec2.init(categoriesSize.x / 6.0, categoriesSize.y);
+            if (updateButton(categoriesPos, homeSize, state.mouseState, scrollYF, &mouseHoverGlobal)) {
+                ww.setUri("/");
             }
         }
+        // for (iconTextures) |iconTexture, i| {
+        //     const textureData = state.assets.getStaticTextureData(iconTexture);
+
+        //     const iF = @intToFloat(f32, i);
+        //     const iconSizeF = m.Vec2.init(
+        //         gridSize * 2.162,
+        //         gridSize * 2.162,
+        //     );
+        //     const iconPos = m.Vec2.init(
+        //         marginX + gridSize * 5 + gridSize * 2.5 * iF,
+        //         gridSize * 5,
+        //     );
+        //     renderQueue.quadTex(
+        //         iconPos, iconSizeF, DEPTH_UI_GENERIC, 0, textureData.id, colorUi
+        //     );
+        //     if (updateButton(iconPos, iconSizeF, state.mouseState, scrollYF, &mouseHoverGlobal)) {
+        //         const uri = switch (iconTexture) {
+        //             .IconHome => "/",
+        //             else => continue,
+        //         };
+        //         ww.setUri(uri);
+        //     }
+        // }
 
         // sticker (main)
         const stickerSize = getTextureScaledSize(stickerMain.size, screenSizeF);

@@ -2,13 +2,13 @@ CRITICAL
 
 HIGH
 - text instead of icons? (home, contact, etc)
+- lag on Chrome (getTextureData? memcpy??)
 
 MEDIUM
-- lively details (react on hover, fade in as you scroll, etc)
 - mobile
+- lively details (react on hover, fade in as you scroll, etc)
 - smarter should-redraw logic
 - release mode crash
-- lag on Chrome (getTextureData? memcpy??)
 - better UI for gallery
 
 LOW
