@@ -1131,7 +1131,7 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
     // ==== SECOND FRAME ====
 
     const section2Height = switch (state.pageData) {
-        .Home => screenSizeF.y * 3.0,
+        .Home => screenSizeF.y * 4.0,
         .Entry => gridSize * 4.0,
     };
     const secondFrameYScrolling = section1Height;
@@ -1193,24 +1193,35 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
             const symbolEye = state.assets.getStaticTextureData(Texture.SymbolEye);
 
             if (weAreStorytellers.loaded() and weAreStorytellersText.loaded() and symbolEye.loaded() and logosAll.loaded()) {
+                const wasPosYCheckpoint1 = section1Height;
+                const wasPosYCheckpoint2 = section1Height + screenSizeF.y;
+                const wasPosBaseY = blk: {
+                    if (scrollYF <= wasPosYCheckpoint1) {
+                        break :blk wasPosYCheckpoint1;
+                    } else if (scrollYF >= wasPosYCheckpoint2) {
+                        break :blk wasPosYCheckpoint2;
+                    } else {
+                        break :blk scrollYF;
+                    }
+                };
                 const wasSize = getTextureScaledSize(weAreStorytellers.size, screenSizeF);
                 const wasPos = m.Vec2.init(
                     contentMarginX - gridSize * 0.3,
-                    secondFrameYScrolling + gridSize * 8
+                    wasPosBaseY + gridSize * 8
                 );
                 renderQueue.quadTex(wasPos, wasSize, DEPTH_UI_GENERIC, 0, weAreStorytellers.id, colorUi);
 
                 const wasTextSize = getTextureScaledSize(weAreStorytellersText.size, screenSizeF);
                 const wasTextPos = m.Vec2.init(
                     contentMarginX - gridSize * 0.3,
-                    secondFrameYStill + gridSize * 18
+                    wasPosBaseY + gridSize * 18
                 );
                 renderQueue.quadTex(wasTextPos, wasTextSize, DEPTH_UI_GENERIC, 0, weAreStorytellersText.id, colorUi);
 
                 const eyeSize = getTextureScaledSize(stickerCircle.size, screenSizeF);
                 const eyePos = m.Vec2.init(
                     wasPos.x + gridSize * 10.4,
-                    secondFrameYScrolling + gridSize * 6.95
+                    wasPosBaseY + gridSize * 6.95
                 );
                 const eyeStickerColor = m.Vec4.init(0.0, 46.0 / 255.0, 226.0 / 255.0, 1.0);
                 renderQueue.quadTex(eyePos, eyeSize, DEPTH_UI_GENERIC - 0.01, 0, stickerCircle.id, eyeStickerColor);
@@ -1230,7 +1241,7 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
                 const logosSize = getTextureScaledSize(logosAll.size, screenSizeF);
                 const logosPos = m.Vec2.init(
                     (screenSizeF.x - logosSize.x) / 2,
-                    logosPosBaseY + gridSize * 9
+                    logosPosBaseY + ((screenSizeF.y - logosSize.y) / 2)
                 );
                 renderQueue.quadTex(logosPos, logosSize, DEPTH_UI_GENERIC, 0, logosAll.id, colorUi);
             }
