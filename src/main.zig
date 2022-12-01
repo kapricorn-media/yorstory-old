@@ -92,6 +92,8 @@ const Texture = enum(usize) {
     StickerShiny,
     SymbolEye,
     WeAreStorytellers,
+    WeAreStorytellersText,
+    YorstoryCompany,
 
     StickerMainHome,
 };
@@ -482,6 +484,12 @@ const State = struct {
                 _ = try self.assets.register(.{ .Static = Texture.WeAreStorytellers },
                     "/images/we-are-storytellers.png", defaultTextureWrap, defaultTextureFilter, 8
                 );
+                _ = try self.assets.register(.{ .Static = Texture.WeAreStorytellersText },
+                    "/images/we-are-storytellers-text.png", defaultTextureWrap, defaultTextureFilter, 8
+                );
+                _ = try self.assets.register(.{ .Static = Texture.YorstoryCompany },
+                    "/images/a-yorstory-company.png", defaultTextureWrap, defaultTextureFilter, 8
+                );
             },
             .Entry => {
             },
@@ -632,6 +640,52 @@ fn getImageUrlFromIndex(entryData: anytype, index: usize) ?[]const u8
     return null;
 }
 
+fn drawCrosshairCorners(pos: m.Vec2, size: m.Vec2, depth: f32, gridSize: f32, decalTopLeft: assets.TextureData, screenSize: m.Vec2, color: m.Vec4, renderQueue: *render.RenderQueue) void
+{
+    const decalMargin = gridSize * 2;
+    const decalSize = getTextureScaledSize(decalTopLeft.size, screenSize);
+
+    const posTL = m.Vec2.init(
+        pos.x + decalMargin,
+        pos.y + decalMargin,
+    );
+    const uvOriginTL = m.Vec2.init(0, 0);
+    const uvSizeTL = m.Vec2.init(1, 1);
+    renderQueue.quadTexUvOffset(
+        posTL, decalSize, depth, 0, uvOriginTL, uvSizeTL, decalTopLeft.id, color
+    );
+
+    const posTR = m.Vec2.init(
+        pos.x + size.x - decalMargin - decalSize.x,
+        pos.y + decalMargin,
+    );
+    const uvOriginTR = m.Vec2.init(1, 0);
+    const uvSizeTR = m.Vec2.init(-1, 1);
+    renderQueue.quadTexUvOffset(
+        posTR, decalSize, depth, 0, uvOriginTR, uvSizeTR, decalTopLeft.id, color
+    );
+
+    const posBL = m.Vec2.init(
+        pos.x + decalMargin,
+        pos.y + size.y - decalMargin - decalSize.y,
+    );
+    const uvOriginBL = m.Vec2.init(0, 1);
+    const uvSizeBL = m.Vec2.init(1, -1);
+    renderQueue.quadTexUvOffset(
+        posBL, decalSize, depth, 0, uvOriginBL, uvSizeBL, decalTopLeft.id, color
+    );
+
+    const posBR = m.Vec2.init(
+        pos.x + size.x - decalMargin - decalSize.x,
+        pos.y + size.y - decalMargin - decalSize.y,
+    );
+    const uvOriginBR = m.Vec2.init(1, 1);
+    const uvSizeBR = m.Vec2.init(-1, -1);
+    renderQueue.quadTexUvOffset(
+        posBR, decalSize, depth, 0, uvOriginBR, uvSizeBR, decalTopLeft.id, color
+    );
+}
+
 export fn onInit() void
 {
     std.log.info("onInit", .{});
@@ -765,6 +819,7 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
 
     const marginX = blk: {
         const maxLandingImageAspect = 2.15;
+        // const landingImageSize = screenSizeF;
         const landingImageSize = m.Vec2.init(
             screenSizeF.x - gridSize * 2.0,
             screenSizeF.y - gridSize * 3.0
@@ -772,6 +827,8 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
         const adjustedWidth = std.math.min(landingImageSize.x, landingImageSize.y * maxLandingImageAspect);
         break :blk (landingImageSize.x - adjustedWidth) / 2.0;
     };
+    const crosshairMarginX = marginX + gridSize * 5;
+    const contentMarginX = marginX + gridSize * 9;
 
     w.glBindFramebuffer(w.GL_FRAMEBUFFER, state.fb);
 
@@ -798,7 +855,7 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
     const colorRedSticker = m.Vec4.init(234.0 / 255.0, 65.0 / 255.0, 0.0, 1.0);
     const parallaxMotionMax = screenSizeF.x / 8.0;
 
-    // ==== LANDING IMAGE ====
+    // ==== FIRST FRAME (LANDING) ====
 
     // get landing UI elements to see if they are loaded
     // const iconTextures = [_]Texture {
@@ -854,6 +911,13 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
         screenSizeF.x - marginX * 2 - gridSize * 2,
         screenSizeF.y - gridSize * 3
     );
+    // const landingImagePos = m.Vec2.init(
+    //     marginX, 0.0,
+    // );
+    // const landingImageSize = m.Vec2.init(
+    //     screenSizeF.x - marginX * 2,
+    //     screenSizeF.y
+    // );
     switch (state.pageData) {
         .Home => {
             // Determine whether the active parallax set is loaded
@@ -900,15 +964,18 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
                         const textureData = state.assets.getTextureData(.{.DynamicId = assetId}) orelse continue;
                         if (!textureData.loaded()) continue;
 
-                        const textureSize = getTextureScaledSize(textureData.size, screenSizeF);
+                        const textureDataF = m.Vec2.initFromVec2i(textureData.size);
+                        const textureSize = m.Vec2.init(
+                            landingImageSize.y * textureDataF.x / textureDataF.y,
+                            landingImageSize.y
+                        );
                         const parallaxOffsetX = state.parallaxTX * parallaxMotionMax * parallaxImage.factor;
 
                         const imgPos = m.Vec2.init(
                             screenSizeF.x / 2.0 - textureSize.x / 2.0 + parallaxOffsetX,
                             landingImagePos.y
                         );
-                        const imgSize = m.Vec2.init(textureSize.x, landingImageSize.y);
-                        renderQueue.quadTex(imgPos, imgSize, DEPTH_LANDINGIMAGE, 0.0, textureData.id, m.Vec4.one);
+                        renderQueue.quadTex(imgPos, textureSize, DEPTH_LANDINGIMAGE, 0.0, textureData.id, m.Vec4.one);
                     }
                 } else {
                     allLandingAssetsLoaded = false;
@@ -941,64 +1008,12 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
     }
 
     if (decalTopLeft.loaded()) {
-        // landing page, four corners
-        const decalSize = m.Vec2.init(gridSize * 5, gridSize * 5);
-        const decalMargin = gridSize * 2;
+        const crosshairRectPos = m.Vec2.init(marginX, 0);
+        const crosshairRectSize = m.Vec2.init(screenSizeF.x - marginX * 2, screenSizeF.y);
 
-        const posTL = m.Vec2.init(
-            marginX + decalMargin,
-            decalMargin,
-        );
-        const uvOriginTL = m.Vec2.init(0, 0);
-        const uvSizeTL = m.Vec2.init(1, 1);
-        renderQueue.quadTexUvOffset(
-            posTL, decalSize, DEPTH_UI_GENERIC, 0, uvOriginTL, uvSizeTL, decalTopLeft.id, colorUi
-        );
-
-        const posTR = m.Vec2.init(
-            screenSizeF.x - marginX - decalMargin - decalSize.x,
-            decalMargin,
-        );
-        const uvOriginTR = m.Vec2.init(1, 0);
-        const uvSizeTR = m.Vec2.init(-1, 1);
-        renderQueue.quadTexUvOffset(
-            posTR, decalSize, DEPTH_UI_GENERIC, 0, uvOriginTR, uvSizeTR, decalTopLeft.id, colorUi
-        );
-
-        const posBL = m.Vec2.init(
-            marginX + decalMargin,
-            screenSizeF.y - decalMargin - gridSize - decalSize.y,
-        );
-        const uvOriginBL = m.Vec2.init(0, 1);
-        const uvSizeBL = m.Vec2.init(1, -1);
-        renderQueue.quadTexUvOffset(
-            posBL, decalSize, DEPTH_UI_GENERIC, 0, uvOriginBL, uvSizeBL, decalTopLeft.id, colorUi
-        );
-
-        const posBR = m.Vec2.init(
-            screenSizeF.x - marginX - decalMargin - decalSize.x,
-            screenSizeF.y - decalMargin - gridSize - decalSize.y,
-        );
-        const uvOriginBR = m.Vec2.init(1, 1);
-        const uvSizeBR = m.Vec2.init(-1, -1);
-        renderQueue.quadTexUvOffset(
-            posBR, decalSize, DEPTH_UI_GENERIC, 0, uvOriginBR, uvSizeBR, decalTopLeft.id, colorUi
-        );
-
-        // content page, 2 start
-        const posContentTL = m.Vec2.init(
-            marginX + decalMargin,
-            screenSizeF.y + gridSize * 2,
-        );
-        renderQueue.quadTexUvOffset(
-            posContentTL, decalSize, DEPTH_UI_GENERIC, 0, uvOriginTL, uvSizeTL, decalTopLeft.id, colorUi
-        );
-        const posContentTR = m.Vec2.init(
-            screenSizeF.x - marginX - decalMargin - decalSize.x,
-            screenSizeF.y + gridSize * 2,
-        );
-        renderQueue.quadTexUvOffset(
-            posContentTR, decalSize, DEPTH_UI_GENERIC, 0, uvOriginTR, uvSizeTR, decalTopLeft.id, colorUi
+        drawCrosshairCorners(
+            crosshairRectPos, crosshairRectSize, DEPTH_UI_GENERIC,
+            gridSize, decalTopLeft, screenSizeF, colorUi, &renderQueue
         );
     }
 
@@ -1009,7 +1024,8 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
         if (categoriesText.loaded()) {
             const categoriesSize = getTextureScaledSize(categoriesText.size, screenSizeF);
             const categoriesPos = m.Vec2.init(
-                marginX + gridSize * 5,
+                // marginX + gridSize * 5,
+                contentMarginX,
                 gridSize * 5,
             );
             renderQueue.quadTex(categoriesPos, categoriesSize, DEPTH_UI_GENERIC, 0, categoriesText.id, colorUi);
@@ -1046,8 +1062,9 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
         // sticker (main)
         const stickerSize = getTextureScaledSize(stickerMain.size, screenSizeF);
         const stickerPos = m.Vec2.init(
-            marginX + gridSize * 5.0,
-            screenSizeF.y - gridSize * 6 - stickerSize.y
+            // marginX + gridSize * 5.0,
+            contentMarginX,
+            screenSizeF.y - gridSize * 5 - stickerSize.y
         );
         const colorSticker = blk: {
             switch (state.pageData) {
@@ -1065,7 +1082,7 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
         // sticker (shiny)
         const stickerShinySize = getTextureScaledSize(stickerShiny.size, screenSizeF);
         const stickerShinyPos = m.Vec2.init(
-            screenSizeF.x - marginX - gridSize * 5.0 - stickerShinySize.x,
+            screenSizeF.x - crosshairMarginX - stickerShinySize.x,
             gridSize * 5.0
         );
         renderQueue.quadTex(stickerShinyPos, stickerShinySize, DEPTH_UI_GENERIC, 0, stickerShiny.id, m.Vec4.one);
@@ -1099,113 +1116,149 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
         }
     }
 
-    // rounded black frame
-    const framePos = m.Vec2.init(marginX + gridSize * 1, gridSize * 1);
-    const frameSize = m.Vec2.init(
-        screenSizeF.x - marginX * 2 - gridSize * 2,
-        screenSizeF.y - gridSize * 3,
-    );
-    renderQueue.roundedFrame(m.Vec2.zero, screenSizeF, DEPTH_UI_OVER1, framePos, frameSize, gridSize, colorBlack);
+    {
+        // rounded black frame
+        const framePos = m.Vec2.init(marginX + gridSize * 1, gridSize * 1);
+        const frameSize = m.Vec2.init(
+            screenSizeF.x - marginX * 2 - gridSize * 2,
+            screenSizeF.y - gridSize * 3,
+        );
+        renderQueue.roundedFrame(m.Vec2.zero, screenSizeF, DEPTH_UI_OVER1, framePos, frameSize, gridSize, colorBlack);
+    }
 
-    // ==== BELOW LANDING IMAGE ====
+    const section1Height = screenSizeF.y;
 
-    const separatorLinePos = m.Vec2.init(gridSize + marginX, screenSizeF.y);
-    const separatorLineSize = m.Vec2.init(screenSizeF.x - marginX * 2 - gridSize * 2, 1);
-    renderQueue.quad(separatorLinePos, separatorLineSize, DEPTH_UI_GENERIC, 0, colorUi);
+    // ==== SECOND FRAME ====
+
+    const section2Height = switch (state.pageData) {
+        .Home => screenSizeF.y * 3.0,
+        .Entry => gridSize * 4.0,
+    };
+    const secondFrameYScrolling = section1Height;
+    const secondFrameYStillForever = if (scrollYF >= section1Height) scrollYF else section1Height;
+    const secondFrameYStill = blk: {
+        switch (state.pageData) {
+            .Home => {
+                if (scrollYF >= section1Height) {
+                    if (scrollYF <= section1Height + section2Height - screenSizeF.y) {
+                        break :blk scrollYF;
+                    } else {
+                        break :blk section1Height + section2Height - screenSizeF.y;
+                    }
+                } else {
+                    break :blk section1Height;
+                }
+            },
+            .Entry => {
+                break :blk section1Height;
+            }
+        }
+    };
+
+    if (state.pageData == .Home) {
+        // draw moving gradient
+        const gradientColor = m.Vec4.init(86.0 / 255.0, 0.0, 214.0 / 255.0, 1.0);
+        const pos = m.Vec2.init(0.0, secondFrameYScrolling);
+        const size = m.Vec2.init(screenSizeF.x, section2Height - screenSizeF.y);
+        renderQueue.quadGradient(pos, size, DEPTH_LANDINGBACKGROUND, 0.0, gradientColor, gradientColor, colorBlack, colorBlack);
+
+        if (decalTopLeft.loaded()) {
+            const crosshairRectPos = m.Vec2.init(marginX, secondFrameYStill);
+            const crosshairRectSize = m.Vec2.init(screenSizeF.x - marginX * 2, screenSizeF.y);
+
+            drawCrosshairCorners(
+                crosshairRectPos, crosshairRectSize, DEPTH_UI_GENERIC,
+                gridSize, decalTopLeft, screenSizeF, colorUi, &renderQueue
+            );
+        }
+    }
+
+    // const start2LinePos = m.Vec2.init(crosshairMarginX, secondFrameYStill);
+    // const start2LineSize = m.Vec2.init(screenSizeF.x - crosshairMarginX * 2, 1);
+    // renderQueue.quad(start2LinePos, start2LineSize, DEPTH_UI_OVER2, 0, colorUi);
 
     const lineHeight = fontTextSize * 1.5;
-    var sectionSize: f32 = 0;
     switch (state.pageData) {
         .Home => {
+            const yorstoryCompany = state.assets.getStaticTextureData(Texture.YorstoryCompany);
+            if (yorstoryCompany.loaded()) {
+                const pos = m.Vec2.init(contentMarginX, secondFrameYStill + gridSize * 3.0);
+                const size = getTextureScaledSize(yorstoryCompany.size, screenSizeF);
+                renderQueue.quadTex(pos, size, DEPTH_UI_GENERIC, 0, yorstoryCompany.id, colorUi);
+            }
+
             const weAreStorytellers = state.assets.getStaticTextureData(Texture.WeAreStorytellers);
+            const weAreStorytellersText = state.assets.getStaticTextureData(Texture.WeAreStorytellersText);
             const logosAll = state.assets.getStaticTextureData(Texture.LogosAll);
             const symbolEye = state.assets.getStaticTextureData(Texture.SymbolEye);
 
-            if (weAreStorytellers.loaded() and logosAll.loaded() and symbolEye.loaded()) {
+            if (weAreStorytellers.loaded() and weAreStorytellersText.loaded() and symbolEye.loaded() and logosAll.loaded()) {
                 const wasSize = getTextureScaledSize(weAreStorytellers.size, screenSizeF);
                 const wasPos = m.Vec2.init(
-                    (screenSizeF.x - wasSize.x) / 2,
-                    screenSizeF.y + gridSize * 5
+                    contentMarginX - gridSize * 0.3,
+                    secondFrameYScrolling + gridSize * 8
                 );
                 renderQueue.quadTex(wasPos, wasSize, DEPTH_UI_GENERIC, 0, weAreStorytellers.id, colorUi);
 
+                const wasTextSize = getTextureScaledSize(weAreStorytellersText.size, screenSizeF);
+                const wasTextPos = m.Vec2.init(
+                    contentMarginX - gridSize * 0.3,
+                    secondFrameYStill + gridSize * 18
+                );
+                renderQueue.quadTex(wasTextPos, wasTextSize, DEPTH_UI_GENERIC, 0, weAreStorytellersText.id, colorUi);
+
                 const eyeSize = getTextureScaledSize(stickerCircle.size, screenSizeF);
                 const eyePos = m.Vec2.init(
-                    screenSizeF.x / 2 - gridSize * 8.6,
-                    screenSizeF.y + gridSize * 6.2
+                    wasPos.x + gridSize * 10.4,
+                    secondFrameYScrolling + gridSize * 6.95
                 );
-                const eyeStickerColor = m.Vec4.init(116.0 / 255.0, 19.0 / 255.0, 179.0 / 255.0, 1.0);
+                const eyeStickerColor = m.Vec4.init(0.0, 46.0 / 255.0, 226.0 / 255.0, 1.0);
                 renderQueue.quadTex(eyePos, eyeSize, DEPTH_UI_GENERIC - 0.01, 0, stickerCircle.id, eyeStickerColor);
                 renderQueue.quadTex(eyePos, eyeSize, DEPTH_UI_GENERIC - 0.02, 0, symbolEye.id, colorUi);
 
+                const logosPosYCheckpoint1 = section1Height + section2Height - screenSizeF.y * 2.0;
+                const logosPosYCheckpoint2 = section1Height + section2Height - screenSizeF.y;
+                const logosPosBaseY = blk: {
+                    if (scrollYF <= logosPosYCheckpoint1) {
+                        break :blk logosPosYCheckpoint1;
+                    } else if (scrollYF >= logosPosYCheckpoint2) {
+                        break :blk logosPosYCheckpoint2;
+                    } else {
+                        break :blk scrollYF;
+                    }
+                };
                 const logosSize = getTextureScaledSize(logosAll.size, screenSizeF);
                 const logosPos = m.Vec2.init(
                     (screenSizeF.x - logosSize.x) / 2,
-                    screenSizeF.y + gridSize * 18
+                    logosPosBaseY + gridSize * 9
                 );
                 renderQueue.quadTex(logosPos, logosSize, DEPTH_UI_GENERIC, 0, logosAll.id, colorUi);
             }
-
-            const textSubPos = m.Vec2.init(marginX + gridSize * 5.5, screenSizeF.y + gridSize * 14.5);
-            renderQueue.textBox(
-                "Yorstory is a creative development studio specializing in sequential art. We are storytellers with over 20 years of experience in the Television, Film, and Video Game industries. Our diverse experience has given us an unparalleled understanding of multiple mediums, giving us the tools to create a cohesive, story-centric vision, along with the visuals needed to create a shared understanding between multiple deparments or disciplines.",
-                textSubPos, screenSizeF.x - marginX * 2 - gridSize * 5.5 * 2,
-                fontTextSize, lineHeight, 0.0,
-                colorUi, "HelveticaMedium", .Left
-            );
-
-            sectionSize = gridSize * 18 + gridSize * 7;
         },
-        .Entry => {
-            sectionSize = gridSize * 4;
-        },
+        .Entry => {},
     }
 
-    // const textSubLeftPos = m.Vec2.init(
-    //     marginX + gridSize * 5.5,
-    //     screenSizeF.y
-    // );
-    // renderQueue.textBox(
-    //     "Yorstory is a creative development studio specializing in sequential art. We are storytellers with over 20 years of experience in the Television, Film, and Video Game industries.",
-    //     textSubLeftPos, gridSize * 13,
-    //     fontTextSize, lineHeight, 0.0,
-    //     colorUi, "HelveticaMedium", .Left
-    // );
-    // const textSubRightPos = m.Vec2.init(
-    //     marginX + gridSize * 19.5,
-    //     screenSizeF.y
-    // );
-    // renderQueue.textBox(
-    //     "Our diverse experience has given us an unparalleled understanding of multiple mediums, giving us the tools to create a cohesive, story-centric vision, along with the visuals needed to create a shared understanding between multiple deparments or disciplines.",
-    //     textSubRightPos, gridSize * 13,
-    //     fontTextSize, lineHeight, 0.0,
-    //     colorUi, "HelveticaMedium", .Left
-    // );
+    if (state.pageData == .Home) {
+        const end2LinePos = m.Vec2.init(crosshairMarginX, secondFrameYStill + screenSizeF.y);
+        const end2LineSize = m.Vec2.init(screenSizeF.x - crosshairMarginX * 2, 1);
+        renderQueue.quad(end2LinePos, end2LineSize, DEPTH_UI_OVER2, 0, colorUi);
+    }
 
-    // if (state.pageData == .Entry) {
-    //     const logoMicrosoft = state.assets.getStaticTextureData(Texture.LogoMicrosoft);
-    //     const logo343 = state.assets.getStaticTextureData(Texture.Logo343);
-    //     if (logoMicrosoft.loaded() and logo343.loaded()) {
-    //         const yBase = textSubRightPos.y + gridSize * 2.0;
-    //         const size343 = getTextureScaledSize(logo343.size, screenSizeF);
-    //         const pos343 = m.Vec2.init(
-    //             screenSizeF.x - marginX - gridSize * 5.5 - size343.x + gridSize * 0.5,
-    //             yBase - size343.y
-    //         );
-    //         renderQueue.quadTex(pos343, size343, 0.0, logo343.id, colorUi);
+    {
+        // rounded black frame
+        const framePos = m.Vec2.init(marginX + gridSize * 1, secondFrameYStill + gridSize * 1);
+        const frameSize = m.Vec2.init(
+            screenSizeF.x - marginX * 2 - gridSize * 2,
+            screenSizeF.y - gridSize * 3,
+        );
+        renderQueue.roundedFrame(m.Vec2.init(0.0, secondFrameYStill), screenSizeF, DEPTH_UI_OVER1, framePos, frameSize, gridSize, colorBlack);
+        _ = secondFrameYStillForever;
+    }
 
-    //         const sizeMicrosoft = getTextureScaledSize(logoMicrosoft.size, screenSizeF);
-    //         const posMicrosoft = m.Vec2.init(
-    //             pos343.x - gridSize * 3 - sizeMicrosoft.x,
-    //             yBase - sizeMicrosoft.y
-    //         );
-    //         renderQueue.quadTex(posMicrosoft, sizeMicrosoft, 0.0, logoMicrosoft.id, colorUi);
-
-    //     }
-    // }
+    // ==== REMAINDER FRAME ====
 
     // content section
-    const baseY = screenSizeF.y + sectionSize;
+    const baseY = section1Height + section2Height;
     const headerText = switch (state.pageData) {
         .Home => "projects",
         .Entry => "boarding the mechanics ***",
@@ -1216,7 +1269,7 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
     };
 
     const contentHeaderPos = m.Vec2.init(
-        marginX + gridSize * 5.5,
+        contentMarginX,
         baseY + gridSize * 3.0,
     );
     renderQueue.textLine(
@@ -1226,10 +1279,10 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
     );
 
     const contentSubPos = m.Vec2.init(
-        marginX + gridSize * 5.5,
+        contentMarginX,
         baseY + gridSize * 4.5,
     );
-    const contentSubWidth = screenSizeF.x - marginX * 2 - gridSize * 5.5 * 2;
+    const contentSubWidth = screenSizeF.x - contentMarginX * 2;
     renderQueue.textBox(
         subText,
         contentSubPos, contentSubWidth,
@@ -1270,7 +1323,7 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
         const pf = portfolio.PORTFOLIO_LIST[entryData.portfolioIndex];
         var images = std.ArrayList(GridImage).init(tempAllocator);
 
-        const x = marginX + gridSize * 5.5;
+        const x = contentMarginX;
         var y = baseY + gridSize * 9;
         var indexOffset: usize = 0; // TODO eh...
         for (pf.subprojects) |sub, i| {
@@ -1335,9 +1388,9 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
             const pf = portfolio.PORTFOLIO_LIST[entryData.portfolioIndex];
 
             if (pf.youtubeId) |youtubeId| {
-                const embedWidth = screenSizeF.x - marginX * 2 - gridSize * 5.5 * 2;
+                const embedWidth = screenSizeF.x - contentMarginX * 2;
                 const embedSize = m.Vec2.init(embedWidth, embedWidth / 2.0);
-                const embedPos = m.Vec2.init(marginX + gridSize * 5.5, yMax);
+                const embedPos = m.Vec2.init(contentMarginX, yMax);
                 renderQueue.embedYoutube(embedPos, embedSize, youtubeId);
                 yMax += embedSize.y + gridSize * 4;
             }
@@ -1347,7 +1400,7 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
     // projects
     if (state.pageData == .Entry) {
         const opos = m.Vec2.init(
-            marginX + gridSize * 5.5,
+            contentMarginX,
             yMax,
         );
         renderQueue.textLine(
@@ -1376,7 +1429,7 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
 
     const itemsPerRow = 3;
     const topLeft = m.Vec2.init(
-        marginX + gridSize * 5.5,
+        contentMarginX,
         yMax,
     );
     const spacing = gridSize * 0.25;
