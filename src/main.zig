@@ -1131,7 +1131,7 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
     // ==== SECOND FRAME ====
 
     const section2Height = switch (state.pageData) {
-        .Home => screenSizeF.y * 4.0,
+        .Home => screenSizeF.y * 3.5,
         .Entry => gridSize * 4.0,
     };
     const secondFrameYScrolling = section1Height;
@@ -1194,7 +1194,7 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
 
             if (weAreStorytellers.loaded() and weAreStorytellersText.loaded() and symbolEye.loaded() and logosAll.loaded()) {
                 const wasPosYCheckpoint1 = section1Height;
-                const wasPosYCheckpoint2 = section1Height + screenSizeF.y;
+                const wasPosYCheckpoint2 = section1Height + screenSizeF.y * 0.5;
                 const wasPosBaseY = blk: {
                     if (scrollYF <= wasPosYCheckpoint1) {
                         break :blk wasPosYCheckpoint1;
