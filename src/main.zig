@@ -99,6 +99,7 @@ const Texture = enum(usize) {
     MobileCrosshair,
     MobileIcons,
     MobileLogo,
+    MobileYorstoryCompany,
 
     StickerMainHome,
 };
@@ -507,6 +508,9 @@ const State = struct {
                 );
                 _ = try self.assets.register(.{ .Static = Texture.MobileLogo },
                     "/images/mobile/logo-and-stuff.png", defaultTextureWrap, defaultTextureFilter, 5
+                );
+                _ = try self.assets.register(.{ .Static = Texture.MobileYorstoryCompany },
+                    "/images/mobile/a-yorstory-company.png", defaultTextureWrap, defaultTextureFilter, 5
                 );
             },
             .Entry => {
@@ -1417,23 +1421,54 @@ fn drawMobile(state: *State, deltaS: f32, scrollY: f32, screenSize: m.Vec2, rend
 {
     _ = deltaS; _ = scrollY; _ = allocator;
 
+    const aspect = screenSize.x / screenSize.y;
     const gridSize = std.math.round(80.0 / 1920.0 * screenSize.y);
     std.log.info("{}", .{gridSize});
+
+    const backgroundTex = state.assets.getStaticTextureData(Texture.MobileBackground);
+    if (backgroundTex.loaded()) {
+        const backgroundSizeF = m.Vec2.initFromVec2i(backgroundTex.size);
+        const backgroundAspect = backgroundSizeF.x / backgroundSizeF.y;
+        const backgroundSize = if (backgroundAspect < aspect)
+            m.Vec2.init(screenSize.x, screenSize.x / backgroundSizeF.x * backgroundSizeF.y)
+            else
+            m.Vec2.init(screenSize.y / backgroundSizeF.y * backgroundSizeF.x, screenSize.y);
+        const backgroundPos = m.Vec2.init(
+            (screenSize.x - backgroundSize.x) / 2.0,
+            (screenSize.y - backgroundSize.y) / 2.0,
+        );
+        renderQueue.quadTex(backgroundPos, backgroundSize, DEPTH_LANDINGBACKGROUND, 0.0, backgroundTex.id, m.Vec4.one);
+    }
+
+    const yorTex = state.assets.getStaticTextureData(Texture.MobileYorstoryCompany);
+    if (yorTex.loaded()) {
+        const yorSize = getTextureScaledSize(yorTex.size, screenSize);
+        const yorPos = m.Vec2.init(
+            gridSize, gridSize * 5.8
+        );
+        renderQueue.quadTex(yorPos, yorSize, DEPTH_UI_GENERIC, 0.0, yorTex.id, m.Vec4.one);
+    }
+
+    const logoTex = state.assets.getStaticTextureData(Texture.MobileLogo);
+    if (logoTex.loaded()) {
+        const logoSize = getTextureScaledSize(logoTex.size, screenSize);
+        const logoPos = m.Vec2.init(
+            gridSize, screenSize.y - gridSize * 3.0 - logoSize.y
+        );
+        renderQueue.quadTex(logoPos, logoSize, DEPTH_UI_GENERIC, 0.0, logoTex.id, m.Vec4.one);
+    }
 
     const crosshairTex = state.assets.getStaticTextureData(Texture.MobileCrosshair);
     const iconsTex = state.assets.getStaticTextureData(Texture.MobileIcons);
     if (crosshairTex.loaded() and iconsTex.loaded()) {
-        const pos = m.Vec2.init(-gridSize, -gridSize);
-        const size = m.Vec2.init(screenSize.x + gridSize * 2.0, screenSize.y + gridSize * 2.0);
+        const crosshairOffset = gridSize * 0.25;
+        const pos = m.Vec2.init(-(gridSize + crosshairOffset), -(gridSize + crosshairOffset));
+        const size = m.Vec2.init(screenSize.x + gridSize * 2.0 + crosshairOffset * 2.0, screenSize.y + gridSize * 2.0 + crosshairOffset * 2.0);
         drawCrosshairCorners(pos, size, DEPTH_UI_GENERIC, gridSize, crosshairTex, screenSize, m.Vec4.one, renderQueue);
 
-        // const iconsSize = getTextureScaledSize(iconsTex.size, screenSize);
-        // const iconsPos = m.Vec2.init(screenSize.x - icons)
-    }
-
-    const backgroundTex = state.assets.getStaticTextureData(Texture.MobileBackground);
-    const logoTex = state.assets.getStaticTextureData(Texture.MobileLogo);
-    if (logoTex.loaded() and backgroundTex.loaded()) {
+        const iconsSize = getTextureScaledSize(iconsTex.size, screenSize);
+        const iconsPos = m.Vec2.init(screenSize.x - iconsSize.x - gridSize * 1.0, gridSize * 4.0);
+        renderQueue.quadTex(iconsPos, iconsSize, DEPTH_UI_GENERIC, 0.0, iconsTex.id, m.Vec4.one);
     }
 
     return @floatToInt(i32, screenSize.y);
