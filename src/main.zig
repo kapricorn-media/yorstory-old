@@ -1,6 +1,6 @@
 const std = @import("std");
 
-const assets = @import("assets.zig");
+const wasm_asset = @import("wasm_asset.zig");
 const m = @import("math.zig");
 const parallax = @import("parallax.zig");
 const portfolio = @import("portfolio.zig");
@@ -385,7 +385,7 @@ const State = struct {
     fbDepthRenderbuffer: c_uint,
     fb: c_uint,
 
-    assets: assets.Assets(Texture, 256),
+    assets: wasm_asset.Assets(Texture, 256),
 
     pageData: PageData,
     screenSizePrev: m.Vec2i,
@@ -429,7 +429,7 @@ const State = struct {
             .fbDepthRenderbuffer = 0,
             .fb = 0,
 
-            .assets = assets.Assets(Texture, 256).init(fbAllocator.allocator()),
+            .assets = wasm_asset.Assets(Texture, 256).init(fbAllocator.allocator()),
 
             .pageData = try uriToPageData(uri),
             .screenSizePrev = m.Vec2i.zero,
@@ -662,7 +662,7 @@ fn getImageUrlFromIndex(entryData: anytype, index: usize) ?[]const u8
     return null;
 }
 
-fn drawCrosshairCorners(pos: m.Vec2, size: m.Vec2, depth: f32, gridSize: f32, decalTopLeft: assets.TextureData, screenSize: m.Vec2, color: m.Vec4, renderQueue: *render.RenderQueue) void
+fn drawCrosshairCorners(pos: m.Vec2, size: m.Vec2, depth: f32, gridSize: f32, decalTopLeft: wasm_asset.TextureData, screenSize: m.Vec2, color: m.Vec4, renderQueue: *render.RenderQueue) void
 {
     const decalMargin = gridSize * 2;
     const decalSize = getTextureScaledSize(decalTopLeft.size, screenSize);

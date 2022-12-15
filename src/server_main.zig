@@ -196,6 +196,9 @@ const ChunkedPngStore = struct {
             if (entry.kind != .File) {
                 continue;
             }
+            if (!std.mem.endsWith(u8, entry.path, ".png")) {
+                continue;
+            }
 
             std.log.info("loading {s}", .{entry.path});
 
