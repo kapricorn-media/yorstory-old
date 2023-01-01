@@ -268,6 +268,11 @@ pub const Vec2 = packed struct {
         return Self.init(@intToFloat(f32, v.x), @intToFloat(f32, v.y));
     }
 
+    pub fn initFromVec2usize(v: Vec2usize) Self
+    {
+        return Self.init(@intToFloat(f32, v.x), @intToFloat(f32, v.y));
+    }
+
     pub fn eql(v1: Self, v2: Self) bool
     {
         return v1.x == v2.x and v1.y == v2.y;
