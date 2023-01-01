@@ -27,7 +27,7 @@ pub const PORTFOLIO_LIST = [_]Portfolio {
     .{
         .title = "HALO",
         .uri = "/halo",
-        .cover = "/images/HALO/attachbeam2/5.png",
+        .cover = "/images/HALO/cover.png",
         .landing = "/images/HALO/landing.png",
         .sticker = "/images/HALO/sticker-main.png",
         .parallaxIndex = 4,

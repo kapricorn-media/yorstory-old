@@ -36,6 +36,7 @@ const Texture = enum(usize) {
     LoadingGlyphs,
     LogosAll,
     Lut1,
+    ProjectSymbols,
     StickerCircle,
     StickerShiny,
     SymbolEye,
@@ -207,6 +208,9 @@ pub const State = struct {
                 _ = try self.assets.register(.{ .Static = Texture.LogosAll },
                     "/images/logos-all.png", defaultTextureWrap, defaultTextureFilter, 8
                 );
+                _ = try self.assets.register(.{ .Static = Texture.ProjectSymbols },
+                    "/images/project-symbols.png", defaultTextureWrap, defaultTextureFilter, 8
+                );
                 _ = try self.assets.register(.{ .Static = Texture.StickerMainHome },
                     "/images/sticker-main.png", defaultTextureWrap, defaultTextureFilter, 5
                 );
@@ -279,7 +283,8 @@ fn drawImageGrid(images: []const GridImage, indexOffset: usize, itemsPerRow: usi
         );
         if (state.assets.getTextureData(.{.DynamicUrl = img.uri})) |tex| {
             if (tex.loaded()) {
-                const cornerRadius = spacing * 2;
+                // const cornerRadius = spacing * 2;
+                const cornerRadius = 0;
                 renderQueue.quadTex(
                     itemPos, itemSize, DEPTH_GRIDIMAGE, cornerRadius, tex.id, m.Vec4.white
                 );
@@ -809,7 +814,7 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
     switch (state.pageData) {
         .Home => {
             const section3Start = section1Height + section2Height;
-            const section3Height = screenSizeF.y * 1.2;
+            const section3Height = screenSizeF.y * 1.1;
             const section3YScrolling = section3Start;
             const section3YStillForever = if (scrollYF >= section3Start) scrollYF else section3Start;
             const section3YStill = blk: {
@@ -866,6 +871,14 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
                 }) catch |err| {
                     std.log.err("image append failed {}", .{err});
                 };
+            }
+
+            const projectSymbols = state.assets.getStaticTextureData(Texture.ProjectSymbols);
+            if (projectSymbols.loaded()) {
+                const symbolsPos = m.Vec2.init(marginX + gridSize * 3.33, section3YStill + gridSize * 7.5);
+                const symbolsSize = getTextureScaledSize(projectSymbols.size, screenSizeF);
+                std.log.info("{}", .{symbolsSize});
+                renderQueue.quadTex(symbolsPos, symbolsSize, DEPTH_UI_GENERIC, 0, projectSymbols.id, colorUi);
             }
 
             const itemsPerRow = 3;
