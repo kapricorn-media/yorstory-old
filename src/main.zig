@@ -149,9 +149,9 @@ pub const State = struct {
 
         self.debug = false;
 
-        // _ = try self.assets.register(.{ .Static = asset.Texture.Lut1 },
-        //     "/images/LUTs/identity.png", defaultTextureWrap, defaultTextureFilter, 1
-        // );
+        _ = try self.assets.register(.{ .Static = asset.Texture.Lut1 },
+            "/images/LUTs/identity.png", defaultTextureWrap, defaultTextureFilter, 2
+        );
 
         _ = try self.assets.register(.{ .Static = asset.Texture.StickerCircle },
             "/images/sticker-circle.png", defaultTextureWrap, defaultTextureFilter, 2
@@ -623,10 +623,7 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
         renderQueue.quadTex(stickerShinyPos, stickerShinySize, DEPTH_UI_GENERIC, 0, stickerShiny.id, m.Vec4.white);
     } else {
         // show loading indicator, if that is loaded
-        std.log.info("{}", .{loadingGlyphs});
-        std.log.info("{}", .{stickerCircle});
         if (stickerCircle.loaded() and loadingGlyphs.loaded()) {
-            std.log.info("preload showing", .{});
             const circleSize = getTextureScaledSize(stickerCircle.size, screenSizeF);
             const circlePos = m.Vec2.init(
                 screenSizeF.x / 2.0 - circleSize.x / 2.0,
@@ -918,7 +915,6 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
                 renderQueue.quad(pos, screenSizeF, DEPTH_UI_OVER2, 0, m.Vec4.init(0.0, 0.0, 0.0, 1.0));
 
                 if (getImageUrlFromIndex(entryData, ind)) |imageUrl| {
-                    std.log.info("{s}", .{imageUrl});
                     if (state.assets.getTextureData(.{.DynamicUrl = imageUrl})) |imageTex| {
                         if (imageTex.loaded()) {
                             const imageRefSizeF = m.Vec2.initFromVec2i(imageTex.size);
@@ -1058,7 +1054,6 @@ fn drawMobile(state: *State, deltaS: f32, scrollY: f32, screenSize: m.Vec2, rend
 
     const aspect = screenSize.x / screenSize.y;
     const gridSize = std.math.round(80.0 / 1920.0 * screenSize.y);
-    std.log.info("{}", .{gridSize});
 
     const backgroundTex = state.assets.getStaticTextureData(asset.Texture.MobileBackground);
     if (backgroundTex.loaded()) {
@@ -1209,9 +1204,9 @@ export fn onAnimationFrame(memory: *core.Memory, width: c_int, height: c_int, sc
     w.bindNullFramebuffer();
     w.glClear(w.GL_COLOR_BUFFER_BIT | w.GL_DEPTH_BUFFER_BIT);
     const lut1 = state.assets.getStaticTextureData(asset.Texture.Lut1);
-    // if (lut1.loaded()) {
+    if (lut1.loaded()) {
         state.renderState.postProcessState.draw(state.fbTexture, lut1.id, screenSizeF);
-    // }
+    }
 
     const maxInflight = 4;
     state.assets.loadQueued(maxInflight);

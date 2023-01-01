@@ -55,7 +55,7 @@ void main()
     vec2 invScreenSize = 1.0 / u_screenSize;
 
     vec3 colorCenter = texture2D(u_sampler, v_uv).rgb;
-    vec3 colorLut = colorCenter;//applyLut(colorCenter, u_lutSampler);
+    vec3 colorLut = applyLut(colorCenter, u_lutSampler);
     gl_FragColor = vec4(colorLut, 1.0);
     return;
 

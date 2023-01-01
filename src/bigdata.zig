@@ -180,7 +180,7 @@ fn calculateChunkSize(imageSize: m.Vec2i, chunkSizeMax: usize) usize
 // 8, 4 => 2 | 7, 4 => 2 | 9, 4 => 3
 fn integerCeilingDivide(n: usize, s: usize) usize
 {
-    return ((n + 1) / s) + 1;
+    return @divTrunc(n + s - 1, s);
 }
 
 const StbCallbackData = struct {
@@ -311,4 +311,18 @@ fn pngToChunkedFormat(pngData: []const u8, chunkSizeMax: usize, allocator: std.m
 
         return outBuf.toOwnedSlice();
     }
+}
+
+fn testIntegerCeilingDivide(v1: usize, v2: usize, expectedResult: usize) !void
+{
+    const result = integerCeilingDivide(v1, v2);
+    try std.testing.expectEqual(expectedResult, result);
+}
+
+test "integerCeilingDivide"
+{
+    try testIntegerCeilingDivide(8, 4, 2);
+    try testIntegerCeilingDivide(7, 4, 2);
+    try testIntegerCeilingDivide(9, 4, 3);
+    try testIntegerCeilingDivide(4096 * 4096, 512 * 1024, 32);
 }

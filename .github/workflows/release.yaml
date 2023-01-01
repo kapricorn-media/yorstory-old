@@ -23,7 +23,7 @@ jobs:
         run: ~/zig-0.10.0/zig build -Dtarget=x86_64-linux -Drelease-fast=true test
 
       - name: build
-        run: ~/zig-0.10.0/zig build -Dtarget=x86_64-linux -Drelease-fast=true
+        run: ~/zig-0.10.0/zig build -Dtarget=x86_64-linux -Drelease-fast=true package
 
       - name: rename
         run: mv zig-out yorstory

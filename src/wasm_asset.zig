@@ -144,7 +144,6 @@ pub fn Assets(comptime StaticTextureEnum: type, comptime maxDynamicTextures: usi
         fn registerStaticTexture(self: *Self, texture: StaticTextureEnum, textureData: TextureData) !void
         {
             self.staticTextures[@enumToInt(texture)] = textureData;
-            std.log.info("{} set\nARG ARG {}\nNEW NEW {}", .{texture, textureData, self.staticTextures[@enumToInt(texture)]});
         }
 
         fn registerDynamicTexture(self: *Self, url: []const u8, textureData: TextureData) !usize

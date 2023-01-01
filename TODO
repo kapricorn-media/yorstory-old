@@ -1,11 +1,11 @@
 CRITICAL
 - font rasterizing is slow
+- finish & deploy LUT
 
 HIGH
-- gallery changes (layout)
-- number stickers font
+- parallax images are massive
+- gallery changes (layout + popup)
 - grid size3
-- lag on Chrome (getTextureData? memcpy??)
 
 MEDIUM
 - sticker on top of "we are storytellers"
@@ -13,15 +13,12 @@ MEDIUM
 - fix kerning
 - flare layer, opacity sine wave 100% <-> 20% 
 - lively details (react on hover, fade in as you scroll, etc)
-- mobile parallax ?
 - smarter should-redraw logic
-- release mode crash
-- better UI for gallery
 - space between "boarding the mechanics" and text should be the same as home (based on baseline, not pure text bounding box size)
 
 LOW
+- mobile parallax ?
 - grid images face cursor
 - film grain
-- LUT
 - animation of loading dots
 - numbers in project page are weird
