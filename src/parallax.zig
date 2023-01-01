@@ -168,6 +168,21 @@ pub const PARALLAX_SETS = [_]ParallaxSet {
             ParallaxImage.init("/images/parallax/newbg/9-tree-front2.png", 1.3),
         },
     },
+    .{
+        .bgColor = .{
+            .Color = colorHexToVec4("#000000") catch unreachable,
+        },
+        .images = &[_]ParallaxImage{
+            ParallaxImage.init("/images/parallax/newbg2/1-bg.png", 0.01),
+            ParallaxImage.init("/images/parallax/newbg2/2-glow1.png", 0.0),
+            ParallaxImage.init("/images/parallax/newbg2/3-lamps.png", 0.1),
+            ParallaxImage.init("/images/parallax/newbg2/4-person-back.png", 0.3),
+            ParallaxImage.init("/images/parallax/newbg2/5-person-front.png", 0.8),
+            ParallaxImage.init("/images/parallax/newbg2/6-smoke.png", 0.8),
+            ParallaxImage.init("/images/parallax/newbg2/7-glow2.png", 0.0),
+            ParallaxImage.init("/images/parallax/newbg2/8-map.png", 1.2),
+        },
+    },
 };
 
 pub fn tryLoadAndGetParallaxSet(assets: anytype, index: usize, priority: u32, textureWrap: c_uint, textureFilter: c_uint) ?*const ParallaxSet
