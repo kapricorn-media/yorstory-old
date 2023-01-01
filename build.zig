@@ -90,6 +90,7 @@ pub fn build(b: *std.build.Builder) void
     zig_http_build.addLibClient(server, target, "deps/zig-http");
     zig_http_build.addLibCommon(server, target, "deps/zig-http");
     zig_http_build.addLibServer(server, target, "deps/zig-http");
+    server.linkLibC();
     server.override_dest_dir = installDirRoot;
     server.install();
 
