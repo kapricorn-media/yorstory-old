@@ -125,15 +125,6 @@ pub fn build(b: *std.build.Builder) void
             .install_dir = installDirScripts,
             .install_subdir = "",
         });
-
-        const installDirStatic = std.build.InstallDir {
-            .custom = "static",
-        };
-        b.installDirectory(.{
-            .source_dir = "static",
-            .install_dir = installDirStatic,
-            .install_subdir = "",
-        });
     }
 
     const runTests = b.step("test", "Run tests");

@@ -79,9 +79,7 @@ fn serverCallback(
                 }
             }
 
-            if (std.mem.eql(u8, request.uri, "/") or isPortfolioUri) {
-                try server.writeFileResponse(writer, "static/wasm.html", allocator);
-            } else if (std.mem.eql(u8, request.uri, "/webgl_png")) {
+            if (std.mem.eql(u8, request.uri, "/webgl_png")) {
                 if (request.queryParams.len != 1) {
                     try server.writeCode(writer, ._400);
                     try server.writeEndHeader(writer);
@@ -107,11 +105,12 @@ fn serverCallback(
             } else if (std.mem.eql(u8, request.uri, "/yorstory.wasm")) {
                 try server.writeFileResponse(writer, WASM_PATH, allocator);
             } else {
+                const uri = if (std.mem.eql(u8, request.uri, "/") or isPortfolioUri) "/wasm.html" else request.uri;
                 if (config.DEBUG) {
                     // For faster iteration
-                    try server.serveStatic(writer, request.uri, "static", allocator);
+                    try server.serveStatic(writer, uri, "static", allocator);
                 } else {
-                    const data = state.map.get(request.uri) orelse {
+                    const data = state.map.get(uri) orelse {
                         try server.writeCode(writer, ._404);
                         try server.writeEndHeader(writer);
                         return;
