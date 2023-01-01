@@ -176,10 +176,10 @@ pub const State = struct {
             .debug = false,
         };
 
-        var tempAllocatorObj = core._memory.getTransientAllocator();
-        const tempAllocator = tempAllocatorObj.allocator();
+        // var tempAllocatorObj = core._memory.getTransientAllocator();
+        // const tempAllocator = tempAllocatorObj.allocator();
 
-        try self.assets.registerStaticFont(Font.HelveticaBold64, @embedFile("HelveticaNeueLTCom-Bd.ttf"), 64.0, tempAllocator);
+        // try self.assets.registerStaticFont(Font.HelveticaBold64, @embedFile("HelveticaNeueLTCom-Bd.ttf"), 64.0, tempAllocator);
 
         _ = try self.assets.register(.{ .Static = Texture.Lut1 },
             "/images/LUTs/identity.png", defaultTextureWrap, defaultTextureFilter, 1
@@ -878,7 +878,6 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
             if (projectSymbols.loaded()) {
                 const symbolsPos = m.Vec2.init(marginX + gridSize * 3.33, section3YStill + gridSize * 7.5);
                 const symbolsSize = getTextureScaledSize(projectSymbols.size, screenSizeF);
-                std.log.info("{}", .{symbolsSize});
                 renderQueue.quadTex(symbolsPos, symbolsSize, DEPTH_UI_GENERIC, 0, projectSymbols.id, colorUi);
             }
 
@@ -1288,9 +1287,9 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
     w.bindNullFramebuffer();
     w.glClear(w.GL_COLOR_BUFFER_BIT | w.GL_DEPTH_BUFFER_BIT);
     const lut1 = state.assets.getStaticTextureData(Texture.Lut1);
-    if (lut1.loaded()) {
+    // if (lut1.loaded()) {
         state.renderState.postProcessState.draw(state.fbTexture, lut1.id, screenSizeF);
-    }
+    // }
 
     const maxInflight = 4;
     state.assets.loadQueued(maxInflight);
