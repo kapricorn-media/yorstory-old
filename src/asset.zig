@@ -1,4 +1,4 @@
-pub const Texture = enum(usize) {
+pub const Texture = enum {
     DecalTopLeft,
     LoadingGlyphs,
     LogosAll,

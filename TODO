@@ -1,10 +1,5 @@
 CRITICAL
-- space between "boarding the mechanics" and text should be the same as home
-- grid with blank squares
-- "other projects" with a frame
-- number stickers on top of subtitle
 - font rasterizing is slow
-- "Projects" module should keep scrolling, not stop
 
 HIGH
 - gallery changes (layout)
@@ -22,6 +17,7 @@ MEDIUM
 - smarter should-redraw logic
 - release mode crash
 - better UI for gallery
+- space between "boarding the mechanics" and text should be the same as home (based on baseline, not pure text bounding box size)
 
 LOW
 - grid images face cursor

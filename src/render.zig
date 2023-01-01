@@ -4,7 +4,7 @@ const m = @import("math.zig");
 const w = @import("wasm_bindings.zig");
 const asset = @import("asset.zig"); // TODO: STOGLY
 
-pub fn text2Size(assets: anytype, text: []const u8, font: asset.Font) m.Vec2
+pub fn text2Rect(assets: anytype, text: []const u8, font: asset.Font) m.Rect
 {
     const fontData = assets.getStaticFontData(font);
 
@@ -35,7 +35,7 @@ pub fn text2Size(assets: anytype, text: []const u8, font: asset.Font) m.Vec2
         }
     }
 
-    return m.Vec2.sub(max, min);
+    return m.Rect.init(min, max);
 }
 
 const TextAlign = enum {

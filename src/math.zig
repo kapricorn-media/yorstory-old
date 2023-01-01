@@ -1,3 +1,5 @@
+const std = @import("std");
+
 pub fn lerpFloat(comptime T: type, v1: T, v2: T, t: f32) T
 {
     return v1 * (1.0 - t) + v2 * t;
@@ -12,6 +14,59 @@ pub fn isInsideRect(p: Vec2, rectOrigin: Vec2, rectSize: Vec2) bool
 {
     return p.x >= rectOrigin.x and p.x <= rectOrigin.x + rectSize.x
         and p.y >= rectOrigin.y and p.y <= rectOrigin.y + rectSize.y;
+}
+
+fn assertMathType(comptime T: type) void
+{
+    std.debug.assert(T == Vec2i or T == Vec2 or T == Vec3 or T == Vec4);
+}
+
+pub fn add(v1: anytype, v2: @TypeOf(v1)) @TypeOf(v1)
+{
+    const T = @TypeOf(v1);
+    assertMathType(T);
+
+    var result: T = undefined;
+    inline for (@typeInfo(T).Struct.fields) |f| {
+        @field(result, f.name) = @field(v1, f.name) + @field(v2, f.name);
+    }
+    return result;
+}
+
+pub fn sub(v1: anytype, v2: @TypeOf(v1)) @TypeOf(v1)
+{
+    const T = @TypeOf(v1);
+    assertMathType(T);
+
+    var result: T = undefined;
+    inline for (@typeInfo(T).Struct.fields) |f| {
+        @field(result, f.name) = @field(v1, f.name) - @field(v2, f.name);
+    }
+    return result;
+}
+
+pub fn max(v1: anytype, v2: @TypeOf(v1)) @TypeOf(v1)
+{
+    const T = @TypeOf(v1);
+    assertMathType(T);
+
+    var result: T = undefined;
+    inline for (@typeInfo(T).Struct.fields) |f| {
+        @field(result, f.name) = @max(@field(v1, f.name), @field(v2, f.name));
+    }
+    return result;
+}
+
+pub fn min(v1: anytype, v2: @TypeOf(v1)) @TypeOf(v1)
+{
+    const T = @TypeOf(v1);
+    assertMathType(T);
+
+    var result: T = undefined;
+    inline for (@typeInfo(T).Struct.fields) |f| {
+        @field(result, f.name) = @min(@field(v1, f.name), @field(v2, f.name));
+    }
+    return result;
 }
 
 pub const Vec2i = packed struct {
@@ -70,6 +125,22 @@ pub const Vec2i = packed struct {
     pub fn dot(v1: Self, v2: Self) f32
     {
         return v1.x * v2.x + v1.y * v2.y;
+    }
+
+    pub fn max(v1: Self, v2: Self) Self
+    {
+        return Self {
+            .x = @max(v1.x, v2.x),
+            .y = @max(v1.y, v2.y),
+        };
+    }
+
+    pub fn min(v1: Self, v2: Self) Self
+    {
+        return Self {
+            .x = @min(v1.x, v2.x),
+            .y = @min(v1.y, v2.y),
+        };
     }
 };
 
@@ -271,6 +342,26 @@ pub const Vec4 = packed struct {
     }
 };
 
+pub const Rect = packed struct {
+    min: Vec2,
+    max: Vec2,
+
+    const Self = @This();
+
+    pub fn init(vMin: Vec2, vMax: Vec2) Self
+    {
+        return Self {
+            .min = vMin,
+            .max = vMax,
+        };
+    }
+
+    pub fn size(self: Self) Vec2
+    {
+        return sub(self.max, self.min);
+    }
+};
+
 pub const Mat4x4 = packed struct {
     e: [4][4]f32,
 
@@ -294,3 +385,11 @@ pub const Mat4x4 = packed struct {
         return result;
     }
 };
+
+test "add"
+{
+    const v1 = Vec2i.init(1, 6);
+    const v2 = Vec2i.init(4, 5);
+    const result = add(v1, v2);
+    try std.testing.expectEqual(Vec2i.init(5, 11), result);
+}

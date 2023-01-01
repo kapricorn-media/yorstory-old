@@ -8,9 +8,12 @@ const stb = @cImport({
     @cInclude("stb_image_write.h");
 });
 
+const png = @import("png");
+
 const config = @import("config");
 const m = @import("math.zig");
 const portfolio = @import("portfolio.zig");
+const psd = @import("psd.zig");
 
 const WASM_PATH = if (config.DEBUG) "zig-out/yorstory.wasm" else "yorstory.wasm";
 const SERVER_IP = "0.0.0.0";
@@ -67,6 +70,63 @@ fn stbCallback(context: ?*anyopaque, data: ?*anyopaque, size: c_int) callconv(.C
     };
 }
 
+fn pixelDataToPngChunkedFormat(imageSize: m.Vec2i, channels: u8, pixelData: []const u8, chunkSize: usize, allocator: std.mem.Allocator) ![]const u8
+{
+    var outBuf = std.ArrayList(u8).init(allocator);
+    defer outBuf.deinit();
+
+    const sizeType = u64;
+    var widthBytes = try outBuf.addManyAsArray(@sizeOf(sizeType));
+    std.mem.writeIntBig(sizeType, widthBytes, @intCast(sizeType, imageSize.x));
+    var heightBytes = try outBuf.addManyAsArray(@sizeOf(sizeType));
+    std.mem.writeIntBig(sizeType, heightBytes, @intCast(sizeType, imageSize.y));
+    var chunkSizeBytes = try outBuf.addManyAsArray(@sizeOf(sizeType));
+    std.mem.writeIntBig(sizeType, chunkSizeBytes, chunkSize);
+
+    var pngDataBuf = std.ArrayList(u8).init(allocator);
+    defer pngDataBuf.deinit();
+
+    const imageSizeXUsize = @intCast(usize, imageSize.x);
+    if (chunkSize % imageSizeXUsize != 0) {
+        return error.ChunkSizeBadModulo;
+    }
+    const chunkRows = if (chunkSize == 0) @intCast(usize, imageSize.y) else chunkSize / imageSizeXUsize;
+    const dataSizePixels = @intCast(usize, imageSize.x * imageSize.y);
+    const n = if (chunkSize == 0) 1 else integerCeilingDivide(dataSizePixels, chunkSize);
+
+    var numChunksBytes = try outBuf.addManyAsArray(@sizeOf(sizeType));
+    std.mem.writeIntBig(sizeType, numChunksBytes, n);
+
+    var i: usize = 0;
+    while (i < n) : (i += 1) {
+        const rowStart = chunkRows * i;
+        const rowEnd = std.math.min(chunkRows * (i + 1), imageSize.y);
+        std.debug.assert(rowEnd > rowStart);
+        const rows = rowEnd - rowStart;
+
+        const chunkStart = rowStart * imageSizeXUsize * channels;
+        const chunkEnd = rowEnd * imageSizeXUsize * channels;
+        const chunkBytes = pixelData[chunkStart..chunkEnd];
+
+        pngDataBuf.clearRetainingCapacity();
+        var cbData = StbCallbackData {
+            .fail = false,
+            .writer = pngDataBuf.writer(),
+        };
+        const pngStride = imageSizeXUsize * channels;
+        const writeResult = stb.stbi_write_png_to_func(stbCallback, &cbData, imageSize.x, @intCast(c_int, rows), @intCast(c_int, channels), &chunkBytes[0], @intCast(c_int, pngStride));
+        if (writeResult == 0) {
+            return error.stbWriteFail;
+        }
+
+        var chunkLenBytes = try outBuf.addManyAsArray(@sizeOf(sizeType));
+        std.mem.writeIntBig(sizeType, chunkLenBytes, pngDataBuf.items.len);
+        try outBuf.appendSlice(pngDataBuf.items);
+    }
+
+    return outBuf.toOwnedSlice();
+}
+
 fn pngToChunkedFormat(pngData: []const u8, chunkSizeMax: usize, allocator: std.mem.Allocator) ![]const u8
 {
     const pngDataLenInt = @intCast(c_int, pngData.len);
@@ -83,18 +143,6 @@ fn pngToChunkedFormat(pngData: []const u8, chunkSizeMax: usize, allocator: std.m
     const imageSize = m.Vec2i.init(width, height);
     const chunkSize = calculateChunkSize(imageSize, chunkSizeMax);
 
-    var outBuf = std.ArrayList(u8).init(allocator);
-    defer outBuf.deinit();
-
-    const sizeType = u64;
-    var widthBytes = try outBuf.addManyAsArray(@sizeOf(sizeType));
-    std.mem.writeIntBig(sizeType, widthBytes, @intCast(sizeType, imageSize.x));
-    var heightBytes = try outBuf.addManyAsArray(@sizeOf(sizeType));
-    std.mem.writeIntBig(sizeType, heightBytes, @intCast(sizeType, imageSize.y));
-    var chunkSizeBytes = try outBuf.addManyAsArray(@sizeOf(sizeType));
-    std.mem.writeIntBig(sizeType, chunkSizeBytes, chunkSize);
-    std.log.info("{}x{}", .{imageSize.x, imageSize.y});
-
     if (chunkSize != 0) {
         var d = stb.stbi_load_from_memory(&pngData[0], @intCast(c_int, pngData.len), &width, &height, &channels, 0);
         if (d == null) {
@@ -106,57 +154,28 @@ fn pngToChunkedFormat(pngData: []const u8, chunkSizeMax: usize, allocator: std.m
         const dataSizePixels = @intCast(usize, imageSize.x * imageSize.y);
         const dataSizeBytes = dataSizePixels * channelsU8;
 
-        // Generate chunked PNG data
         const pixelData = d[0..dataSizeBytes];
-
-        var pngDataBuf = std.ArrayList(u8).init(allocator);
-        defer pngDataBuf.deinit();
-
-        const imageSizeXUsize = @intCast(usize, imageSize.x);
-        if (chunkSize % imageSizeXUsize != 0) {
-            return error.ChunkSizeBadModulo;
-        }
-        const chunkRows = chunkSize / imageSizeXUsize;
-        const n = integerCeilingDivide(dataSizePixels, chunkSize);
-
-        var numChunksBytes = try outBuf.addManyAsArray(@sizeOf(sizeType));
-        std.mem.writeIntBig(sizeType, numChunksBytes, n);
-
-        var i: usize = 0;
-        while (i < n) : (i += 1) {
-            const rowStart = chunkRows * i;
-            const rowEnd = std.math.min(chunkRows * (i + 1), imageSize.y);
-            std.debug.assert(rowEnd > rowStart);
-            const rows = rowEnd - rowStart;
-
-            const chunkStart = rowStart * imageSizeXUsize * channelsU8;
-            const chunkEnd = rowEnd * imageSizeXUsize * channelsU8;
-            const chunkBytes = pixelData[chunkStart..chunkEnd];
-
-            pngDataBuf.clearRetainingCapacity();
-            var cbData = StbCallbackData {
-                .fail = false,
-                .writer = pngDataBuf.writer(),
-            };
-            const pngStride = imageSizeXUsize * channelsU8;
-            const writeResult = stb.stbi_write_png_to_func(stbCallback, &cbData, imageSize.x, @intCast(c_int, rows), channels, &chunkBytes[0], @intCast(c_int, pngStride));
-            if (writeResult == 0) {
-                return error.stbWriteFail;
-            }
-
-            var chunkLenBytes = try outBuf.addManyAsArray(@sizeOf(sizeType));
-            std.mem.writeIntBig(sizeType, chunkLenBytes, pngDataBuf.items.len);
-            try outBuf.appendSlice(pngDataBuf.items);
-        }
+        return pixelDataToPngChunkedFormat(imageSize, channelsU8, pixelData, chunkSize, allocator);
     } else {
+        var outBuf = std.ArrayList(u8).init(allocator);
+        defer outBuf.deinit();
+
+        const sizeType = u64;
+        var widthBytes = try outBuf.addManyAsArray(@sizeOf(sizeType));
+        std.mem.writeIntBig(sizeType, widthBytes, @intCast(sizeType, imageSize.x));
+        var heightBytes = try outBuf.addManyAsArray(@sizeOf(sizeType));
+        std.mem.writeIntBig(sizeType, heightBytes, @intCast(sizeType, imageSize.y));
+        var chunkSizeBytes = try outBuf.addManyAsArray(@sizeOf(sizeType));
+        std.mem.writeIntBig(sizeType, chunkSizeBytes, chunkSize);
+
         var numChunksBytes = try outBuf.addManyAsArray(@sizeOf(sizeType));
         std.mem.writeIntBig(sizeType, numChunksBytes, 1);
         var chunkLenBytes = try outBuf.addManyAsArray(@sizeOf(sizeType));
         std.mem.writeIntBig(sizeType, chunkLenBytes, pngData.len);
         try outBuf.appendSlice(pngData);
-    }
 
-    return outBuf.toOwnedSlice();
+        return outBuf.toOwnedSlice();
+    }
 }
 
 const ChunkedPngStore = struct {
@@ -171,6 +190,7 @@ const ChunkedPngStore = struct {
             .allocator = allocator,
             .map = std.BufMap.init(allocator),
         };
+        errdefer self.deinit();
         try self.loadImages();
         return self;
     }
@@ -196,24 +216,60 @@ const ChunkedPngStore = struct {
             if (entry.kind != .File) {
                 continue;
             }
-            if (!std.mem.endsWith(u8, entry.path, ".png")) {
-                continue;
+
+            if (std.mem.endsWith(u8, entry.path, ".png")) {
+                // std.log.info("loading {s}", .{entry.path});
+
+                var arenaAllocator = std.heap.ArenaAllocator.init(self.allocator);
+                defer arenaAllocator.deinit();
+                const allocator = arenaAllocator.allocator();
+
+                // Read file data
+                const file = try dir.openFile(entry.path, .{});
+                defer file.close();
+                const fileData = try file.readToEndAlloc(allocator, 1024 * 1024 * 1024);
+                const chunked = try pngToChunkedFormat(fileData, CHUNK_SIZE_MAX, allocator);
+                const uri = try std.fmt.allocPrint(allocator, "/images/{s}", .{entry.path});
+                try self.map.put(uri, chunked);
+                // std.log.info("- done ({}K -> {}K)", .{fileData.len / 1024, chunked.len / 1024});
+            } else if (std.mem.endsWith(u8, entry.path, ".psd")) {
+                std.log.info("loading {s}", .{entry.path});
+                var arenaAllocator = std.heap.ArenaAllocator.init(self.allocator);
+                defer arenaAllocator.deinit();
+                const allocator = arenaAllocator.allocator();
+
+                // Read file data
+                const file = try dir.openFile(entry.path, .{});
+                defer file.close();
+                const fileData = try file.readToEndAlloc(allocator, 1024 * 1024 * 1024);
+
+                var psdFile: psd.PsdFile = undefined;
+                try psdFile.load(fileData, allocator);
+                for (psdFile.layers) |l, i| {
+                    const dashInd = std.mem.indexOfScalar(u8, l.name, '-') orelse continue;
+                    const pre = l.name[0..dashInd];
+                    var allNumbers = true;
+                    for (pre) |c| {
+                        if (!('0' <= c and c <= '9')) {
+                            allNumbers = false;
+                            break;
+                        }
+                    }
+                    if (!allNumbers) continue;
+
+                    const layerPixelData = try psdFile.getLayerPixelData(i, null, allocator);
+                    std.log.info("layer {} - {s}", .{i, l.name});
+                    std.log.info("{}", .{layerPixelData.topLeft});
+                    std.log.info("{}", .{layerPixelData.size});
+                    std.log.info("{}", .{layerPixelData.channels});
+                    const chunkSize = calculateChunkSize(layerPixelData.size, CHUNK_SIZE_MAX);
+                    const chunked = try pixelDataToPngChunkedFormat(layerPixelData.size, layerPixelData.channels, layerPixelData.data, chunkSize, allocator);
+                    const outputDir = entry.path[0..entry.path.len - 4];
+                    const uri = try std.fmt.allocPrint(allocator, "/images/{s}/{s}.png", .{outputDir, l.name});
+                    try self.map.put(uri, chunked);
+                    std.log.info("wrote chunked layer as {s}", .{uri});
+                }
             }
-
-            std.log.info("loading {s}", .{entry.path});
-
-            var arenaAllocator = std.heap.ArenaAllocator.init(self.allocator);
-            defer arenaAllocator.deinit();
-            const allocator = arenaAllocator.allocator();
-
-            // Read file data
-            const file = try dir.openFile(entry.path, .{});
-            defer file.close();
-            const fileData = try file.readToEndAlloc(allocator, 1024 * 1024 * 1024);
-            const chunked = try pngToChunkedFormat(fileData, CHUNK_SIZE_MAX, allocator);
-            const uri = try std.fmt.allocPrint(allocator, "/images/{s}", .{entry.path});
-            try self.map.put(uri, chunked);
-            std.log.info("- done ({}K -> {}K)", .{fileData.len / 1024, chunked.len / 1024});
         }
     }
 };

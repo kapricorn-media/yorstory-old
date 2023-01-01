@@ -20,6 +20,7 @@ pub fn build(b: *std.build.Builder) void
     server.setTarget(target);
     const configSrc = if (isDebug) "src/config_debug.zig" else "src/config_release.zig";
     server.addPackagePath("config", configSrc);
+    server.addPackagePath("png", "src/png.zig");
     zig_bearssl_build.addLib(server, target, "deps/zig-bearssl");
     zig_http_build.addLibClient(server, target, "deps/zig-http");
     zig_http_build.addLibCommon(server, target, "deps/zig-http");
@@ -50,27 +51,29 @@ pub fn build(b: *std.build.Builder) void
     wasm.override_dest_dir = installDirRoot;
     wasm.install();
 
-    const installDirScripts = std.build.InstallDir {
-        .custom = "scripts",
-    };
-    b.installDirectory(.{
-        .source_dir = "scripts",
-        .install_dir = installDirScripts,
-        .install_subdir = "",
-    });
+    if (!isDebug) {
+        const installDirScripts = std.build.InstallDir {
+            .custom = "scripts",
+        };
+        b.installDirectory(.{
+            .source_dir = "scripts",
+            .install_dir = installDirScripts,
+            .install_subdir = "",
+        });
 
-    const installDirStatic = std.build.InstallDir {
-        .custom = "static",
-    };
-    b.installDirectory(.{
-        .source_dir = "static",
-        .install_dir = installDirStatic,
-        .install_subdir = "",
-    });
+        const installDirStatic = std.build.InstallDir {
+            .custom = "static",
+        };
+        b.installDirectory(.{
+            .source_dir = "static",
+            .install_dir = installDirStatic,
+            .install_subdir = "",
+        });
+    }
 
     const runTests = b.step("test", "Run tests");
     const testSrcs = [_][]const u8 {
-        "src/server_main.zig",
+        "src/math.zig",
     };
     for (testSrcs) |src| {
         const tests = b.addTest(src);
@@ -86,6 +89,7 @@ pub fn build(b: *std.build.Builder) void
     const genLut = b.addExecutable("gen_lut", "src/tools/gen_lut.zig");
     genLut.setBuildMode(mode);
     genLut.setTarget(target);
+    genLut.addPackagePath("png", "src/png.zig");
     genLut.addIncludePath("deps/stb");
     genLut.addCSourceFiles(&[_][]const u8{
         "deps/stb/stb_image_write_impl.c"
@@ -93,4 +97,17 @@ pub fn build(b: *std.build.Builder) void
     genLut.linkLibC();
     genLut.override_dest_dir = installDirRoot;
     genLut.install();
+
+    const genBigdata = b.addExecutable("gen_bigdata", "src/tools/gen_bigdata.zig");
+    genBigdata.setBuildMode(mode);
+    genBigdata.setTarget(target);
+    genBigdata.addPackagePath("bigdata", "src/bigdata.zig");
+    genBigdata.addIncludePath("deps/stb");
+    genBigdata.addCSourceFiles(&[_][]const u8{
+        "deps/stb/stb_image_impl.c",
+        "deps/stb/stb_image_write_impl.c",
+    }, &[_][]const u8{"-std=c99"});
+    genBigdata.linkLibC();
+    genBigdata.override_dest_dir = installDirRoot;
+    genBigdata.install();
 }
