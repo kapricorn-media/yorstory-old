@@ -814,7 +814,7 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
     switch (state.pageData) {
         .Home => {
             const section3Start = section1Height + section2Height;
-            const section3Height = screenSizeF.y * 1.1;
+            const section3Height = screenSizeF.y * 1.3;
             const section3YScrolling = section3Start;
             const section3YStillForever = if (scrollYF >= section3Start) scrollYF else section3Start;
             const section3YStill = blk: {
@@ -854,11 +854,12 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
 
             const contentHeaderPos = m.Vec2.init(
                 contentMarginX,
-                section3Start + gridSize * (11.0 - 0.33),
+                section3Start + gridSize * (15.0 - 0.33),
             );
+            const fontSize = 180 / refSize.y * screenSizeF.y;
             renderQueue.textLine(
                 "Projects",
-                contentHeaderPos, fontStickerSize, -gridSize * 0.05,
+                contentHeaderPos, fontSize, -gridSize * 0.05,
                 colorUi, "HelveticaBold"
             );
 
@@ -884,7 +885,7 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
             const itemsPerRow = 3;
             const topLeft = m.Vec2.init(
                 contentMarginX,
-                section3Start + gridSize * 13.0,
+                section3Start + gridSize * 17.0,
             );
             const spacing = gridSize * 0.25;
             const gridWidth = screenSizeF.x - contentMarginX * 2;
