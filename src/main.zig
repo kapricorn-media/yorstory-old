@@ -883,7 +883,7 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
                 renderQueue.text2(sub.name, m.Vec2.init(x, yGallery), DEPTH_UI_GENERIC, asset.Font.Subtitle, colorUi);
                 yGallery += -subNameRect.min.y + gridSize * 2.0;
 
-                const subDescriptionRect = render.text2Rect(&state.assets, sub.name, asset.Font.Subtitle);
+                const subDescriptionRect = render.text2Rect(&state.assets, sub.description, asset.Font.Text);
                 renderQueue.text2(sub.description, m.Vec2.init(x, yGallery), DEPTH_UI_GENERIC, asset.Font.Text, colorUi);
                 yGallery += -subDescriptionRect.min.y + gridSize * 2.0;
 
