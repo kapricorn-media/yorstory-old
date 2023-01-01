@@ -23,5 +23,7 @@ pub const Texture = enum(usize) {
 
 pub const Font = enum {
     Title,
+    Subtitle,
     Text,
+    // Number,
 };

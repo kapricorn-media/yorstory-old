@@ -388,8 +388,8 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
     const mousePosF = m.Vec2.initFromVec2i(state.mouseState.pos);
     var mouseHoverGlobal = false;
 
-    const fontStickerSize = 124 / refSize.y * screenSizeF.y;
-    const fontSubtitleSize = 84 / refSize.y * screenSizeF.y;
+    // const fontStickerSize = 124 / refSize.y * screenSizeF.y;
+    // const fontSubtitleSize = 84 / refSize.y * screenSizeF.y;
     const fontTextSize = 30 / refSize.y * screenSizeF.y;
     const gridSize = std.math.round(gridRefSize / refSize.y * screenSizeF.y);
 
@@ -413,12 +413,26 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
             std.log.err("registerStaticFont failed err={}", .{err});
         };
 
+        const subtitleFontSize = gridSize * 1.25;
+        const subtitleKerning = -gridSize * 0.05;
+        const subtitleLineHeight = subtitleFontSize;
+        state.assets.registerStaticFont(asset.Font.Subtitle, @embedFile("HelveticaNeueLTCom-Lt.ttf"), subtitleFontSize, subtitleKerning, subtitleLineHeight, allocator) catch |err| {
+            std.log.err("registerStaticFont failed err={}", .{err});
+        };
+
         const textFontSize = gridSize * 0.4;
         const textKerning = 0;
         const textLineHeight = textFontSize * 1.4;
         state.assets.registerStaticFont(asset.Font.Text, @embedFile("HelveticaNeueLTCom-Md.ttf"), textFontSize, textKerning, textLineHeight, allocator) catch |err| {
             std.log.err("registerStaticFont failed err={}", .{err});
         };
+
+        // const numberFontSize = gridSize * 1.8;
+        // const numberKerning = 0;
+        // const numberLineHeight = numberFontSize;
+        // state.assets.registerStaticFont(asset.Font.Number, @embedFile("HelveticaNeueLTCom-Bd.ttf"), numberFontSize, numberKerning, numberLineHeight, allocator) catch |err| {
+        //     std.log.err("registerStaticFont failed err={}", .{err});
+        // };
     }
 
     var allIconsLoaded = true;
@@ -810,6 +824,7 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
     };
 
     var yMax: f32 = 0;
+    const contentSubWidth = screenSizeF.x - contentMarginX * 2;
     switch (state.pageData) {
         .Home => {
             const section3Start = section1Height + section2Height;
@@ -882,8 +897,7 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
                 section3Start + gridSize * 14.0,
             );
             const spacing = gridSize * 0.25;
-            const gridWidth = screenSizeF.x - contentMarginX * 2;
-            const y = drawImageGrid(images.items, 0, itemsPerRow, topLeft, gridWidth, spacing, fontTextSize, colorUi, state, scrollYF, &mouseHoverGlobal, renderQueue, CB.home);
+            const y = drawImageGrid(images.items, 0, itemsPerRow, topLeft, contentSubWidth, spacing, fontTextSize, colorUi, state, scrollYF, &mouseHoverGlobal, renderQueue, CB.home);
 
             {
                 // rounded black frame
@@ -903,44 +917,43 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
         .Entry => |entryData| {
             // content section
             const baseY = section1Height + section2Height;
-            const lineHeight = fontTextSize * 1.5;
+            // const lineHeight = fontTextSize * 1.5;
 
             const pf = portfolio.PORTFOLIO_LIST[entryData.portfolioIndex];
-            const contentHeader = pf.contentHeader;
-            const contentDescription = pf.contentDescription;
 
             const contentHeaderPos = m.Vec2.init(
                 contentMarginX,
-                baseY + gridSize * 3.0,
+                baseY + gridSize * 4.0,
             );
-            renderQueue.text2(contentHeader, contentHeaderPos, DEPTH_UI_GENERIC, asset.Font.Title, colorUi);
-            renderQueue.textLine(
-                contentHeader,
-                contentHeaderPos, fontStickerSize, 0.0,
-                colorUi, "HelveticaBold"
-            );
+            renderQueue.text2(pf.contentHeader, contentHeaderPos, DEPTH_UI_GENERIC, asset.Font.Title, colorUi);
+            const headerSizeYExtra = gridSize * 3 * @intToFloat(f32, std.mem.count(u8, pf.contentHeader, "\n"));
+            // renderQueue.textLine(
+            //     pf.contentHeader,
+            //     contentHeaderPos, fontStickerSize, 0.0,
+            //     colorUi, "HelveticaBold"
+            // );
 
             const contentSubPos = m.Vec2.init(
                 contentMarginX,
-                baseY + gridSize * 4.5,
+                contentHeaderPos.y + headerSizeYExtra + gridSize * 2.0,
             );
-            const contentSubWidth = screenSizeF.x - contentMarginX * 2;
-            renderQueue.textBox(
-                contentDescription,
-                contentSubPos, contentSubWidth,
-                fontTextSize, lineHeight, 0.0,
-                colorUi, "HelveticaMedium", .Left
-            );
+            renderQueue.text2(pf.contentDescription, contentSubPos, DEPTH_UI_GENERIC, asset.Font.Text, colorUi);
+            // renderQueue.textBox(
+            //     pf.contentDescription,
+            //     contentSubPos, contentSubWidth,
+            //     fontTextSize, lineHeight, 0.0,
+            //     colorUi, "HelveticaMedium", .Left
+            // );
 
-            yMax = baseY + gridSize * 6.5;
+            yMax = contentSubPos.y + gridSize * 4.0;
 
             var galleryImages = std.ArrayList(GridImage).init(allocator);
 
             const x = contentMarginX;
-            var yGallery = baseY + gridSize * 9;
+            var yGallery = yMax;
             var indexOffset: usize = 0; // TODO eh...
             for (pf.subprojects) |sub, i| {
-                const numberSizeIsh = gridSize * 2.16;
+                // const numberSizeIsh = gridSize * 2.16;
                 const numberSize = getTextureScaledSize(stickerCircle.size, screenSizeF);
                 const numberPos = m.Vec2.init(
                     marginX + gridSize * 2.5,
@@ -953,23 +966,26 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
                 }
                 const numStr = std.fmt.allocPrint(allocator, "{}", .{i + 1}) catch unreachable;
                 const numberTextPos = m.Vec2.init(
-                    numberPos.x + gridSize * 0.1,
-                    numberPos.y + gridSize * 0.1
+                    numberPos.x + numberSize.x / 3,
+                    numberPos.y + numberSize.y * 0.7
                 );
-                const numberLineHeight = numberSizeIsh;
-                renderQueue.textBox(
-                    numStr, numberTextPos, numberSizeIsh, fontStickerSize, numberLineHeight, 0.0,
-                    m.Vec4.black, "HelveticaBold", .Center
-                );
+                // const numberLineHeight = numberSizeIsh;
+                renderQueue.text2(numStr, numberTextPos, DEPTH_UI_GENERIC - 0.01, asset.Font.Subtitle, m.Vec4.black);
+                // renderQueue.textBox(
+                //     numStr, numberTextPos, numberSizeIsh, fontStickerSize, numberLineHeight, 0.0,
+                //     m.Vec4.black, "HelveticaBold", .Center
+                // );
 
-                renderQueue.textLine(
-                    sub.name, m.Vec2.init(x, yGallery), fontSubtitleSize, 0.0, colorUi, "HelveticaLight"
-                );
+                renderQueue.text2(sub.name, m.Vec2.init(x, yGallery), DEPTH_UI_GENERIC, asset.Font.Subtitle, colorUi);
+                // renderQueue.textLine(
+                //     sub.name, m.Vec2.init(x, yGallery), fontSubtitleSize, 0.0, colorUi, "HelveticaLight"
+                // );
                 yGallery += gridSize * 1;
 
-                renderQueue.textBox(
-                    sub.description, m.Vec2.init(x, yGallery), contentSubWidth, fontTextSize, lineHeight, 0.0, colorUi, "HelveticaMedium", .Left
-                );
+                renderQueue.text2(sub.description, m.Vec2.init(x, yGallery), DEPTH_UI_GENERIC, asset.Font.Text, colorUi);
+                // renderQueue.textBox(
+                //     sub.description, m.Vec2.init(x, yGallery), contentSubWidth, fontTextSize, lineHeight, 0.0, colorUi, "HelveticaMedium", .Left
+                // );
                 yGallery += gridSize * 2;
 
                 galleryImages.clearRetainingCapacity();
@@ -1002,17 +1018,14 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
                 yMax += embedSize.y + gridSize * 4;
             }
 
+            yMax += gridSize * 1;
+
             // projects
             const opos = m.Vec2.init(
                 contentMarginX,
                 yMax,
             );
             renderQueue.text2("other projects", opos, DEPTH_UI_GENERIC, asset.Font.Title, colorUi);
-            renderQueue.textLine(
-                "other projects",
-                opos, fontStickerSize, 0.0,
-                colorUi, "HelveticaBold"
-            );
 
             yMax += gridSize * 2;
 

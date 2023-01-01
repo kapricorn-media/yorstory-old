@@ -36,7 +36,7 @@ pub const PORTFOLIO_LIST = [_]Portfolio {
         .youtubeId = null,
         // .contentHeader = "boarding\nthe mechanics ***",
         .contentHeader = "boarding\nthe mechanics",
-        .contentDescription = "In 2010, Yorstory partnered with Microsoft/343 Studios to join one of the video game industry's most iconic franchises - Halo. Working with the team's weapons and mission designers, we were tasked with helping visualize some of the game's weapons and idealized gameplay scenarios. The result was an exciting blend of enthusiasm sci-fi mayhem, starring the infamous Master Chief.",
+        .contentDescription = "In 2010, Yorstory partnered with Microsoft/343 Studios to join one of the video game industry's most iconic franchises - Halo. Working with the team's weapons and mission designers,\nwe were tasked with helping visualize some of the game's weapons and idealized gameplay scenarios. The result was an exciting blend of enthusiasm sci-fi mayhem,\nstarring the infamous Master Chief.",
         .subprojects = &[_]Subproject {
             .{
                 .name = "ATTACH BEAM",
@@ -58,7 +58,7 @@ pub const PORTFOLIO_LIST = [_]Portfolio {
             },
             .{
                 .name = "ATTACH BEAM II",
-                .description = "Anyone who has played Halo knows that there's a lot of vehicular combat. Using the Attach Beam, a player connects a tether to their opponent's vehicle. Once connected, a player is able to deliver a series of pulses to destroy their enemy's vehicle.",
+                .description = "Anyone who has played Halo knows that there's a lot of vehicular combat. Using the Attach Beam, a player connects a tether to their opponent's vehicle.\nOnce connected, a player is able to deliver a series of pulses to destroy their enemy's vehicle.",
                 .images = &[_][]const u8{
                     "/images/HALO/attachbeam2/1.png",
                     "/images/HALO/attachbeam2/2.png",
@@ -226,7 +226,7 @@ pub const PORTFOLIO_LIST = [_]Portfolio {
             },
             .{
                 .name = "Act 3",
-                .description = "Thanos catches up with Spiderman, wounded and now on his last legs. Before the killing blow can be struck, the Civil Warrior arrives with the cavalry.  Spiderman reveals that he has been carrying one of the lost infinity stones this entire time!  As the team of heroes are able to push Thanos back, Spiderman flees with the stone, inciting the Mad Titan's Wrath!",
+                .description = "Thanos catches up with Spiderman, wounded and now on his last legs. Before the killing blow can be struck, the Civil Warrior arrives with the cavalry.\nSpiderman reveals that he has been carrying one of the lost infinity stones this entire time! As the team of heroes are able to push Thanos back, Spiderman flees with the stone,\ninciting the Mad Titan's Wrath!",
                 .images = &[_][]const u8{
                     "/images/marvel/all/Mad_Titan_0071_72.png",
                     "/images/marvel/all/Mad_Titan_0073_74.png",

@@ -1,11 +1,8 @@
 CRITICAL
 
 HIGH
-- in project page, "other projects" and fix all fonts
-- line before "other projects"
-
 - gallery changes (layout)
-- number stickers off center
+- number stickers font
 - grid size3
 - lag on Chrome (getTextureData? memcpy??)
 
