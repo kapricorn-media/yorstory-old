@@ -133,7 +133,7 @@ pub fn generate(dirPath: []const u8, allocator: std.mem.Allocator) ![]const u8
                     .uri = uri,
                     .data = chunked,
                 });
-                std.log.info("wrote chunked layer as {s} ({}K)", .{uri, chunked.len});
+                std.log.info("wrote chunked layer as {s} ({}K)", .{uri, chunked.len / 1024});
             }
         } else {
             try entries.append(Entry {

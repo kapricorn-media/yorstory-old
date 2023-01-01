@@ -34,7 +34,6 @@ pub const PORTFOLIO_LIST = [_]Portfolio {
         .colorUi = m.Vec4.init(0.0, 220.0 / 255.0, 164.0 / 255.0, 1.0),
         .colorSticker = m.Vec4.init(0.0, 220.0 / 255.0, 164.0 / 255.0, 1.0),
         .youtubeId = null,
-        // .contentHeader = "boarding\nthe mechanics ***",
         .contentHeader = "boarding\nthe mechanics",
         .contentDescription = "In 2010, Yorstory partnered with Microsoft/343 Studios to join one of the video game industry's most iconic franchises - Halo. Working with the team's weapons and mission designers,\nwe were tasked with helping visualize some of the game's weapons and idealized gameplay scenarios. The result was an exciting blend of enthusiasm sci-fi mayhem,\nstarring the infamous Master Chief.",
         .subprojects = &[_]Subproject {

@@ -94,7 +94,7 @@ pub const LayerData = struct {
             };
 
             switch (c.dataFormat) {
-                // .Raw => readPixelDataRaw(&pixelData, channelOffset, self.topLeft, self.size, c.data),
+                .Raw => readPixelDataRaw(c.data, self.size, sliceSrc, buf, sliceDstAdjusted, channelOffset),
                 .RLE => try readPixelDataLRE(c.data, self.size, sliceSrc, buf, sliceDstAdjusted, channelOffset),
                 else => return error.UnsupportedDataFormat,
             }
@@ -303,23 +303,28 @@ pub const PsdFile = struct {
     }
 };
 
-// fn readPixelDataRaw(pixelData: *PixelData, channelOffset: usize, layerTopLeft: m.Vec2i, layerSize: m.Vec2usize, data: []const u8) void
-// {
-//     const layerOffsetX = @intCast(usize, pixelData.topLeft.x - layerTopLeft.x);
-//     const layerOffsetY = @intCast(usize, pixelData.topLeft.y - layerTopLeft.y);
-//     const width = @intCast(usize, pixelData.size.x);
-//     const height = @intCast(usize, pixelData.size.y);
+fn readPixelDataRaw(data: []const u8, layerSize: m.Vec2usize, sliceSrc: image.PixelDataSlice, buf: image.PixelData, sliceDst: image.PixelDataSlice, channelOffset: usize) void
+{
+    std.debug.assert(m.eql(sliceSrc.size, sliceDst.size));
+    const srcMax = m.add(sliceSrc.topLeft, sliceSrc.size);
+    std.debug.assert(srcMax.x <= layerSize.x and srcMax.y <= layerSize.y);
 
-//     var y: usize = 0;
-//     while (y < height) : (y += 1) {
-//         var x: usize = 0;
-//         while (x < width) : (x += 1) {
-//             const inIndex = (layerOffsetY + y) * layerSize.x + layerOffsetX + x;
-//             const outIndex = (y * width + x) * pixelData.channels + channelOffset;
-//             pixelData.data[outIndex] = data[inIndex];
-//         }
-//     }
-// }
+    var y: usize = 0;
+    while (y < sliceSrc.size.y) : (y += 1) {
+        const yIn = sliceSrc.topLeft.y + y;
+        const yOut = sliceDst.topLeft.y + y;
+
+        var x: usize = 0;
+        while (x < sliceSrc.size.x) : (x += 1) {
+            const xIn = sliceSrc.topLeft.x + x;
+            const xOut = sliceDst.topLeft.x + x;
+
+            const inIndex = yIn * layerSize.x + xIn;
+            const outIndex = (yOut * buf.size.x + xOut) * buf.channels + channelOffset;
+            buf.data[outIndex] = data[inIndex];
+        }
+    }
+}
 
 fn readRowLength(rowLengths: []const u8, row: usize) u16
 {
