@@ -186,12 +186,6 @@ pub const State = struct {
                 _ = try self.assets.register(.{ .Static = asset.Texture.SymbolEye },
                     "/images/symbol-eye.png", defaultTextureWrap, defaultTextureFilter, 5
                 );
-                _ = try self.assets.register(.{ .Static = asset.Texture.WeAreStorytellers },
-                    "/images/we-are-storytellers.png", defaultTextureWrap, defaultTextureFilter, 5
-                );
-                _ = try self.assets.register(.{ .Static = asset.Texture.WeAreStorytellersText },
-                    "/images/we-are-storytellers-text.png", defaultTextureWrap, defaultTextureFilter, 5
-                );
                 _ = try self.assets.register(.{ .Static = asset.Texture.YorstoryCompany },
                     "/images/a-yorstory-company.png", defaultTextureWrap, defaultTextureFilter, 5
                 );
@@ -236,7 +230,7 @@ const GridImage = struct {
     goToUri: ?[]const u8,
 };
 
-fn drawImageGrid(images: []const GridImage, indexOffset: usize, itemsPerRow: usize, topLeft: m.Vec2, width: f32, spacing: f32, fontSize: f32, fontColor: m.Vec4, state: *State, scrollY: f32, mouseHoverGlobal: *bool,renderQueue: *render.RenderQueue, callback: *const fn(*State, GridImage, usize) void) f32
+fn drawImageGrid(images: []const GridImage, indexOffset: usize, itemsPerRow: usize, topLeft: m.Vec2, width: f32, spacing: f32, font: asset.Font, fontColor: m.Vec4, state: *State, scrollY: f32, mouseHoverGlobal: *bool,renderQueue: *render.RenderQueue, callback: *const fn(*State, GridImage, usize) void) f32
 {
     const itemAspect = 1.74;
     const itemWidth = (width - spacing * (@intToFloat(f32, itemsPerRow) - 1)) / @intToFloat(f32, itemsPerRow);
@@ -272,11 +266,7 @@ fn drawImageGrid(images: []const GridImage, indexOffset: usize, itemsPerRow: usi
                 itemPos.x,
                 itemPos.y + itemSize.y + spacing * 4
             );
-            _ = fontSize;
-            renderQueue.text2(title, textPos, DEPTH_UI_GENERIC, asset.Font.Text, fontColor);
-            // renderQueue.textLine(
-            //     title, textPos, fontSize, 0.0, fontColor, "HelveticaBold"
-            // );
+            renderQueue.text2(title, textPos, DEPTH_UI_GENERIC, font, fontColor);
         }
 
         if (updateButton(itemPos, itemSize, state.mouseState, scrollY, mouseHoverGlobal)) {
@@ -388,9 +378,6 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
     const mousePosF = m.Vec2.initFromVec2i(state.mouseState.pos);
     var mouseHoverGlobal = false;
 
-    // const fontStickerSize = 124 / refSize.y * screenSizeF.y;
-    // const fontSubtitleSize = 84 / refSize.y * screenSizeF.y;
-    const fontTextSize = 30 / refSize.y * screenSizeF.y;
     const gridSize = std.math.round(gridRefSize / refSize.y * screenSizeF.y);
 
     const marginX = blk: {
@@ -408,7 +395,7 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
     if (screenResize) {
         const titleFontSize = gridSize * 4.0;
         const titleKerning = -gridSize * 0.2;
-        const titleLineHeight = gridSize * 3.2;
+        const titleLineHeight = gridSize * 3.8;
         state.assets.registerStaticFont(asset.Font.Title, @embedFile("HelveticaNeueLTCom-Bd.ttf"), titleFontSize, titleKerning, titleLineHeight, allocator) catch |err| {
             std.log.err("registerStaticFont failed err={}", .{err});
         };
@@ -718,24 +705,6 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
         );
         renderQueue.text2("Our diverse experience has given us an unparalleled understanding of\nmultiple mediums, giving us the tools to create a cohesive, story-centric vision\nalong with the visuals needed to create a shared understanding between\nmultiple departments and disciplines.", wasTextPos2, DEPTH_UI_GENERIC, asset.Font.Text, colorUi);
 
-        // const weAreStorytellers = state.assets.getStaticTextureData(asset.Texture.WeAreStorytellers);
-        // const weAreStorytellersText = state.assets.getStaticTextureData(asset.Texture.WeAreStorytellersText);
-        // if (weAreStorytellers.loaded() and weAreStorytellersText.loaded()) {
-        //     const wasPos2 = m.Vec2.init(
-        //         contentMarginX - gridSize * 0.3,
-        //         wasPosBaseY + gridSize * 8
-        //     );
-        //     const wasSize = getTextureScaledSize(weAreStorytellers.size, screenSizeF);
-        //     renderQueue.quadTex(wasPos2, wasSize, DEPTH_UI_GENERIC, 0, weAreStorytellers.id, colorUi);
-
-        //     const wasTextSize = getTextureScaledSize(weAreStorytellersText.size, screenSizeF);
-        //     const wasTextPos22 = m.Vec2.init(
-        //         contentMarginX - gridSize * 0.3,
-        //         wasPosBaseY + gridSize * 18.4
-        //     );
-        //     renderQueue.quadTex(wasTextPos22, wasTextSize, DEPTH_UI_GENERIC, 0, weAreStorytellersText.id, colorUi);
-        // }
-
         if (symbolEye.loaded()) {
             const eyeSize = getTextureScaledSize(stickerCircle.size, screenSizeF);
             const eyePosY = blk: {
@@ -897,7 +866,7 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
                 section3Start + gridSize * 14.0,
             );
             const spacing = gridSize * 0.25;
-            const y = drawImageGrid(images.items, 0, itemsPerRow, topLeft, contentSubWidth, spacing, fontTextSize, colorUi, state, scrollYF, &mouseHoverGlobal, renderQueue, CB.home);
+            const y = drawImageGrid(images.items, 0, itemsPerRow, topLeft, contentSubWidth, spacing, asset.Font.Text, colorUi, state, scrollYF, &mouseHoverGlobal, renderQueue, CB.home);
 
             {
                 // rounded black frame
@@ -917,7 +886,6 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
         .Entry => |entryData| {
             // content section
             const baseY = section1Height + section2Height;
-            // const lineHeight = fontTextSize * 1.5;
 
             const pf = portfolio.PORTFOLIO_LIST[entryData.portfolioIndex];
 
@@ -927,23 +895,12 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
             );
             renderQueue.text2(pf.contentHeader, contentHeaderPos, DEPTH_UI_GENERIC, asset.Font.Title, colorUi);
             const headerSizeYExtra = gridSize * 3 * @intToFloat(f32, std.mem.count(u8, pf.contentHeader, "\n"));
-            // renderQueue.textLine(
-            //     pf.contentHeader,
-            //     contentHeaderPos, fontStickerSize, 0.0,
-            //     colorUi, "HelveticaBold"
-            // );
 
             const contentSubPos = m.Vec2.init(
                 contentMarginX,
                 contentHeaderPos.y + headerSizeYExtra + gridSize * 2.0,
             );
             renderQueue.text2(pf.contentDescription, contentSubPos, DEPTH_UI_GENERIC, asset.Font.Text, colorUi);
-            // renderQueue.textBox(
-            //     pf.contentDescription,
-            //     contentSubPos, contentSubWidth,
-            //     fontTextSize, lineHeight, 0.0,
-            //     colorUi, "HelveticaMedium", .Left
-            // );
 
             yMax = contentSubPos.y + gridSize * 4.0;
 
@@ -953,7 +910,6 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
             var yGallery = yMax;
             var indexOffset: usize = 0; // TODO eh...
             for (pf.subprojects) |sub, i| {
-                // const numberSizeIsh = gridSize * 2.16;
                 const numberSize = getTextureScaledSize(stickerCircle.size, screenSizeF);
                 const numberPos = m.Vec2.init(
                     marginX + gridSize * 2.5,
@@ -969,23 +925,12 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
                     numberPos.x + numberSize.x / 3,
                     numberPos.y + numberSize.y * 0.7
                 );
-                // const numberLineHeight = numberSizeIsh;
                 renderQueue.text2(numStr, numberTextPos, DEPTH_UI_GENERIC - 0.01, asset.Font.Subtitle, m.Vec4.black);
-                // renderQueue.textBox(
-                //     numStr, numberTextPos, numberSizeIsh, fontStickerSize, numberLineHeight, 0.0,
-                //     m.Vec4.black, "HelveticaBold", .Center
-                // );
 
                 renderQueue.text2(sub.name, m.Vec2.init(x, yGallery), DEPTH_UI_GENERIC, asset.Font.Subtitle, colorUi);
-                // renderQueue.textLine(
-                //     sub.name, m.Vec2.init(x, yGallery), fontSubtitleSize, 0.0, colorUi, "HelveticaLight"
-                // );
                 yGallery += gridSize * 1;
 
                 renderQueue.text2(sub.description, m.Vec2.init(x, yGallery), DEPTH_UI_GENERIC, asset.Font.Text, colorUi);
-                // renderQueue.textBox(
-                //     sub.description, m.Vec2.init(x, yGallery), contentSubWidth, fontTextSize, lineHeight, 0.0, colorUi, "HelveticaMedium", .Left
-                // );
                 yGallery += gridSize * 2;
 
                 galleryImages.clearRetainingCapacity();
@@ -1002,7 +947,7 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
                 const itemsPerRow = 6;
                 const topLeft = m.Vec2.init(x, yGallery);
                 const spacing = gridSize * 0.25;
-                yGallery += drawImageGrid(galleryImages.items, indexOffset, itemsPerRow, topLeft, contentSubWidth, spacing, fontTextSize, colorUi, state, scrollYF, &mouseHoverGlobal, renderQueue, CB.entry);
+                yGallery += drawImageGrid(galleryImages.items, indexOffset, itemsPerRow, topLeft, contentSubWidth, spacing, asset.Font.Text, colorUi, state, scrollYF, &mouseHoverGlobal, renderQueue, CB.entry);
                 yGallery += gridSize * 3;
                 indexOffset += sub.images.len;
             }
@@ -1050,7 +995,7 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
                 yMax,
             );
             const spacing = gridSize * 0.25;
-            const yPortfolio = drawImageGrid(images.items, 0, itemsPerRow, topLeft, contentSubWidth, spacing, fontTextSize, colorUi, state, scrollYF, &mouseHoverGlobal, renderQueue, CB.home);
+            const yPortfolio = drawImageGrid(images.items, 0, itemsPerRow, topLeft, contentSubWidth, spacing, asset.Font.Text, colorUi, state, scrollYF, &mouseHoverGlobal, renderQueue, CB.home);
 
             yMax += yPortfolio + gridSize * 3;
 

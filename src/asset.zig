@@ -8,8 +8,6 @@ pub const Texture = enum(usize) {
     StickerCircle,
     StickerShiny,
     SymbolEye,
-    WeAreStorytellers,
-    WeAreStorytellersText,
     YorstoryCompany,
 
     MobileBackground,
