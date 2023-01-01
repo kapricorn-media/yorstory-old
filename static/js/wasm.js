@@ -1,4 +1,5 @@
 let gl = null;
+let _ext = null;
 let _wasmInstance = null;
 let _memory = null;
 let _memoryPtr = null;
@@ -367,6 +368,14 @@ function bindNullFramebuffer() {
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 }
 
+function vertexAttribDivisorANGLE(attrLoc, divisor) {
+    _ext.vertexAttribDivisorANGLE(attrLoc, divisor);
+}
+
+function drawArraysInstancedANGLE(mode, first, count, primcount) {
+    _ext.drawArraysInstancedANGLE(mode, first, count, primcount);
+}
+
 const env = {
     // Debug functions
     consoleMessage,
@@ -388,7 +397,9 @@ const env = {
     createTexture,
     createTextureWithData,
     loadTexture,
-    bindNullFramebuffer
+    bindNullFramebuffer,
+    vertexAttribDivisorANGLE,
+    drawArraysInstancedANGLE,
 };
 
 function fillGlFunctions(env)
@@ -415,9 +426,16 @@ function fillGlFunctions(env)
     env.glBindBuffer = function(type, id) {
         gl.bindBuffer(type, _glBuffers[id]);
     };
+    env.glBufferData3 = function(type, count, drawType) {
+        gl.bufferData(type, count, drawType);
+    };
     env.glBufferData = function(type, dataPtr, count, drawType) {
         const floats = new Float32Array(_wasmInstance.exports.memory.buffer, dataPtr, count);
         gl.bufferData(type, floats, drawType);
+    };
+    env.glBufferSubData = function(type, offset, dataPtr, count) {
+        const floats = new Float32Array(_wasmInstance.exports.memory.buffer, dataPtr, count);
+        gl.bufferSubData(type, offset, floats);
     };
 
     env.glCreateFramebuffer = function() {
@@ -496,6 +514,15 @@ function wasmInit(wasmUri, memoryBytes)
 {
     _canvas = document.getElementById("canvas");
     gl = _canvas.getContext("webgl") || _canvas.getContext("experimental-webgl");
+    if (!gl) {
+        console.error("no webGL support");
+        return;
+    }
+    _ext = gl.getExtension("ANGLE_instanced_arrays");
+    if (!_ext) {
+        console.error("no webGL instanced arrays support");
+        return;
+    }
     updateCanvasSize();
 
     document.addEventListener("mousemove", function(event) {

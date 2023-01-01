@@ -2,6 +2,7 @@ const std = @import("std");
 
 const core = @import("wasm_core.zig");
 
+const asset = @import("asset.zig");
 const wasm_asset = @import("wasm_asset.zig");
 const input = @import("wasm_input.zig");
 const m = @import("math.zig");
@@ -29,33 +30,6 @@ const DEPTH_LANDINGIMAGE = 0.6;
 const DEPTH_LANDINGBACKGROUND = 0.7;
 const DEPTH_GRIDIMAGE = 0.6;
 const DEPTH_UI_BELOWALL = 1.0;
-
-const Texture = enum(usize) {
-    CategoriesText,
-    DecalTopLeft,
-    LoadingGlyphs,
-    LogosAll,
-    Lut1,
-    ProjectSymbols,
-    StickerCircle,
-    StickerShiny,
-    SymbolEye,
-    WeAreStorytellers,
-    WeAreStorytellersText,
-    YorstoryCompany,
-
-    MobileBackground,
-    MobileCrosshair,
-    MobileIcons,
-    MobileLogo,
-    MobileYorstoryCompany,
-
-    StickerMainHome,
-};
-
-const Font = enum {
-    HelveticaBold64,
-};
 
 // return true when pressed
 fn updateButton(topLeft: m.Vec2, size: m.Vec2, mouseState: input.MouseState, scrollY: f32, mouseHoverGlobal: *bool) bool
@@ -118,7 +92,7 @@ pub const State = struct {
     fbDepthRenderbuffer: c_uint,
     fb: c_uint,
 
-    assets: wasm_asset.Assets(Texture, 256, Font),
+    assets: wasm_asset.Assets(asset.Texture, 256, asset.Font),
 
     pageData: PageData,
     screenSizePrev: m.Vec2i,
@@ -161,7 +135,7 @@ pub const State = struct {
             .fbDepthRenderbuffer = 0,
             .fb = 0,
 
-            .assets = wasm_asset.Assets(Texture, 256, Font).init(fbAllocator.allocator()),
+            .assets = wasm_asset.Assets(asset.Texture, 256, asset.Font).init(fbAllocator.allocator()),
 
             .pageData = try uriToPageData(uri),
             .screenSizePrev = m.Vec2i.zero,
@@ -176,70 +150,65 @@ pub const State = struct {
             .debug = false,
         };
 
-        // var tempAllocatorObj = core._memory.getTransientAllocator();
-        // const tempAllocator = tempAllocatorObj.allocator();
-
-        // try self.assets.registerStaticFont(Font.HelveticaBold64, @embedFile("HelveticaNeueLTCom-Bd.ttf"), 64.0, tempAllocator);
-
-        _ = try self.assets.register(.{ .Static = Texture.Lut1 },
+        _ = try self.assets.register(.{ .Static = asset.Texture.Lut1 },
             "/images/LUTs/identity.png", defaultTextureWrap, defaultTextureFilter, 1
         );
 
-        _ = try self.assets.register(.{ .Static = Texture.StickerCircle },
+        _ = try self.assets.register(.{ .Static = asset.Texture.StickerCircle },
             "/images/sticker-circle.png", defaultTextureWrap, defaultTextureFilter, 2
         );
-        _ = try self.assets.register(.{ .Static = Texture.LoadingGlyphs },
+        _ = try self.assets.register(.{ .Static = asset.Texture.LoadingGlyphs },
             "/images/loading-glyphs.png", defaultTextureWrap, defaultTextureFilter, 2
         );
-        _ = try self.assets.register(.{ .Static = Texture.DecalTopLeft },
+        _ = try self.assets.register(.{ .Static = asset.Texture.DecalTopLeft },
             "/images/decal-topleft.png", defaultTextureWrap, defaultTextureFilter, 2
         );
 
-        _ = try self.assets.register(.{ .Static = Texture.CategoriesText },
+        _ = try self.assets.register(.{ .Static = asset.Texture.CategoriesText },
             "/images/categories-text.png", defaultTextureWrap, defaultTextureFilter, 5
         );
-        _ = try self.assets.register(.{ .Static = Texture.StickerShiny },
+        _ = try self.assets.register(.{ .Static = asset.Texture.StickerShiny },
             "/images/sticker-shiny.png", defaultTextureWrap, defaultTextureFilter, 5
         );
 
 
         switch (self.pageData) {
             .Home => {
-                _ = try self.assets.register(.{ .Static = Texture.LogosAll },
+                _ = try self.assets.register(.{ .Static = asset.Texture.LogosAll },
                     "/images/logos-all.png", defaultTextureWrap, defaultTextureFilter, 8
                 );
-                _ = try self.assets.register(.{ .Static = Texture.ProjectSymbols },
+                _ = try self.assets.register(.{ .Static = asset.Texture.ProjectSymbols },
                     "/images/project-symbols.png", defaultTextureWrap, defaultTextureFilter, 8
                 );
-                _ = try self.assets.register(.{ .Static = Texture.StickerMainHome },
+                _ = try self.assets.register(.{ .Static = asset.Texture.StickerMainHome },
                     "/images/sticker-main.png", defaultTextureWrap, defaultTextureFilter, 5
                 );
-                _ = try self.assets.register(.{ .Static = Texture.SymbolEye },
+                _ = try self.assets.register(.{ .Static = asset.Texture.SymbolEye },
                     "/images/symbol-eye.png", defaultTextureWrap, defaultTextureFilter, 5
                 );
-                _ = try self.assets.register(.{ .Static = Texture.WeAreStorytellers },
+                _ = try self.assets.register(.{ .Static = asset.Texture.WeAreStorytellers },
                     "/images/we-are-storytellers.png", defaultTextureWrap, defaultTextureFilter, 5
                 );
-                _ = try self.assets.register(.{ .Static = Texture.WeAreStorytellersText },
+                _ = try self.assets.register(.{ .Static = asset.Texture.WeAreStorytellersText },
                     "/images/we-are-storytellers-text.png", defaultTextureWrap, defaultTextureFilter, 5
                 );
-                _ = try self.assets.register(.{ .Static = Texture.YorstoryCompany },
+                _ = try self.assets.register(.{ .Static = asset.Texture.YorstoryCompany },
                     "/images/a-yorstory-company.png", defaultTextureWrap, defaultTextureFilter, 5
                 );
 
-                _ = try self.assets.register(.{ .Static = Texture.MobileBackground },
+                _ = try self.assets.register(.{ .Static = asset.Texture.MobileBackground },
                     "/images/mobile/background.png", defaultTextureWrap, defaultTextureFilter, 5
                 );
-                _ = try self.assets.register(.{ .Static = Texture.MobileCrosshair },
+                _ = try self.assets.register(.{ .Static = asset.Texture.MobileCrosshair },
                     "/images/mobile/crosshair.png", defaultTextureWrap, defaultTextureFilter, 5
                 );
-                _ = try self.assets.register(.{ .Static = Texture.MobileIcons },
+                _ = try self.assets.register(.{ .Static = asset.Texture.MobileIcons },
                     "/images/mobile/icons.png", defaultTextureWrap, defaultTextureFilter, 5
                 );
-                _ = try self.assets.register(.{ .Static = Texture.MobileLogo },
+                _ = try self.assets.register(.{ .Static = asset.Texture.MobileLogo },
                     "/images/mobile/logo-and-stuff.png", defaultTextureWrap, defaultTextureFilter, 5
                 );
-                _ = try self.assets.register(.{ .Static = Texture.MobileYorstoryCompany },
+                _ = try self.assets.register(.{ .Static = asset.Texture.MobileYorstoryCompany },
                     "/images/mobile/a-yorstory-company.png", defaultTextureWrap, defaultTextureFilter, 5
                 );
             },
@@ -303,9 +272,11 @@ fn drawImageGrid(images: []const GridImage, indexOffset: usize, itemsPerRow: usi
                 itemPos.x,
                 itemPos.y + itemSize.y + spacing * 4
             );
-            renderQueue.textLine(
-                title, textPos, fontSize, 0.0, fontColor, "HelveticaBold"
-            );
+            _ = fontSize;
+            renderQueue.text2(title, textPos, DEPTH_UI_GENERIC, asset.Font.Text, fontColor);
+            // renderQueue.textLine(
+            //     title, textPos, fontSize, 0.0, fontColor, "HelveticaBold"
+            // );
         }
 
         if (updateButton(itemPos, itemSize, state.mouseState, scrollY, mouseHoverGlobal)) {
@@ -397,15 +368,8 @@ fn drawCrosshairCorners(pos: m.Vec2, size: m.Vec2, depth: f32, gridSize: f32, de
     );
 }
 
-fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, renderQueue: *render.RenderQueue, allocator: std.mem.Allocator) i32
+fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, renderQueue: *render.RenderQueue, allocator: std.mem.Allocator, screenResize: bool) i32
 {
-    // TEST
-    // const helveticaBold64 = state.assets.getStaticFontData(Font.HelveticaBold64);
-    // renderQueue.quadTex(m.Vec2.zero, m.Vec2.init(500.0, 500.0), 0.0, 0.0, helveticaBold64.textureId, m.Vec4.white);
-    // const char = 'g';
-    // const charData = helveticaBold64.charData[char];
-    // renderQueue.quadTexUvOffset(m.Vec2.zero, m.Vec2.init(100.0, 100.0), 0.0, 0.0, charData.uvOffset, charData.uvSize, helveticaBold64.textureId, m.Vec4.white);
-
     const colorYellowHome = m.Vec4.init(234.0 / 255.0, 1.0, 0.0, 1.0);
     const colorUi = blk: {
         switch (state.pageData) {
@@ -441,13 +405,29 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
     const crosshairMarginX = marginX + gridSize * 5;
     const contentMarginX = marginX + gridSize * 9;
 
-    var allIconsLoaded = true;
-    const categoriesText = state.assets.getStaticTextureData(Texture.CategoriesText);
+    if (screenResize) {
+        const titleFontSize = gridSize * 4.0;
+        const titleKerning = -gridSize * 0.2;
+        const titleLineHeight = gridSize * 3.2;
+        state.assets.registerStaticFont(asset.Font.Title, @embedFile("HelveticaNeueLTCom-Bd.ttf"), titleFontSize, titleKerning, titleLineHeight, allocator) catch |err| {
+            std.log.err("registerStaticFont failed err={}", .{err});
+        };
 
-    const decalTopLeft = state.assets.getStaticTextureData(Texture.DecalTopLeft);
+        const textFontSize = gridSize * 0.4;
+        const textKerning = 0;
+        const textLineHeight = textFontSize * 1.4;
+        state.assets.registerStaticFont(asset.Font.Text, @embedFile("HelveticaNeueLTCom-Md.ttf"), textFontSize, textKerning, textLineHeight, allocator) catch |err| {
+            std.log.err("registerStaticFont failed err={}", .{err});
+        };
+    }
+
+    var allIconsLoaded = true;
+    const categoriesText = state.assets.getStaticTextureData(asset.Texture.CategoriesText);
+
+    const decalTopLeft = state.assets.getStaticTextureData(asset.Texture.DecalTopLeft);
     const stickerMain = blk: {
         switch (state.pageData) {
-            .Home => break :blk state.assets.getStaticTextureData(Texture.StickerMainHome),
+            .Home => break :blk state.assets.getStaticTextureData(asset.Texture.StickerMainHome),
             .Entry => |entryData| {
                 const pf = portfolio.PORTFOLIO_LIST[entryData.portfolioIndex];
                 if (state.assets.getTextureData(.{.DynamicUrl = pf.sticker})) |tex| {
@@ -470,7 +450,7 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
             },
         }
     };
-    const stickerShiny = state.assets.getStaticTextureData(Texture.StickerShiny);
+    const stickerShiny = state.assets.getStaticTextureData(asset.Texture.StickerShiny);
 
     var allLandingAssetsLoaded = allIconsLoaded and categoriesText.loaded() and decalTopLeft.loaded() and stickerMain.loaded() and stickerShiny.loaded();
 
@@ -566,8 +546,8 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
         );
     }
 
-    const stickerCircle = state.assets.getStaticTextureData(Texture.StickerCircle);
-    const loadingGlyphs = state.assets.getStaticTextureData(Texture.LoadingGlyphs);
+    const stickerCircle = state.assets.getStaticTextureData(asset.Texture.StickerCircle);
+    const loadingGlyphs = state.assets.getStaticTextureData(asset.Texture.LoadingGlyphs);
 
     if (allLandingAssetsLoaded) {
         if (categoriesText.loaded()) {
@@ -686,44 +666,63 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
             );
         }
 
-        const yorstoryCompany = state.assets.getStaticTextureData(Texture.YorstoryCompany);
+        const yorstoryCompany = state.assets.getStaticTextureData(asset.Texture.YorstoryCompany);
         if (yorstoryCompany.loaded()) {
             const pos = m.Vec2.init(contentMarginX, secondFrameYStill + gridSize * 3.0);
             const size = getTextureScaledSize(yorstoryCompany.size, screenSizeF);
             renderQueue.quadTex(pos, size, DEPTH_UI_GENERIC, 0, yorstoryCompany.id, colorUi);
         }
 
-        const weAreStorytellers = state.assets.getStaticTextureData(Texture.WeAreStorytellers);
-        const weAreStorytellersText = state.assets.getStaticTextureData(Texture.WeAreStorytellersText);
-        const logosAll = state.assets.getStaticTextureData(Texture.LogosAll);
-        const symbolEye = state.assets.getStaticTextureData(Texture.SymbolEye);
+        const logosAll = state.assets.getStaticTextureData(asset.Texture.LogosAll);
+        const symbolEye = state.assets.getStaticTextureData(asset.Texture.SymbolEye);
 
-        if (weAreStorytellers.loaded() and weAreStorytellersText.loaded() and symbolEye.loaded() and logosAll.loaded()) {
-            const wasPosYCheckpoint1 = section1Height;
-            const wasPosYCheckpoint2 = section1Height + screenSizeF.y * 1.0;
-            const wasPosBaseY = blk: {
-                if (scrollYF <= wasPosYCheckpoint1) {
-                    break :blk wasPosYCheckpoint1;
-                } else if (scrollYF >= wasPosYCheckpoint2) {
-                    break :blk wasPosYCheckpoint2;
-                } else {
-                    break :blk scrollYF;
-                }
-            };
-            const wasSize = getTextureScaledSize(weAreStorytellers.size, screenSizeF);
-            const wasPos = m.Vec2.init(
-                contentMarginX - gridSize * 0.3,
-                wasPosBaseY + gridSize * 8
-            );
-            renderQueue.quadTex(wasPos, wasSize, DEPTH_UI_GENERIC, 0, weAreStorytellers.id, colorUi);
+        const wasPosYCheckpoint1 = section1Height;
+        const wasPosYCheckpoint2 = section1Height + screenSizeF.y * 1.0;
+        const wasPosBaseY = blk: {
+            if (scrollYF <= wasPosYCheckpoint1) {
+                break :blk wasPosYCheckpoint1;
+            } else if (scrollYF >= wasPosYCheckpoint2) {
+                break :blk wasPosYCheckpoint2;
+            } else {
+                break :blk scrollYF;
+            }
+        };
+        const wasPos = m.Vec2.init(
+            contentMarginX - gridSize * 0.3,
+            wasPosBaseY + gridSize * 10.8
+        );
+        renderQueue.text2("We are\nStorytellers.", wasPos, DEPTH_UI_GENERIC, asset.Font.Title, colorUi);
 
-            const wasTextSize = getTextureScaledSize(weAreStorytellersText.size, screenSizeF);
-            const wasTextPos = m.Vec2.init(
-                contentMarginX - gridSize * 0.3,
-                wasPosBaseY + gridSize * 18
-            );
-            renderQueue.quadTex(wasTextPos, wasTextSize, DEPTH_UI_GENERIC, 0, weAreStorytellersText.id, colorUi);
+        const wasTextPos1 = m.Vec2.init(
+            contentMarginX - gridSize * 0.3,
+            wasPosBaseY + gridSize * 18.5
+        );
+        renderQueue.text2("Yorstory is a creative development studio specializing in sequential art. We\nare storytellers with over 20 years of experience in the Television, Film, and\nVideo Game industries.", wasTextPos1, DEPTH_UI_GENERIC, asset.Font.Text, colorUi);
+        const wasTextPos2 = m.Vec2.init(
+            screenSizeF.x / 2.0,
+            wasPosBaseY + gridSize * 18.5
+        );
+        renderQueue.text2("Our diverse experience has given us an unparalleled understanding of\nmultiple mediums, giving us the tools to create a cohesive, story-centric vision\nalong with the visuals needed to create a shared understanding between\nmultiple departments and disciplines.", wasTextPos2, DEPTH_UI_GENERIC, asset.Font.Text, colorUi);
 
+        // const weAreStorytellers = state.assets.getStaticTextureData(asset.Texture.WeAreStorytellers);
+        // const weAreStorytellersText = state.assets.getStaticTextureData(asset.Texture.WeAreStorytellersText);
+        // if (weAreStorytellers.loaded() and weAreStorytellersText.loaded()) {
+        //     const wasPos2 = m.Vec2.init(
+        //         contentMarginX - gridSize * 0.3,
+        //         wasPosBaseY + gridSize * 8
+        //     );
+        //     const wasSize = getTextureScaledSize(weAreStorytellers.size, screenSizeF);
+        //     renderQueue.quadTex(wasPos2, wasSize, DEPTH_UI_GENERIC, 0, weAreStorytellers.id, colorUi);
+
+        //     const wasTextSize = getTextureScaledSize(weAreStorytellersText.size, screenSizeF);
+        //     const wasTextPos22 = m.Vec2.init(
+        //         contentMarginX - gridSize * 0.3,
+        //         wasPosBaseY + gridSize * 18.4
+        //     );
+        //     renderQueue.quadTex(wasTextPos22, wasTextSize, DEPTH_UI_GENERIC, 0, weAreStorytellersText.id, colorUi);
+        // }
+
+        if (symbolEye.loaded()) {
             const eyeSize = getTextureScaledSize(stickerCircle.size, screenSizeF);
             const eyePosY = blk: {
                 const eyeCheckpoint1 = section1Height + screenSizeF.y * 0.1;
@@ -740,13 +739,18 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
                 }
             };
             const eyePos = m.Vec2.init(
-                wasPos.x + gridSize * 10.4,
+                wasPos.x + gridSize * 10.7,
                 eyePosY,
             );
             const eyeStickerColor = m.Vec4.init(0.0, 46.0 / 255.0, 226.0 / 255.0, 1.0);
-            renderQueue.quadTex(eyePos, eyeSize, DEPTH_UI_GENERIC - 0.01, 0, stickerCircle.id, eyeStickerColor);
-            renderQueue.quadTex(eyePos, eyeSize, DEPTH_UI_GENERIC - 0.02, 0, symbolEye.id, colorUi);
+            // TODO change plus to minus once depth/blend shit is fixed
+            const eyeDepth = DEPTH_UI_GENERIC + 0.02;
+            const eyeSymbolDepth = DEPTH_UI_GENERIC + 0.01;
+            renderQueue.quadTex(eyePos, eyeSize, eyeDepth, 0, stickerCircle.id, eyeStickerColor);
+            renderQueue.quadTex(eyePos, eyeSize, eyeSymbolDepth, 0, symbolEye.id, colorUi);
+        }
 
+        if (logosAll.loaded()) {
             const logosPosYCheckpoint1 = section1Height + section2Height - screenSizeF.y * 2.0;
             const logosPosYCheckpoint2 = section1Height + section2Height - screenSizeF.y;
             const logosPosBaseY = blk: {
@@ -766,10 +770,6 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
             renderQueue.quadTex(logosPos, logosSize, DEPTH_UI_GENERIC, 0, logosAll.id, colorUi);
         }
 
-        // const end2LinePos = m.Vec2.init(crosshairMarginX, secondFrameYStill + screenSizeF.y);
-        // const end2LineSize = m.Vec2.init(screenSizeF.x - crosshairMarginX * 2, 1);
-        // renderQueue.quad(end2LinePos, end2LineSize, DEPTH_UI_OVER2, 0, colorUi);
-
         {
             // rounded black frame
             const framePos = m.Vec2.init(marginX + gridSize * 1, secondFrameYStill + gridSize * 1);
@@ -783,7 +783,6 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
     }
 
     // ==== THIRD FRAME ====
-
 
     const CB = struct {
         fn home(theState: *State, image: GridImage, index: usize) void
@@ -845,7 +844,7 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
                 );
             }
 
-            const yorstoryCompany = state.assets.getStaticTextureData(Texture.YorstoryCompany);
+            const yorstoryCompany = state.assets.getStaticTextureData(asset.Texture.YorstoryCompany);
             if (yorstoryCompany.loaded()) {
                 const pos = m.Vec2.init(contentMarginX, section3YStill + gridSize * 3.0);
                 const size = getTextureScaledSize(yorstoryCompany.size, screenSizeF);
@@ -854,14 +853,10 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
 
             const contentHeaderPos = m.Vec2.init(
                 contentMarginX,
-                section3Start + gridSize * (12.0 - 0.33),
+                section3Start + gridSize * (11.5 - 0.33),
             );
-            const fontSize = 180 / refSize.y * screenSizeF.y;
-            renderQueue.textLine(
-                "Projects",
-                contentHeaderPos, fontSize, -gridSize * 0.05,
-                colorUi, "HelveticaBold"
-            );
+            // const fontSize = 180 / refSize.y * screenSizeF.y;
+            renderQueue.text2("Projects", contentHeaderPos, DEPTH_UI_GENERIC, asset.Font.Title, colorUi);
 
             var images = std.ArrayList(GridImage).init(allocator);
             for (portfolio.PORTFOLIO_LIST) |pf| {
@@ -874,7 +869,7 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
                 };
             }
 
-            const projectSymbols = state.assets.getStaticTextureData(Texture.ProjectSymbols);
+            const projectSymbols = state.assets.getStaticTextureData(asset.Texture.ProjectSymbols);
             if (projectSymbols.loaded()) {
                 const symbolsPos = m.Vec2.init(marginX + gridSize * 3.33, section3YStill + gridSize * 7.5);
                 const symbolsSize = getTextureScaledSize(projectSymbols.size, screenSizeF);
@@ -918,6 +913,7 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
                 contentMarginX,
                 baseY + gridSize * 3.0,
             );
+            renderQueue.text2(contentHeader, contentHeaderPos, DEPTH_UI_GENERIC, asset.Font.Title, colorUi);
             renderQueue.textLine(
                 contentHeader,
                 contentHeaderPos, fontStickerSize, 0.0,
@@ -1011,6 +1007,7 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
                 contentMarginX,
                 yMax,
             );
+            renderQueue.text2("other projects", opos, DEPTH_UI_GENERIC, asset.Font.Title, colorUi);
             renderQueue.textLine(
                 "other projects",
                 opos, fontStickerSize, 0.0,
@@ -1113,7 +1110,7 @@ fn drawMobile(state: *State, deltaS: f32, scrollY: f32, screenSize: m.Vec2, rend
     const gridSize = std.math.round(80.0 / 1920.0 * screenSize.y);
     std.log.info("{}", .{gridSize});
 
-    const backgroundTex = state.assets.getStaticTextureData(Texture.MobileBackground);
+    const backgroundTex = state.assets.getStaticTextureData(asset.Texture.MobileBackground);
     if (backgroundTex.loaded()) {
         const backgroundSizeF = m.Vec2.initFromVec2i(backgroundTex.size);
         const backgroundAspect = backgroundSizeF.x / backgroundSizeF.y;
@@ -1128,7 +1125,7 @@ fn drawMobile(state: *State, deltaS: f32, scrollY: f32, screenSize: m.Vec2, rend
         renderQueue.quadTex(backgroundPos, backgroundSize, DEPTH_LANDINGBACKGROUND, 0.0, backgroundTex.id, m.Vec4.white);
     }
 
-    const yorTex = state.assets.getStaticTextureData(Texture.MobileYorstoryCompany);
+    const yorTex = state.assets.getStaticTextureData(asset.Texture.MobileYorstoryCompany);
     if (yorTex.loaded()) {
         const yorSize = getTextureScaledSize(yorTex.size, screenSize);
         const yorPos = m.Vec2.init(
@@ -1137,7 +1134,7 @@ fn drawMobile(state: *State, deltaS: f32, scrollY: f32, screenSize: m.Vec2, rend
         renderQueue.quadTex(yorPos, yorSize, DEPTH_UI_GENERIC, 0.0, yorTex.id, m.Vec4.white);
     }
 
-    const logoTex = state.assets.getStaticTextureData(Texture.MobileLogo);
+    const logoTex = state.assets.getStaticTextureData(asset.Texture.MobileLogo);
     if (logoTex.loaded()) {
         const logoSize = getTextureScaledSize(logoTex.size, screenSize);
         const logoPos = m.Vec2.init(
@@ -1146,8 +1143,8 @@ fn drawMobile(state: *State, deltaS: f32, scrollY: f32, screenSize: m.Vec2, rend
         renderQueue.quadTex(logoPos, logoSize, DEPTH_UI_GENERIC, 0.0, logoTex.id, m.Vec4.white);
     }
 
-    const crosshairTex = state.assets.getStaticTextureData(Texture.MobileCrosshair);
-    const iconsTex = state.assets.getStaticTextureData(Texture.MobileIcons);
+    const crosshairTex = state.assets.getStaticTextureData(asset.Texture.MobileCrosshair);
+    const iconsTex = state.assets.getStaticTextureData(asset.Texture.MobileIcons);
     if (crosshairTex.loaded() and iconsTex.loaded()) {
         const crosshairOffset = gridSize * 0.25;
         const pos = m.Vec2.init(-(gridSize + crosshairOffset), -(gridSize + crosshairOffset));
@@ -1238,7 +1235,8 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
 
     var renderQueue = render.RenderQueue.init(tempAllocator);
 
-    if (!m.Vec2i.eql(state.screenSizePrev, screenSizeI)) {
+    const screenResize = !m.Vec2i.eql(state.screenSizePrev, screenSizeI);
+    if (screenResize) {
         std.log.info("resetting screen framebuffer", .{});
         state.fbTexture = w.createTexture(screenSizeI.x, screenSizeI.y, defaultTextureWrap, w.GL_NEAREST);
 
@@ -1272,10 +1270,10 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
     if (isVertical) {
         yMax = drawMobile(state, deltaS, scrollYF, screenSizeF, &renderQueue, tempAllocator);
     } else {
-        yMax = drawDesktop(state, deltaMs, scrollYF, screenSizeF, &renderQueue, tempAllocator);
+        yMax = drawDesktop(state, deltaMs, scrollYF, screenSizeF, &renderQueue, tempAllocator, screenResize);
     }
 
-    renderQueue.renderShapes(state.renderState, screenSizeF, scrollYF);
+    renderQueue.renderShapes(state.renderState, &state.assets, screenSizeF, scrollYF);
     if (!m.Vec2i.eql(state.screenSizePrev, screenSizeI)) {
         std.log.info("resize, clearing text", .{});
         w.clearAllText();
@@ -1286,10 +1284,10 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
 
     w.bindNullFramebuffer();
     w.glClear(w.GL_COLOR_BUFFER_BIT | w.GL_DEPTH_BUFFER_BIT);
-    const lut1 = state.assets.getStaticTextureData(Texture.Lut1);
-    // if (lut1.loaded()) {
+    const lut1 = state.assets.getStaticTextureData(asset.Texture.Lut1);
+    if (lut1.loaded()) {
         state.renderState.postProcessState.draw(state.fbTexture, lut1.id, screenSizeF);
-    // }
+    }
 
     const maxInflight = 4;
     state.assets.loadQueued(maxInflight);

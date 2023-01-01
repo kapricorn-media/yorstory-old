@@ -2,6 +2,7 @@ const std = @import("std");
 
 const m = @import("math.zig");
 const w = @import("wasm_bindings.zig");
+const asset = @import("asset.zig"); // TODO: STOGLY
 
 const TextAlign = enum {
     Left,
@@ -83,6 +84,12 @@ fn sizeToNdc(comptime T: type, size: T, canvas: T) T
     }
 }
 
+fn getAttributeLocation(programId: c_uint, attributeName: []const u8) !c_int
+{
+    const loc = w.glGetAttribLocation(programId, &attributeName[0], attributeName.len);
+    return if (loc == -1) error.MissingAttributeLoc else loc;
+}
+
 fn getUniformLocation(programId: c_uint, uniformName: []const u8) !c_int
 {
     const loc = w.glGetUniformLocation(programId, &uniformName[0], uniformName.len);
@@ -91,12 +98,10 @@ fn getUniformLocation(programId: c_uint, uniformName: []const u8) !c_int
 
 const QuadState = struct {
     positionBuffer: c_uint,
-    uvBuffer: c_uint,
 
     programId: c_uint,
 
     positionAttrLoc: c_int,
-    uvAttrLoc: c_int,
 
     posPixelsDepthUniLoc: c_int,
     sizePixelsUniLoc: c_int,
@@ -122,31 +127,14 @@ const QuadState = struct {
         w.glBindBuffer(w.GL_ARRAY_BUFFER, positionBuffer);
         w.glBufferData(w.GL_ARRAY_BUFFER, &POS_UNIT_SQUARE[0].x, POS_UNIT_SQUARE.len * 2, w.GL_STATIC_DRAW);
 
-        const uvBuffer = w.glCreateBuffer();
-        w.glBindBuffer(w.GL_ARRAY_BUFFER, uvBuffer);
-        w.glBufferData(w.GL_ARRAY_BUFFER, &POS_UNIT_SQUARE[0].x, POS_UNIT_SQUARE.len * 2, w.GL_STATIC_DRAW);
-
         const programId = w.linkShaderProgram(vertQuadId, fragQuadId);
-
-        const a_position = "a_position";
-        const positionAttrLoc = w.glGetAttribLocation(programId, &a_position[0], a_position.len);
-        if (positionAttrLoc == -1) {
-            return error.MissingAttrLoc;
-        }
-        const a_uv = "a_uv";
-        const uvAttrLoc = w.glGetAttribLocation(programId, &a_uv[0], a_uv.len);
-        if (uvAttrLoc == -1) {
-            return error.MissingAttrLoc;
-        }
 
         return Self {
             .positionBuffer = positionBuffer,
-            .uvBuffer = uvBuffer,
 
             .programId = programId,
 
-            .positionAttrLoc = positionAttrLoc,
-            .uvAttrLoc = uvAttrLoc,
+            .positionAttrLoc = try getAttributeLocation(programId, "a_position"),
 
             .posPixelsDepthUniLoc = try getUniformLocation(programId, "u_posPixelsDepth"),
             .sizePixelsUniLoc = try getUniformLocation(programId, "u_sizePixels"),
@@ -176,9 +164,6 @@ const QuadState = struct {
         w.glEnableVertexAttribArray(@intCast(c_uint, self.positionAttrLoc));
         w.glBindBuffer(w.GL_ARRAY_BUFFER, self.positionBuffer);
         w.glVertexAttribPointer(@intCast(c_uint, self.positionAttrLoc), 2, w.GL_f32, 0, 0, 0);
-        w.glEnableVertexAttribArray(@intCast(c_uint, self.uvAttrLoc));
-        w.glBindBuffer(w.GL_ARRAY_BUFFER, self.uvBuffer);
-        w.glVertexAttribPointer(@intCast(c_uint, self.uvAttrLoc), 2, w.GL_f32, 0, 0, 0);
 
         w.glUniform3fv(self.posPixelsDepthUniLoc, posPixels.x, posPixels.y, depth);
         w.glUniform2fv(self.sizePixelsUniLoc, scalePixels.x, scalePixels.y);
@@ -207,12 +192,10 @@ const QuadState = struct {
 
 const QuadTextureState = struct {
     positionBuffer: c_uint,
-    uvBuffer: c_uint,
 
     programId: c_uint,
 
     positionAttrLoc: c_int,
-    uvAttrLoc: c_int,
 
     posPixelsDepthUniLoc: c_int,
     sizePixelsUniLoc: c_int,
@@ -238,31 +221,14 @@ const QuadTextureState = struct {
         w.glBindBuffer(w.GL_ARRAY_BUFFER, positionBuffer);
         w.glBufferData(w.GL_ARRAY_BUFFER, &POS_UNIT_SQUARE[0].x, POS_UNIT_SQUARE.len * 2, w.GL_STATIC_DRAW);
 
-        const uvBuffer = w.glCreateBuffer();
-        w.glBindBuffer(w.GL_ARRAY_BUFFER, uvBuffer);
-        w.glBufferData(w.GL_ARRAY_BUFFER, &POS_UNIT_SQUARE[0].x, POS_UNIT_SQUARE.len * 2, w.GL_STATIC_DRAW);
-
         const programId = w.linkShaderProgram(vertQuadId, fragQuadId);
-
-        const a_position = "a_position";
-        const positionAttrLoc = w.glGetAttribLocation(programId, &a_position[0], a_position.len);
-        if (positionAttrLoc == -1) {
-            return error.MissingAttrLoc;
-        }
-        const a_uv = "a_uv";
-        const uvAttrLoc = w.glGetAttribLocation(programId, &a_uv[0], a_uv.len);
-        if (uvAttrLoc == -1) {
-            return error.MissingAttrLoc;
-        }
 
         return Self {
             .positionBuffer = positionBuffer,
-            .uvBuffer = uvBuffer,
 
             .programId = programId,
 
-            .positionAttrLoc = positionAttrLoc,
-            .uvAttrLoc = uvAttrLoc,
+            .positionAttrLoc = try getAttributeLocation(programId, "a_position"),
 
             .posPixelsDepthUniLoc = try getUniformLocation(programId, "u_posPixelsDepth"),
             .sizePixelsUniLoc = try getUniformLocation(programId, "u_sizePixels"),
@@ -292,9 +258,6 @@ const QuadTextureState = struct {
         w.glEnableVertexAttribArray(@intCast(c_uint, self.positionAttrLoc));
         w.glBindBuffer(w.GL_ARRAY_BUFFER, self.positionBuffer);
         w.glVertexAttribPointer(@intCast(c_uint, self.positionAttrLoc), 2, w.GL_f32, 0, 0, 0);
-        w.glEnableVertexAttribArray(@intCast(c_uint, self.uvAttrLoc));
-        w.glBindBuffer(w.GL_ARRAY_BUFFER, self.uvBuffer);
-        w.glVertexAttribPointer(@intCast(c_uint, self.uvAttrLoc), 2, w.GL_f32, 0, 0, 0);
 
         w.glUniform3fv(self.posPixelsDepthUniLoc, posPixels.x, posPixels.y, depth);
         w.glUniform2fv(self.sizePixelsUniLoc, scalePixels.x, scalePixels.y);
@@ -359,18 +322,12 @@ const RoundedFrameState = struct {
 
         const programId = w.linkShaderProgram(vertQuadId, fragQuadId);
 
-        const a_position = "a_position";
-        const positionAttrLoc = w.glGetAttribLocation(programId, &a_position[0], a_position.len);
-        if (positionAttrLoc == -1) {
-            return error.MissingAttrLoc;
-        }
-
         return Self {
             .positionBuffer = positionBuffer,
 
             .programId = programId,
 
-            .positionAttrLoc = positionAttrLoc,
+            .positionAttrLoc = try getAttributeLocation(programId, "a_position"),
 
             .offsetPosUniLoc = try getUniformLocation(programId, "u_offsetPos"),
             .scalePosUniLoc = try getUniformLocation(programId, "u_scalePos"),
@@ -430,6 +387,136 @@ const RoundedFrameState = struct {
     }
 };
 
+const TextState = struct {
+    posBuffer: c_uint,
+    posPixelsBuffer: c_uint,
+    sizePixelsBuffer: c_uint,
+    uvOffsetBuffer: c_uint,
+
+    programId: c_uint,
+
+    posAttrLoc: c_int,
+    posPixelsAttrLoc: c_int,
+    sizePixelsAttrLoc: c_int,
+    uvOffsetAttrLoc: c_int,
+
+    screenSizeUniLoc: c_int,
+    depthUniLoc: c_int,
+    samplerUniLoc: c_int,
+    colorUniLoc: c_int,
+
+    const maxInstances = 1024;
+    const vert = @embedFile("shaders/text.vert");
+    const frag = @embedFile("shaders/text.frag");
+
+    const Self = @This();
+
+    pub fn init() !Self
+    {
+        // TODO error check all these
+        const vertQuadId = w.compileShader(&vert[0], vert.len, w.GL_VERTEX_SHADER);
+        const fragQuadId = w.compileShader(&frag[0], frag.len, w.GL_FRAGMENT_SHADER);
+
+        const posBuffer = w.glCreateBuffer();
+        w.glBindBuffer(w.GL_ARRAY_BUFFER, posBuffer);
+        w.glBufferData(w.GL_ARRAY_BUFFER, &POS_UNIT_SQUARE[0].x, POS_UNIT_SQUARE.len * 2, w.GL_STATIC_DRAW);
+
+        const posPixelsBuffer = w.glCreateBuffer();
+        w.glBindBuffer(w.GL_ARRAY_BUFFER, posPixelsBuffer);
+        w.glBufferData3(w.GL_ARRAY_BUFFER, maxInstances * @sizeOf(m.Vec2), w.GL_DYNAMIC_DRAW);
+
+        const sizePixelsBuffer = w.glCreateBuffer();
+        w.glBindBuffer(w.GL_ARRAY_BUFFER, sizePixelsBuffer);
+        w.glBufferData3(w.GL_ARRAY_BUFFER, maxInstances * @sizeOf(m.Vec2), w.GL_DYNAMIC_DRAW);
+
+        const uvOffsetBuffer = w.glCreateBuffer();
+        w.glBindBuffer(w.GL_ARRAY_BUFFER, uvOffsetBuffer);
+        w.glBufferData3(w.GL_ARRAY_BUFFER, maxInstances * @sizeOf(m.Vec2), w.GL_DYNAMIC_DRAW);
+
+        const programId = w.linkShaderProgram(vertQuadId, fragQuadId);
+
+        return Self {
+            .posBuffer = posBuffer,
+            .posPixelsBuffer = posPixelsBuffer,
+            .sizePixelsBuffer = sizePixelsBuffer,
+            .uvOffsetBuffer = uvOffsetBuffer,
+
+            .programId = programId,
+
+            .posAttrLoc = try getAttributeLocation(programId, "a_pos"),
+            .posPixelsAttrLoc = try getAttributeLocation(programId, "a_posPixels"),
+            .sizePixelsAttrLoc = try getAttributeLocation(programId, "a_sizePixels"),
+            .uvOffsetAttrLoc = try getAttributeLocation(programId, "a_uvOffset"),
+
+            .screenSizeUniLoc = try getUniformLocation(programId, "u_screenSize"),
+            .depthUniLoc = try getUniformLocation(programId, "u_depth"),
+            .samplerUniLoc = try getUniformLocation(programId, "u_sampler"),
+            .colorUniLoc = try getUniformLocation(programId, "u_color"),
+        };
+    }
+
+    // pub fn draw(
+    //     self: Self,
+    //     posPixels: m.Vec2,
+    //     sizePixels: m.Vec2,
+    //     depth: f32,
+    //     atlasTexture: c_uint,
+    //     color: m.Vec4,
+    //     screenSize: m.Vec2) void
+    // {
+    //     w.glUseProgram(self.programId);
+
+    //     w.glEnableVertexAttribArray(@intCast(c_uint, self.posAttrLoc));
+    //     w.glBindBuffer(w.GL_ARRAY_BUFFER, self.posBuffer);
+    //     w.glVertexAttribPointer(@intCast(c_uint, self.posAttrLoc), 2, w.GL_f32, 0, 0, 0);
+
+    //     var buffer: [maxInstances]m.Vec2 = undefined;
+    //     for (buffer) |*v| {
+    //         v.* = m.Vec2.zero;
+    //     }
+
+    //     buffer[0] = posPixels;
+    //     buffer[1] = m.Vec2.add(posPixels, m.Vec2.init(200, 0));
+    //     w.glEnableVertexAttribArray(@intCast(c_uint, self.posPixelsAttrLoc));
+    //     w.glBindBuffer(w.GL_ARRAY_BUFFER, self.posPixelsBuffer);
+    //     w.glBufferSubData(w.GL_ARRAY_BUFFER, 0, &buffer[0].x, buffer.len * 2);
+    //     w.glVertexAttribPointer(@intCast(c_uint, self.posPixelsAttrLoc), 2, w.GL_f32, 0, 0, 0);
+    //     w.vertexAttribDivisorANGLE(self.posPixelsAttrLoc, 1);
+
+    //     buffer[0] = sizePixels;
+    //     buffer[1] = sizePixels;
+    //     w.glEnableVertexAttribArray(@intCast(c_uint, self.sizePixelsAttrLoc));
+    //     w.glBindBuffer(w.GL_ARRAY_BUFFER, self.sizePixelsBuffer);
+    //     w.glBufferSubData(w.GL_ARRAY_BUFFER, 0, &buffer[0].x, buffer.len * 2);
+    //     w.glVertexAttribPointer(@intCast(c_uint, self.sizePixelsAttrLoc), 2, w.GL_f32, 0, 0, 0);
+    //     w.vertexAttribDivisorANGLE(self.sizePixelsAttrLoc, 1);
+
+    //     buffer[0] = m.Vec2.zero;
+    //     buffer[1] = m.Vec2.zero;
+    //     w.glEnableVertexAttribArray(@intCast(c_uint, self.uvOffsetAttrLoc));
+    //     w.glBindBuffer(w.GL_ARRAY_BUFFER, self.uvOffsetBuffer);
+    //     w.glBufferSubData(w.GL_ARRAY_BUFFER, 0, &buffer[0].x, buffer.len * 2);
+    //     w.glVertexAttribPointer(@intCast(c_uint, self.uvOffsetAttrLoc), 2, w.GL_f32, 0, 0, 0);
+    //     w.vertexAttribDivisorANGLE(self.uvOffsetAttrLoc, 1);
+
+    //     w.glUniform2fv(self.screenSizeUniLoc, screenSize.x, screenSize.y);
+    //     w.glUniform1fv(self.depthUniLoc, depth);
+    //     w.glUniform4fv(self.colorUniLoc, color.x, color.y, color.z, color.w);
+
+    //     w.glActiveTexture(w.GL_TEXTURE0);
+    //     w.glBindTexture(w.GL_TEXTURE_2D, atlasTexture);
+    //     w.glUniform1i(self.samplerUniLoc, 0);
+
+    //     w.drawArraysInstancedANGLE(w.GL_TRIANGLES, 0, POS_UNIT_SQUARE.len, 2);
+
+    //     w.vertexAttribDivisorANGLE(0, 0);
+    //     w.vertexAttribDivisorANGLE(1, 0);
+    //     w.vertexAttribDivisorANGLE(2, 0);
+    //     w.vertexAttribDivisorANGLE(3, 0);
+    //     w.vertexAttribDivisorANGLE(4, 0);
+    // }
+};
+
 const PostProcessState = struct {
     positionBuffer: c_uint,
     uvBuffer: c_uint,
@@ -464,25 +551,14 @@ const PostProcessState = struct {
 
         const programId = w.linkShaderProgram(vertQuadId, fragQuadId);
 
-        const a_position = "a_position";
-        const positionAttrLoc = w.glGetAttribLocation(programId, &a_position[0], a_position.len);
-        if (positionAttrLoc == -1) {
-            return error.MissingAttrLoc;
-        }
-        const a_uv = "a_uv";
-        const uvAttrLoc = w.glGetAttribLocation(programId, &a_uv[0], a_uv.len);
-        if (uvAttrLoc == -1) {
-            return error.MissingAttrLoc;
-        }
-
         return Self {
             .positionBuffer = positionBuffer,
             .uvBuffer = uvBuffer,
 
             .programId = programId,
 
-            .positionAttrLoc = positionAttrLoc,
-            .uvAttrLoc = uvAttrLoc,
+            .positionAttrLoc = try getAttributeLocation(programId, "a_position"),
+            .uvAttrLoc = try getAttributeLocation(programId, "a_uv"),
 
             .samplerUniLoc = try getUniformLocation(programId, "u_sampler"),
             .screenSizeUniLoc = try getUniformLocation(programId, "u_screenSize"),
@@ -519,6 +595,7 @@ pub const RenderState = struct {
     quadState: QuadState,
     quadTexState: QuadTextureState,
     roundedFrameState: RoundedFrameState,
+    textState: TextState,
     postProcessState: PostProcessState,
 
     const Self = @This();
@@ -529,6 +606,7 @@ pub const RenderState = struct {
             .quadState = try QuadState.init(),
             .quadTexState = try QuadTextureState.init(),
             .roundedFrameState = try RoundedFrameState.init(),
+            .textState = try TextState.init(),
             .postProcessState = try PostProcessState.init(),
         };
     }
@@ -538,6 +616,7 @@ pub const RenderState = struct {
         self.quadState.deinit();
         self.quadTexState.deinit();
         self.roundedFrameState.deinit();
+        self.textState.deinit();
         self.postProcessState.deinit();
     }
 };
@@ -585,6 +664,14 @@ const RenderEntryRoundedFrame = struct {
     color: m.Vec4,
 };
 
+const RenderEntryText = struct {
+    text: []const u8,
+    baselineLeft: m.Vec2,
+    depth: f32,
+    font: asset.Font,
+    color: m.Vec4,
+};
+
 const RenderEntryTextLine = struct {
     text: []const u8,
     baselineLeft: m.Vec2,
@@ -625,6 +712,7 @@ pub const RenderQueue = struct
     quads: std.ArrayList(RenderEntryQuad),
     quadTexs: std.ArrayList(RenderEntryQuadTex),
     roundedFrames: std.ArrayList(RenderEntryRoundedFrame),
+    texts: std.ArrayList(RenderEntryText),
     textLines: std.ArrayList(RenderEntryTextLine),
     textBoxes: std.ArrayList(RenderEntryTextBox),
     youtubeEmbeds: std.ArrayList(RenderEntryYoutubeEmbed),
@@ -637,6 +725,7 @@ pub const RenderQueue = struct
             .quads = std.ArrayList(RenderEntryQuad).init(allocator),
             .quadTexs = std.ArrayList(RenderEntryQuadTex).init(allocator),
             .roundedFrames = std.ArrayList(RenderEntryRoundedFrame).init(allocator),
+            .texts = std.ArrayList(RenderEntryText).init(allocator),
             .textLines = std.ArrayList(RenderEntryTextLine).init(allocator),
             .textBoxes = std.ArrayList(RenderEntryTextBox).init(allocator),
             .youtubeEmbeds = std.ArrayList(RenderEntryYoutubeEmbed).init(allocator),
@@ -648,6 +737,7 @@ pub const RenderQueue = struct
         self.quads.deinit();
         self.quadTexs.deinit();
         self.roundedFrames.deinit();
+        self.texts.deinit();
         self.textLines.deinit();
         self.textBoxes.deinit();
         self.youtubeEmbeds.deinit();
@@ -704,6 +794,17 @@ pub const RenderQueue = struct
         };
     }
 
+    pub fn text2(self: *Self, text: []const u8, baselineLeft: m.Vec2, depth: f32, font: asset.Font, color: m.Vec4) void
+    {
+        (self.texts.addOne() catch return).* = RenderEntryText {
+            .text = text,
+            .baselineLeft = baselineLeft,
+            .depth = depth,
+            .font = font,
+            .color = color,
+        };
+    }
+
     pub fn textLine(self: *Self, text: []const u8, baselineLeft: m.Vec2, fontSize: f32, letterSpacing: f32, color: m.Vec4, fontFamily: []const u8) void
     {
         (self.textLines.addOne() catch return).* = RenderEntryTextLine {
@@ -740,8 +841,10 @@ pub const RenderQueue = struct
         };
     }
 
-    pub fn renderShapes(self: Self, renderState: RenderState, screenSize: m.Vec2, scrollY: f32) void
+    pub fn renderShapes(self: Self, renderState: RenderState, assets: anytype, screenSize: m.Vec2, scrollY: f32) void
     {
+        // TODO fix depth/blend madness
+
         for (self.quads.items) |e| {
             const posBottomLeft = posTopLeftToBottomLeft(e.topLeft, e.size, screenSize, scrollY);
             renderState.quadState.drawQuadGradient(posBottomLeft, e.size, e.depth, e.cornerRadius, e.colorTL, e.colorTR, e.colorBL, e.colorBR, screenSize);
@@ -750,6 +853,82 @@ pub const RenderQueue = struct
             const posBottomLeft = posTopLeftToBottomLeft(e.topLeft, e.size, screenSize, scrollY);
             renderState.quadTexState.drawQuadUvOffset(posBottomLeft, e.size, e.depth, e.cornerRadius, e.uvOffset, e.uvScale, e.textureId, e.color, screenSize);
         }
+
+        w.glUseProgram(renderState.textState.programId);
+        w.glUniform2fv(renderState.textState.screenSizeUniLoc, screenSize.x, screenSize.y);
+
+        w.glEnableVertexAttribArray(@intCast(c_uint, renderState.textState.posAttrLoc));
+        w.glBindBuffer(w.GL_ARRAY_BUFFER, renderState.textState.posBuffer);
+        w.glVertexAttribPointer(@intCast(c_uint, renderState.textState.posAttrLoc), 2, w.GL_f32, 0, 0, 0);
+
+        var buffer: [TextState.maxInstances]m.Vec2 = undefined;
+        for (self.texts.items) |e| {
+            const fontData = assets.getStaticFontData(e.font);
+            const n = std.math.min(e.text.len, TextState.maxInstances);
+            const text = e.text[0..n];
+
+            var pos = m.Vec2.init(e.baselineLeft.x, screenSize.y - e.baselineLeft.y + scrollY);
+            for (text) |c, i| {
+                if (c == '\n') {
+                    buffer[i] = m.Vec2.zero;
+                    pos.y -= fontData.lineHeight;
+                    pos.x = e.baselineLeft.x;
+                } else {
+                    const charData = fontData.charData[c];
+                    buffer[i] = m.Vec2.add(pos, charData.offset);
+                    pos.x += charData.advanceX + fontData.kerning; // TODO nah
+                }
+            }
+            w.glEnableVertexAttribArray(@intCast(c_uint, renderState.textState.posPixelsAttrLoc));
+            w.glBindBuffer(w.GL_ARRAY_BUFFER, renderState.textState.posPixelsBuffer);
+            w.glBufferSubData(w.GL_ARRAY_BUFFER, 0, &buffer[0].x, n * 2);
+            w.glVertexAttribPointer(@intCast(c_uint, renderState.textState.posPixelsAttrLoc), 2, w.GL_f32, 0, 0, 0);
+            w.vertexAttribDivisorANGLE(renderState.textState.posPixelsAttrLoc, 1);
+
+            for (text) |c, i| {
+                if (c == '\n') {
+                    buffer[i] = m.Vec2.zero;
+                } else {
+                    const charData = fontData.charData[c];
+                    buffer[i] = charData.size;
+                }
+            }
+            w.glEnableVertexAttribArray(@intCast(c_uint, renderState.textState.sizePixelsAttrLoc));
+            w.glBindBuffer(w.GL_ARRAY_BUFFER, renderState.textState.sizePixelsBuffer);
+            w.glBufferSubData(w.GL_ARRAY_BUFFER, 0, &buffer[0].x, n * 2);
+            w.glVertexAttribPointer(@intCast(c_uint, renderState.textState.sizePixelsAttrLoc), 2, w.GL_f32, 0, 0, 0);
+            w.vertexAttribDivisorANGLE(renderState.textState.sizePixelsAttrLoc, 1);
+
+            for (text) |c, i| {
+                if (c == '\n') {
+                    buffer[i] = m.Vec2.zero;
+                } else {
+                    const charData = fontData.charData[c];
+                    buffer[i] = charData.uvOffset;
+                }
+            }
+            w.glEnableVertexAttribArray(@intCast(c_uint, renderState.textState.uvOffsetAttrLoc));
+            w.glBindBuffer(w.GL_ARRAY_BUFFER, renderState.textState.uvOffsetBuffer);
+            w.glBufferSubData(w.GL_ARRAY_BUFFER, 0, &buffer[0].x, n * 2);
+            w.glVertexAttribPointer(@intCast(c_uint, renderState.textState.uvOffsetAttrLoc), 2, w.GL_f32, 0, 0, 0);
+            w.vertexAttribDivisorANGLE(renderState.textState.uvOffsetAttrLoc, 1);
+
+            w.glUniform1fv(renderState.textState.depthUniLoc, e.depth);
+            w.glUniform4fv(renderState.textState.colorUniLoc, e.color.x, e.color.y, e.color.z, e.color.w);
+
+            w.glActiveTexture(w.GL_TEXTURE0);
+            w.glBindTexture(w.GL_TEXTURE_2D, fontData.textureId);
+            w.glUniform1i(renderState.textState.samplerUniLoc, 0);
+
+            w.drawArraysInstancedANGLE(w.GL_TRIANGLES, 0, POS_UNIT_SQUARE.len, n);
+        }
+
+        w.vertexAttribDivisorANGLE(0, 0);
+        w.vertexAttribDivisorANGLE(1, 0);
+        w.vertexAttribDivisorANGLE(2, 0);
+        w.vertexAttribDivisorANGLE(3, 0);
+        w.vertexAttribDivisorANGLE(4, 0);
+
         for (self.roundedFrames.items) |e| {
             const posBottomLeft = posTopLeftToBottomLeft(e.topLeft, e.size, screenSize, scrollY);
             const frameBottomLeft = posTopLeftToBottomLeft(e.frameTopLeft, e.frameSize, screenSize, scrollY);

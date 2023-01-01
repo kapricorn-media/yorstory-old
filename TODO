@@ -1,12 +1,17 @@
 CRITICAL
 
 HIGH
+- in project page, "other projects" and fix all fonts
+- line before "other projects"
+
 - gallery changes (layout)
 - number stickers off center
 - grid size3
 - lag on Chrome (getTextureData? memcpy??)
 
 MEDIUM
+- make font more crisp
+- fix kerning
 - flare layer, opacity sine wave 100% <-> 20% 
 - lively details (react on hover, fade in as you scroll, etc)
 - mobile parallax ?

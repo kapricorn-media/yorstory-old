@@ -36,26 +36,26 @@ pub const TextureData = struct {
 };
 
 pub const FontCharData = struct {
-    uvOffset: m.Vec2,
-    uvSize: m.Vec2,
     offset: m.Vec2,
+    size: m.Vec2,
+    uvOffset: m.Vec2,
     advanceX: f32,
 };
 
 pub const FontData = struct {
     textureId: c_uint,
     size: f32,
+    kerning: f32,
+    lineHeight: f32,
     charData: [256]FontCharData,
 
     const Self = @This();
 
-    pub fn init(fontFile: []const u8, size: f32, allocator: std.mem.Allocator) !Self
+    pub fn load(self: *Self, fontFile: []const u8, size: f32, kerning: f32, lineHeight: f32, allocator: std.mem.Allocator) !void
     {
-        var self = Self {
-            .textureId = 0,
-            .size = size,
-            .charData = undefined,
-        };
+        self.size = size;
+        self.kerning = kerning;
+        self.lineHeight = lineHeight;
 
         const width = 2048;
         const height = 2048;
@@ -65,32 +65,29 @@ pub const FontData = struct {
         if (stb.stbtt_PackBegin(&context, &pixelBytes[0], width, height, width, 1, null) != 1) {
             return error.stbtt_PackBegin;
         }
-        stb.stbtt_PackSetOversampling(&context, 1, 1);
+        const oversampleN = 1;
+        stb.stbtt_PackSetOversampling(&context, oversampleN, oversampleN);
 
         var charData = try allocator.alloc(stb.stbtt_packedchar, self.charData.len);
-        if (stb.stbtt_PackFontRange(&context, &fontFile[0], 0, 64.0, 0, @intCast(c_int, charData.len), &charData[0]) != 1) {
+        if (stb.stbtt_PackFontRange(&context, &fontFile[0], 0, size, 0, @intCast(c_int, charData.len), &charData[0]) != 1) {
             return error.stbtt_PackFontRange;
         }
 
         stb.stbtt_PackEnd(&context);
 
-        for (charData) |_, i| {
+        for (charData) |cd, i| {
+            const sizeF = m.Vec2.initFromVec2i(m.Vec2i.init(cd.x1 - cd.x0, cd.y1 - cd.y0));
             self.charData[i] = FontCharData {
+                .offset = m.Vec2.init(cd.xoff, -(sizeF.y + cd.yoff)),
+                .size = sizeF,
                 .uvOffset = m.Vec2.init(
-                    @intToFloat(f32, charData[i].x0) / width,
-                    @intToFloat(f32, height - charData[i].y1) / height, // TODO should do -1 ?
+                    @intToFloat(f32, cd.x0) / width,
+                    @intToFloat(f32, height - cd.y1) / height, // TODO should do -1 ?
                 ),
-                .uvSize = m.Vec2.init(
-                    @intToFloat(f32, charData[i].x1 - charData[i].x0) / width,
-                    @intToFloat(f32, charData[i].y1 - charData[i].y0) / height,
-                ),
-                .offset = m.Vec2.init(charData[i].xoff, charData[i].yoff),
-                .advanceX = charData[i].xadvance,
+                .advanceX = cd.xadvance,
             };
         }
         self.textureId = w.createTextureWithData(width, height, 1, &pixelBytes[0], pixelBytes.len, w.GL_CLAMP_TO_EDGE, w.GL_LINEAR);
-
-        return self;
     }
 };
 
@@ -285,14 +282,14 @@ pub fn Assets(comptime StaticTextureEnum: type, comptime maxDynamicTextures: usi
             }
         }
 
-        pub fn registerStaticFont(self: *Self, font: StaticFontEnum, fontFile: []const u8, size: f32, allocator: std.mem.Allocator) !void
+        pub fn registerStaticFont(self: *Self, font: StaticFontEnum, fontFile: []const u8, size: f32, kerning: f32, lineHeight: f32, allocator: std.mem.Allocator) !void
         {
-            self.staticFonts[@enumToInt(font)] = try FontData.init(fontFile, size, allocator);
+            try self.staticFonts[@enumToInt(font)].load(fontFile, size, kerning, lineHeight, allocator);
         }
 
-        pub fn getStaticFontData(self: Self, font: StaticFontEnum) FontData
+        pub fn getStaticFontData(self: Self, font: StaticFontEnum) *const FontData
         {
-            return self.staticFonts[@enumToInt(font)];
+            return &self.staticFonts[@enumToInt(font)];
         }
     };
 
