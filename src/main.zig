@@ -150,9 +150,9 @@ pub const State = struct {
             .debug = false,
         };
 
-        _ = try self.assets.register(.{ .Static = asset.Texture.Lut1 },
-            "/images/LUTs/identity.png", defaultTextureWrap, defaultTextureFilter, 1
-        );
+        // _ = try self.assets.register(.{ .Static = asset.Texture.Lut1 },
+        //     "/images/LUTs/identity.png", defaultTextureWrap, defaultTextureFilter, 1
+        // );
 
         _ = try self.assets.register(.{ .Static = asset.Texture.StickerCircle },
             "/images/sticker-circle.png", defaultTextureWrap, defaultTextureFilter, 2
@@ -1285,9 +1285,9 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
     w.bindNullFramebuffer();
     w.glClear(w.GL_COLOR_BUFFER_BIT | w.GL_DEPTH_BUFFER_BIT);
     const lut1 = state.assets.getStaticTextureData(asset.Texture.Lut1);
-    if (lut1.loaded()) {
+    // if (lut1.loaded()) {
         state.renderState.postProcessState.draw(state.fbTexture, lut1.id, screenSizeF);
-    }
+    // }
 
     const maxInflight = 4;
     state.assets.loadQueued(maxInflight);
