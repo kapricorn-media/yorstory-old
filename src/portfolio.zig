@@ -246,7 +246,7 @@ pub const PORTFOLIO_LIST = [_]Portfolio {
     .{
         .title = "PROJECT" ++ titleSpaces ++ "COMPANY",
         .uri = "/",
-        .cover = "/images/HALO/cover.png",
+        .cover = "/images/cover-empty.png",
         .sticker = "/images/404.png",
         .parallaxIndex = 5,
         .colorUi = m.Vec4.init(165.0 / 255.0, 56.0 / 255.0, 1.0, 1.0),
@@ -260,7 +260,7 @@ pub const PORTFOLIO_LIST = [_]Portfolio {
     .{
         .title = "PROJECT" ++ titleSpaces ++ "COMPANY",
         .uri = "/",
-        .cover = "/images/HALO/cover.png",
+        .cover = "/images/cover-empty.png",
         .sticker = "/images/404.png",
         .parallaxIndex = 5,
         .colorUi = m.Vec4.init(165.0 / 255.0, 56.0 / 255.0, 1.0, 1.0),
@@ -274,7 +274,7 @@ pub const PORTFOLIO_LIST = [_]Portfolio {
     .{
         .title = "PROJECT" ++ titleSpaces ++ "COMPANY",
         .uri = "/",
-        .cover = "/images/HALO/cover.png",
+        .cover = "/images/cover-empty.png",
         .sticker = "/images/404.png",
         .parallaxIndex = 5,
         .colorUi = m.Vec4.init(165.0 / 255.0, 56.0 / 255.0, 1.0, 1.0),
@@ -288,7 +288,7 @@ pub const PORTFOLIO_LIST = [_]Portfolio {
     .{
         .title = "PROJECT" ++ titleSpaces ++ "COMPANY",
         .uri = "/",
-        .cover = "/images/marvel/cover.png",
+        .cover = "/images/cover-empty.png",
         .sticker = "/images/404.png",
         .parallaxIndex = 5,
         .colorUi = m.Vec4.init(165.0 / 255.0, 56.0 / 255.0, 1.0, 1.0),
@@ -302,7 +302,7 @@ pub const PORTFOLIO_LIST = [_]Portfolio {
     .{
         .title = "PROJECT" ++ titleSpaces ++ "COMPANY",
         .uri = "/",
-        .cover = "/images/marvel/cover.png",
+        .cover = "/images/cover-empty.png",
         .sticker = "/images/404.png",
         .parallaxIndex = 5,
         .colorUi = m.Vec4.init(165.0 / 255.0, 56.0 / 255.0, 1.0, 1.0),
@@ -316,7 +316,7 @@ pub const PORTFOLIO_LIST = [_]Portfolio {
     .{
         .title = "PROJECT" ++ titleSpaces ++ "COMPANY",
         .uri = "/",
-        .cover = "/images/HALO/cover.png",
+        .cover = "/images/cover-empty.png",
         .sticker = "/images/404.png",
         .parallaxIndex = 5,
         .colorUi = m.Vec4.init(165.0 / 255.0, 56.0 / 255.0, 1.0, 1.0),

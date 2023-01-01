@@ -18,7 +18,42 @@ pub fn isInsideRect(p: Vec2, rectOrigin: Vec2, rectSize: Vec2) bool
 
 fn assertMathType(comptime T: type) void
 {
-    std.debug.assert(T == Vec2i or T == Vec2 or T == Vec3 or T == Vec4);
+    std.debug.assert(T == Vec2usize or T == Vec2i or T == Vec2 or T == Vec3 or T == Vec4);
+}
+
+fn zeroValue(comptime T: type) T
+{
+    assertMathType(T);
+
+    var result: T = undefined;
+    inline for (@typeInfo(T).Struct.fields) |f| {
+        @field(result, f.name) = 0;
+    }
+    return result;
+}
+
+fn oneValue(comptime T: type) T
+{
+    assertMathType(T);
+
+    var result: T = undefined;
+    inline for (@typeInfo(T).Struct.fields) |f| {
+        @field(result, f.name) = 1;
+    }
+    return result;
+}
+
+pub fn eql(v1: anytype, v2: @TypeOf(v1)) bool
+{
+    const T = @TypeOf(v1);
+    assertMathType(T);
+
+    inline for (@typeInfo(T).Struct.fields) |f| {
+        if (@field(v1, f.name) != @field(v2, f.name)) {
+            return false;
+        }
+    }
+    return true;
 }
 
 pub fn add(v1: anytype, v2: @TypeOf(v1)) @TypeOf(v1)
@@ -41,6 +76,48 @@ pub fn sub(v1: anytype, v2: @TypeOf(v1)) @TypeOf(v1)
     var result: T = undefined;
     inline for (@typeInfo(T).Struct.fields) |f| {
         @field(result, f.name) = @field(v1, f.name) - @field(v2, f.name);
+    }
+    return result;
+}
+
+pub fn multScalar(v: anytype, s: @TypeOf(v.x)) @TypeOf(v)
+{
+    const T = @TypeOf(v);
+    assertMathType(T);
+
+    var result: T = undefined;
+    inline for (@typeInfo(T).Struct.fields) |f| {
+        @field(result, f.name) = @field(v, f.name) * s;
+    }
+    return result;
+}
+
+pub fn divScalar(v: anytype, s: @TypeOf(v.x)) @TypeOf(v)
+{
+    const T = @TypeOf(v);
+    assertMathType(T);
+    const TScalar = @TypeOf(v.x);
+
+    var result: T = undefined;
+    inline for (@typeInfo(T).Struct.fields) |f| {
+        if (@typeInfo(TScalar) == .Int) {
+            @field(result, f.name) = @divTrunc(@field(v, f.name), s);
+        } else {
+            @field(result, f.name) = @field(v, f.name) / s;
+        }
+    }
+    return result;
+}
+
+pub fn dot(v1: anytype, v2: @TypeOf(v1)) @TypeOf(v1.x)
+{
+    const T = @TypeOf(v1);
+    assertMathType(T);
+    const TScalar = @TypeOf(v1.x);
+
+    var result: TScalar = 0;
+    inline for (@typeInfo(T).Struct.fields) |f| {
+        result += @field(v1, f.name) * @field(v2, f.name);
     }
     return result;
 }
@@ -69,20 +146,45 @@ pub fn min(v1: anytype, v2: @TypeOf(v1)) @TypeOf(v1)
     return result;
 }
 
+pub const Vec2usize = packed struct {
+    x: usize,
+    y: usize,
+
+    const Self = @This();
+
+    pub const zero = zeroValue(Self);
+    pub const one  = oneValue(Self);
+
+    pub fn init(x: usize, y: usize) Self
+    {
+        return Self { .x = x, .y = y };
+    }
+
+    pub fn initFromVec2i(v: Vec2i) Self
+    {
+        return Self { .x = @intCast(usize, v.x), .y = @intCast(usize, v.y) };
+    }
+};
+
 pub const Vec2i = packed struct {
     x: i32,
     y: i32,
 
     const Self = @This();
 
-    pub const zero  = init(0, 0);
-    pub const one   = init(1, 1);
+    pub const zero  = zeroValue(Self);
+    pub const one   = oneValue(Self);
     pub const unitX = init(1, 0);
     pub const unitY = init(0, 1);
 
     pub fn init(x: i32, y: i32) Self
     {
         return Self { .x = x, .y = y };
+    }
+
+    pub fn initFromVec2usize(v: Vec2usize) Self
+    {
+        return Self { .x = @intCast(i32, v.x), .y = @intCast(i32, v.y) };
     }
 
     pub fn eql(v1: Self, v2: Self) bool
@@ -386,10 +488,29 @@ pub const Mat4x4 = packed struct {
     }
 };
 
-test "add"
+fn testFn(function: anytype, v1: anytype, v2: anytype, expected: anytype) !void
 {
-    const v1 = Vec2i.init(1, 6);
-    const v2 = Vec2i.init(4, 5);
-    const result = add(v1, v2);
-    try std.testing.expectEqual(Vec2i.init(5, 11), result);
+    const result = function(v1, v2);
+    try std.testing.expectEqual(expected, result);
+}
+
+test "arithmetic"
+{
+    try testFn(add, Vec2i.init(1, 6), Vec2i.init(4, 5), Vec2i.init(5, 11));
+    try testFn(add, Vec2.init(1.0, 0.0), Vec2.init(4.0, 5.0), Vec2.init(5.0, 5.0));
+    try testFn(add, Vec3.init(1.0, 0.0, -200.0), Vec3.init(4.0, 5.0, 1.0), Vec3.init(5.0, 5.0, -199.0));
+
+    try testFn(sub, Vec2i.init(1, 6), Vec2i.init(4, 5), Vec2i.init(-3, 1));
+    try testFn(sub, Vec2.init(1.0, 0.0), Vec2.init(4.0, 5.0), Vec2.init(-3.0, -5.0));
+    try testFn(sub, Vec3.init(1.0, 0.0, -200.0), Vec3.init(4.0, 5.0, 1.0), Vec3.init(-3.0, -5.0, -201.0));
+
+    try testFn(multScalar, Vec2i.init(1, 6), 3, Vec2i.init(1 * 3, 6 * 3));
+    try testFn(multScalar, Vec2.init(-3.0, 5.0), 2.5, Vec2.init(-3.0 * 2.5, 5.0 * 2.5));
+    try testFn(multScalar, Vec3.init(1.0, 0.0, -200.0), 2.5, Vec3.init(1.0 * 2.5, 0.0 * 2.5, -200.0 * 2.5));
+
+    try testFn(divScalar, Vec2i.init(1, 6), 3, Vec2i.init(0, 2));
+    try testFn(divScalar, Vec2.init(-3.0, 5.0), 2.5, Vec2.init(-3.0 / 2.5, 5.0 / 2.5));
+    try testFn(divScalar, Vec3.init(1.0, 0.0, -200.0), 2.5, Vec3.init(1.0 / 2.5, 0.0 / 2.5, -200.0 / 2.5));
+
+    // TODO max, min, dot
 }

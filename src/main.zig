@@ -663,6 +663,10 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
 
     const section1Height = screenSizeF.y;
 
+    if (!allLandingAssetsLoaded) {
+        return @floatToInt(i32, section1Height);
+    }
+
     // ==== SECOND FRAME ====
 
     var section2Height: f32 = 0;
@@ -857,12 +861,13 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
             for (pf.subprojects) |sub, i| {
                 const numberSize = getTextureScaledSize(stickerCircle.size, screenSizeF);
                 const numberPos = m.Vec2.init(
-                    contentMarginX - gridSize * 1.6,
-                    yGallery - gridSize * 2.5,
+                    contentMarginX - gridSize * 1.4,
+                    yGallery - gridSize * 2.4,
                 );
+                // TODO number should be on top, but depth sorting is bad
                 if (stickerCircle.loaded()) {
                     renderQueue.quadTex(
-                        numberPos, numberSize, DEPTH_UI_GENERIC, 0, stickerCircle.id, colorRedSticker
+                        numberPos, numberSize, DEPTH_UI_GENERIC + 0.02, 0, stickerCircle.id, colorRedSticker
                     );
                 }
                 const numStr = std.fmt.allocPrint(allocator, "{}", .{i + 1}) catch unreachable;
@@ -870,7 +875,7 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
                     numberPos.x + numberSize.x * 0.28,
                     numberPos.y + numberSize.y * 0.75
                 );
-                renderQueue.text2(numStr, numberTextPos, DEPTH_UI_GENERIC - 0.01, asset.Font.Number, m.Vec4.black);
+                renderQueue.text2(numStr, numberTextPos, DEPTH_UI_GENERIC + 0.01, asset.Font.Number, m.Vec4.black);
 
                 renderQueue.text2(sub.name, m.Vec2.init(x, yGallery), DEPTH_UI_GENERIC, asset.Font.Subtitle, colorUi);
                 yGallery += gridSize * 1;
