@@ -449,10 +449,10 @@ function fillGlFunctions(env)
 
 function updateCanvasSize()
 {
-    // _canvas.width = window.innerWidth;
-    // _canvas.height = window.innerHeight;
-    _canvas.width = window.screen.width;
-    _canvas.height = window.screen.height;
+    _canvas.width = window.innerWidth;
+    _canvas.height = window.innerHeight;
+    // _canvas.width = window.screen.width;
+    // _canvas.height = window.screen.height;
 
     gl.viewport(0, 0, _canvas.width, _canvas.height);
 

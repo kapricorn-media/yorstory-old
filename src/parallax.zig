@@ -140,6 +140,39 @@ pub const PARALLAX_SETS = [_]ParallaxSet{
             ParallaxImage.init("/images/parallax/parallax6-5.png", 1.5),
         },
     },
+    .{ // Halo
+        .bgColor = .{
+            .Color = colorHexToVec4("#000000") catch unreachable,
+        },
+        .images = &[_]ParallaxImage{
+            ParallaxImage.init("/images/HALO/parallax/1.png", 0.0),
+            ParallaxImage.init("/images/HALO/parallax/2.png", 0.01),
+            ParallaxImage.init("/images/HALO/parallax/3.png", 0.05),
+            ParallaxImage.init("/images/HALO/parallax/4.png", 0.08),
+            ParallaxImage.init("/images/HALO/parallax/5.png", 0.1),
+            ParallaxImage.init("/images/HALO/parallax/6.png", 0.2),
+            ParallaxImage.init("/images/HALO/parallax/7.png", 0.24),
+            ParallaxImage.init("/images/HALO/parallax/8.png", 0.3),
+            ParallaxImage.init("/images/HALO/parallax/9.png", 0.4),
+            ParallaxImage.init("/images/HALO/parallax/10.png", 0.4),
+            ParallaxImage.init("/images/HALO/parallax/11.png", 0.35),
+            ParallaxImage.init("/images/HALO/parallax/12.png", 1.2),
+            ParallaxImage.init("/images/HALO/parallax/13.png", 1.2),
+        },
+    },
+    .{ // Thanos
+        .bgColor = .{
+            .Color = colorHexToVec4("#000000") catch unreachable,
+        },
+        .images = &[_]ParallaxImage{
+            ParallaxImage.init("/images/marvel/parallax/1.png", 0.05),
+            ParallaxImage.init("/images/marvel/parallax/2.png", 0.1),
+            ParallaxImage.init("/images/marvel/parallax/3.png", 0.15),
+            ParallaxImage.init("/images/marvel/parallax/4.png", 0.7),
+            ParallaxImage.init("/images/marvel/parallax/5.png", 1.2),
+            ParallaxImage.init("/images/marvel/parallax/6.png", 1.2),
+        },
+    },
 };
 
 pub fn tryLoadAndGetParallaxSet(assets: anytype, index: usize, priority: u32, textureWrap: c_uint, textureFilter: c_uint) ?*const ParallaxSet

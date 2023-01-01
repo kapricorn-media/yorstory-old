@@ -133,7 +133,8 @@ pub const State = struct {
     debug: bool,
 
     const Self = @This();
-    const PARALLAX_SET_INDEX_START = 3;
+    // const PARALLAX_SET_INDEX_START = 3;
+    const PARALLAX_SET_INDEX_START = 6;
     comptime {
         if (PARALLAX_SET_INDEX_START >= parallax.PARALLAX_SETS.len) {
             @compileError("start parallax index out of bounds");
@@ -483,107 +484,86 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
 
     var allLandingAssetsLoaded = allIconsLoaded and categoriesText.loaded() and decalTopLeft.loaded() and stickerMain.loaded() and stickerShiny.loaded();
 
-    const landingImagePos = m.Vec2.init(
-        marginX + gridSize * 1,
-        gridSize * 1
-    );
-    const landingImageSize = m.Vec2.init(
-        screenSizeF.x - marginX * 2 - gridSize * 2,
-        screenSizeF.y - gridSize * 3
-    );
-    // const landingImagePos = m.Vec2.init(
-    //     marginX, 0.0,
-    // );
-    // const landingImageSize = m.Vec2.init(
-    //     screenSizeF.x - marginX * 2,
-    //     screenSizeF.y
-    // );
-    switch (state.pageData) {
-        .Home => {
-            // Determine whether the active parallax set is loaded
-            var activeParallaxSet = parallax.tryLoadAndGetParallaxSet(&state.assets, state.activeParallaxSetIndex, 5, defaultTextureWrap, defaultTextureFilter);
+    const parallaxIndex = blk: {
+        switch (state.pageData) {
+            .Home => break :blk state.activeParallaxSetIndex,
+            .Entry => |entryData| {
+                const pf = portfolio.PORTFOLIO_LIST[entryData.portfolioIndex];
+                break :blk pf.parallaxIndex;
+            },
+        }
+    };
+
+    // Determine whether the active parallax set is loaded
+    var activeParallaxSet = parallax.tryLoadAndGetParallaxSet(&state.assets, parallaxIndex, 5, defaultTextureWrap, defaultTextureFilter);
+
+    // Load later sets
+    if (state.pageData == .Home and activeParallaxSet != null) {
+        state.parallaxIdleTimeMs += deltaMs;
+        const nextSetIndex = (parallaxIndex + 1) % parallax.PARALLAX_SETS.len;
+        var nextParallaxSet = parallax.tryLoadAndGetParallaxSet(&state.assets, nextSetIndex, 20, defaultTextureWrap, defaultTextureFilter);
+        if (nextParallaxSet) |_| {
             const parallaxSetSwapSeconds = 6;
-            if (activeParallaxSet) |_| {
-                state.parallaxIdleTimeMs += deltaMs;
-                const nextSetIndex = (state.activeParallaxSetIndex + 1) % parallax.PARALLAX_SETS.len;
-                var nextParallaxSet = parallax.tryLoadAndGetParallaxSet(&state.assets, nextSetIndex, 20, defaultTextureWrap, defaultTextureFilter);
-                if (nextParallaxSet) |_| {
-                    if (state.parallaxIdleTimeMs >= parallaxSetSwapSeconds * 1000) {
-                        state.parallaxIdleTimeMs = 0;
-                        state.activeParallaxSetIndex = nextSetIndex;
-                        activeParallaxSet = nextParallaxSet;
-                    } else {
-                        for (parallax.PARALLAX_SETS) |_, i| {
-                            if (parallax.tryLoadAndGetParallaxSet(&state.assets, i, 20, defaultTextureWrap, defaultTextureFilter) == null) {
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
-
-            const targetParallaxTX = mousePosF.x / screenSizeF.x * 2.0 - 1.0; // -1 to 1
-            state.parallaxTX = targetParallaxTX;
-
-            if (allLandingAssetsLoaded) {
-                if (activeParallaxSet) |parallaxSet| {
-                    switch (parallaxSet.bgColor) {
-                        .Color => |color| {
-                            renderQueue.quad(landingImagePos, landingImageSize, DEPTH_LANDINGBACKGROUND, 0, color);
-                        },
-                        .Gradient => |gradient| {
-                            renderQueue.quadGradient(
-                                landingImagePos, landingImageSize, DEPTH_LANDINGBACKGROUND, 0,
-                                gradient.colorTop, gradient.colorTop,
-                                gradient.colorBottom, gradient.colorBottom);
-                        },
-                    }
-
-                    for (parallaxSet.images) |parallaxImage| {
-                        const textureData = state.assets.getTextureData(.{.DynamicUrl = parallaxImage.url}) orelse continue;
-                        if (!textureData.loaded()) continue;
-
-                        const textureDataF = m.Vec2.initFromVec2i(textureData.size);
-                        const textureSize = m.Vec2.init(
-                            landingImageSize.y * textureDataF.x / textureDataF.y,
-                            landingImageSize.y
-                        );
-                        const parallaxOffsetX = state.parallaxTX * parallaxMotionMax * parallaxImage.factor;
-
-                        const imgPos = m.Vec2.init(
-                            screenSizeF.x / 2.0 - textureSize.x / 2.0 + parallaxOffsetX,
-                            landingImagePos.y
-                        );
-                        renderQueue.quadTex(imgPos, textureSize, DEPTH_LANDINGIMAGE, 0.0, textureData.id, m.Vec4.one);
-                    }
-                } else {
-                    allLandingAssetsLoaded = false;
-                }
-            }
-        },
-        .Entry => |entryData| {
-            const pf = portfolio.PORTFOLIO_LIST[entryData.portfolioIndex];
-            if (state.assets.getTextureData(.{.DynamicUrl = pf.landing})) |landingTex| {
-                if (allLandingAssetsLoaded and landingTex.loaded()) {
-                    const textureSize = getTextureScaledSize(landingTex.size, screenSizeF);
-                    const imgPos = m.Vec2.init(
-                        screenSizeF.x / 2.0 - textureSize.x / 2.0,
-                        landingImagePos.y
-                    );
-                    const imgSize = m.Vec2.init(textureSize.x, landingImageSize.y);
-                    renderQueue.quadTex(imgPos, imgSize, DEPTH_LANDINGIMAGE, 0.0, landingTex.id, m.Vec4.one);
-                } else {
-                    allLandingAssetsLoaded = false;
-                }
+            if (state.parallaxIdleTimeMs >= parallaxSetSwapSeconds * 1000) {
+                state.parallaxIdleTimeMs = 0;
+                state.activeParallaxSetIndex = nextSetIndex;
+                activeParallaxSet = nextParallaxSet;
             } else {
-                allLandingAssetsLoaded = false;
-                _ = state.assets.register(.{.DynamicUrl = pf.landing},
-                    pf.landing, defaultTextureWrap, defaultTextureFilter, 5
-                ) catch |err| {
-                    std.log.err("register failed for {s} error {}", .{pf.landing, err});
-                };
+                for (parallax.PARALLAX_SETS) |_, i| {
+                    if (parallax.tryLoadAndGetParallaxSet(&state.assets, i, 20, defaultTextureWrap, defaultTextureFilter) == null) {
+                        break;
+                    }
+                }
             }
-        },
+        }
+    }
+
+    const targetParallaxTX = mousePosF.x / screenSizeF.x * 2.0 - 1.0; // -1 to 1
+    state.parallaxTX = targetParallaxTX;
+
+    if (allLandingAssetsLoaded) {
+        if (activeParallaxSet) |parallaxSet| {
+            const landingImagePos = m.Vec2.init(
+                marginX + gridSize * 1,
+                gridSize * 1
+            );
+            const landingImageSize = m.Vec2.init(
+                screenSizeF.x - marginX * 2 - gridSize * 2,
+                screenSizeF.y - gridSize * 3
+            );
+
+            switch (parallaxSet.bgColor) {
+                .Color => |color| {
+                    renderQueue.quad(landingImagePos, landingImageSize, DEPTH_LANDINGBACKGROUND, 0, color);
+                },
+                .Gradient => |gradient| {
+                    renderQueue.quadGradient(
+                        landingImagePos, landingImageSize, DEPTH_LANDINGBACKGROUND, 0,
+                        gradient.colorTop, gradient.colorTop,
+                        gradient.colorBottom, gradient.colorBottom);
+                },
+            }
+
+            for (parallaxSet.images) |parallaxImage| {
+                const textureData = state.assets.getTextureData(.{.DynamicUrl = parallaxImage.url}) orelse continue;
+                if (!textureData.loaded()) continue;
+
+                const textureDataF = m.Vec2.initFromVec2i(textureData.size);
+                const textureSize = m.Vec2.init(
+                    landingImageSize.y * textureDataF.x / textureDataF.y,
+                    landingImageSize.y
+                );
+                const parallaxOffsetX = state.parallaxTX * parallaxMotionMax * parallaxImage.factor;
+
+                const imgPos = m.Vec2.init(
+                    screenSizeF.x / 2.0 - textureSize.x / 2.0 + parallaxOffsetX,
+                    landingImagePos.y
+                );
+                renderQueue.quadTex(imgPos, textureSize, DEPTH_LANDINGIMAGE, 0.0, textureData.id, m.Vec4.one);
+            }
+        } else {
+            allLandingAssetsLoaded = false;
+        }
     }
 
     if (decalTopLeft.loaded()) {
@@ -870,21 +850,21 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
 
     // content section
     const baseY = section1Height + section2Height;
-    const headerText = switch (state.pageData) {
-        .Home => "projects",
-        .Entry => "boarding the mechanics ***",
-    };
-    const subText = switch (state.pageData) {
-        .Home => "In alchemy, the term chrysopoeia (from Greek χρυσοποιία, khrusopoiia, \"gold-making\") refers to the artificial production of gold, most commonly by the alleged transmutation of base metals such as lead. A related term is argyropoeia (ἀργυροποιία, arguropoiia, \"silver-making\"), referring to the artificial production...",
-        .Entry => "In 2010, Yorstory partnered with Microsoft/343 Studios to join one of the video game industry's most iconic franchises - Halo. Working with the team's weapons and mission designers, we were tasked with helping visualize some of the game's weapons and idealized gameplay scenarios. The result was an exciting blend of enthusiasm sci-fi mayhem, starring the infamous Master Chief.",
-    };
+    var contentHeader: []const u8 = "projects";
+    var contentDescription: []const u8 = "In alchemy, the term chrysopoeia (from Greek χρυσοποιία, khrusopoiia, \"gold-making\") refers to the artificial production of gold, most commonly by the alleged transmutation of base metals such as lead. A related term is argyropoeia (ἀργυροποιία, arguropoiia, \"silver-making\"), referring to the artificial production...";
+    if (state.pageData == .Entry) {
+        const entryData = state.pageData.Entry;
+        const pf = portfolio.PORTFOLIO_LIST[entryData.portfolioIndex];
+        contentHeader = pf.contentHeader;
+        contentDescription = pf.contentDescription;
+    }
 
     const contentHeaderPos = m.Vec2.init(
         contentMarginX,
         baseY + gridSize * 3.0,
     );
     renderQueue.textLine(
-        headerText,
+        contentHeader,
         contentHeaderPos, fontStickerSize, 0.0,
         colorUi, "HelveticaBold"
     );
@@ -895,7 +875,7 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
     );
     const contentSubWidth = screenSizeF.x - contentMarginX * 2;
     renderQueue.textBox(
-        subText,
+        contentDescription,
         contentSubPos, contentSubWidth,
         fontTextSize, lineHeight, 0.0,
         colorUi, "HelveticaMedium", .Left
