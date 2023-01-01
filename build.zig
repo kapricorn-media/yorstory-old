@@ -90,14 +90,6 @@ pub fn build(b: *std.build.Builder) void
     zig_http_build.addLibClient(server, target, "deps/zig-http");
     zig_http_build.addLibCommon(server, target, "deps/zig-http");
     zig_http_build.addLibServer(server, target, "deps/zig-http");
-    server.addIncludePath("deps/stb");
-    server.addCSourceFiles(&[_][]const u8{
-        "deps/stb/stb_image_impl.c",
-        "deps/stb/stb_image_write_impl.c",
-        "deps/stb/stb_rect_pack_impl.c",
-        "deps/stb/stb_truetype_impl.c",
-    }, &[_][]const u8{"-std=c99"});
-    server.linkLibC();
     server.override_dest_dir = installDirRoot;
     server.install();
 

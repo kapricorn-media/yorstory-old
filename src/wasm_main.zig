@@ -14,7 +14,7 @@ const ww = @import("wasm.zig");
 
 // Set up wasm export functions and logging.
 pub const log = wasm_core.log;
-usingnamespace wasm_app;
+pub usingnamespace wasm_app;
 usingnamespace wasm_core;
 
 const defaultTextureWrap = w.GL_CLAMP_TO_EDGE;
@@ -370,7 +370,7 @@ fn drawCrosshairCorners(pos: m.Vec2, size: m.Vec2, depth: f32, gridSize: f32, de
     );
 }
 
-fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, renderQueue: *render.RenderQueue, allocator: std.mem.Allocator, screenResize: bool) i32
+fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, screenResize:bool, renderQueue: *render.RenderQueue, allocator: std.mem.Allocator) i32
 {
     const colorYellowHome = m.Vec4.init(234.0 / 255.0, 1.0, 0.0, 1.0);
     const colorUi = blk: {
@@ -775,7 +775,7 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
                     break :blk scrollYF - eyeSize.y;
                 } else if (scrollYF <= eyeCheckpoint2) {
                     const t = (scrollYF - eyeCheckpoint1) / (eyeCheckpoint2 - eyeCheckpoint1);
-                    break :blk scrollYF + m.lerpFloat(f32, -eyeSize.y, eyeOffset, t);
+                    break :blk scrollYF + m.lerpFloat(-eyeSize.y, eyeOffset, t);
                 } else {
                     break :blk wasPosBaseY + eyeOffset;
                 }
@@ -1075,12 +1075,79 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
     return @floatToInt(i32, yMax);
 }
 
-fn drawMobile(state: *State, deltaS: f32, scrollY: f32, screenSize: m.Vec2, renderQueue: *render.RenderQueue, allocator: std.mem.Allocator) i32
+fn drawMobile(state: *State, deltaS: f32, scrollY: f32, screenSize: m.Vec2, screenResize: bool, renderQueue: *render.RenderQueue, allocator: std.mem.Allocator) i32
 {
-    _ = deltaS; _ = scrollY; _ = allocator;
+    _ = deltaS;
+    _ = scrollY;
+    // _ = allocator;
 
     const aspect = screenSize.x / screenSize.y;
     const gridSize = std.math.round(80.0 / 1920.0 * screenSize.y);
+
+    if (screenResize) {
+        // const helveticaBoldUrl = "/fonts/HelveticaNeueLTCom-Bd.ttf";
+        // const helveticaMediumUrl = "/fonts/HelveticaNeueLTCom-Md.ttf";
+        // const helveticaLightUrl = "/fonts/HelveticaNeueLTCom-Lt.ttf";
+
+        // const categoryFontSize = gridSize * 0.6;
+        // const categoryKerning = 0;
+        // const categoryLineHeight = categoryFontSize;
+        // state.assets.registerStaticFont(asset.Font.Category, helveticaBoldUrl, categoryFontSize, categoryKerning, categoryLineHeight) catch |err| {
+        //     std.log.err("registerStaticFont failed err={}", .{err});
+        // };
+
+        // const titleFontSize = gridSize * 4.0;
+        // const titleKerning = -gridSize * 0.15;
+        // const titleLineHeight = gridSize * 3.6;
+        // state.assets.registerStaticFont(asset.Font.Title, helveticaBoldUrl, titleFontSize, titleKerning, titleLineHeight) catch |err| {
+        //     std.log.err("registerStaticFont failed err={}", .{err});
+        // };
+
+        // const subtitleFontSize = gridSize * 1.25;
+        // const subtitleKerning = -gridSize * 0.05;
+        // const subtitleLineHeight = subtitleFontSize;
+        // state.assets.registerStaticFont(asset.Font.Subtitle, helveticaLightUrl, subtitleFontSize, subtitleKerning, subtitleLineHeight) catch |err| {
+        //     std.log.err("registerStaticFont failed err={}", .{err});
+        // };
+
+        // const textFontSize = gridSize * 0.4;
+        // const textKerning = 0;
+        // const textLineHeight = textFontSize * 1.4;
+        // state.assets.registerStaticFont(asset.Font.Text, helveticaMediumUrl, textFontSize, textKerning, textLineHeight) catch |err| {
+        //     std.log.err("registerStaticFont failed err={}", .{err});
+        // };
+
+        // const numberFontSize = gridSize * 1.8;
+        // const numberKerning = 0;
+        // const numberLineHeight = numberFontSize;
+        // state.assets.registerStaticFont(asset.Font.Number, helveticaBoldUrl, numberFontSize, numberKerning, numberLineHeight) catch |err| {
+        //     std.log.err("registerStaticFont failed err={}", .{err});
+        // };
+    }
+
+    const eulerAngles = m.Vec3.init(state.deviceState.angles.y, state.deviceState.angles.z, state.deviceState.angles.x);
+    const quat = m.Quat.initFromEulerAngles(eulerAngles);
+    _ = quat;
+    const anglesTarget = state.deviceState.angles;
+    // TODO use something more linear
+    state.anglesRef = m.lerp(state.anglesRef, anglesTarget, 0.01);
+
+    _ = allocator;
+    // const allFontsLoaded = state.assets.getStaticFontData(asset.Font.Text) != null;
+    // if (allFontsLoaded) {
+    //     // const anglesRefText = std.fmt.allocPrint(allocator, "x={d:.2}\ny={d:.2}\nz={d:.2}", .{state.anglesRef.x, state.anglesRef.y, state.anglesRef.z}) catch "";
+    //     // renderQueue.text2(anglesRefText, m.Vec2.init(50.0, 100.0), 0.0, asset.Font.Text, m.Vec4.one);
+
+    //     const anglesTargetText = std.fmt.allocPrint(allocator, "x={d:.2}\ny={d:.2}\nz={d:.2}", .{anglesTarget.x, anglesTarget.y, anglesTarget.z}) catch "";
+    //     renderQueue.text2(anglesTargetText, m.Vec2.init(50.0, 100.0), 0.0, asset.Font.Text, m.Vec4.one);
+
+    //     const relativeUp = m.Quat.rotate(quat, m.Vec3.unitY);
+    //     const relativeFront = m.Quat.rotate(quat, m.Vec3.unitZ);
+    //     const relativeUpText = std.fmt.allocPrint(allocator, "relative up:\nx={d:.2}\ny={d:.2}\nz={d:.2}", .{relativeUp.x, relativeUp.y, relativeUp.z}) catch "";
+    //     renderQueue.text2(relativeUpText, m.Vec2.init(50.0, 400.0), 0.0, asset.Font.Text, m.Vec4.one);
+    //     const relativeFrontText = std.fmt.allocPrint(allocator, "relative front:\nx={d:.2}\ny={d:.2}\nz={d:.2}", .{relativeFront.x, relativeFront.y, relativeFront.z}) catch "";
+    //     renderQueue.text2(relativeFrontText, m.Vec2.init(50.0, 600.0), 0.0, asset.Font.Text, m.Vec4.one);
+    // }
 
     const backgroundTex = state.assets.getStaticTextureData(asset.Texture.MobileBackground);
     if (backgroundTex.loaded()) {
@@ -1118,8 +1185,10 @@ fn drawMobile(state: *State, deltaS: f32, scrollY: f32, screenSize: m.Vec2, rend
     const crosshairTex = state.assets.getStaticTextureData(asset.Texture.MobileCrosshair);
     const iconsTex = state.assets.getStaticTextureData(asset.Texture.MobileIcons);
     if (crosshairTex.loaded() and iconsTex.loaded()) {
+        // const offsetTest = if (state.anglesRef.z > anglesTarget.z) state.anglesRef.z - anglesTarget.z) / 90.0 * 100.0;
+        const offsetTest = anglesTarget.z / 90.0 * 100.0;
         const crosshairOffset = gridSize * 0.25;
-        const pos = m.Vec2.init(-(gridSize + crosshairOffset), -(gridSize + crosshairOffset));
+        const pos = m.Vec2.init(-(gridSize + crosshairOffset) + offsetTest, -(gridSize + crosshairOffset));
         const size = m.Vec2.init(screenSize.x + gridSize * 2.0 + crosshairOffset * 2.0, screenSize.y + gridSize * 2.0 + crosshairOffset * 2.0);
         drawCrosshairCorners(pos, size, DEPTH_UI_GENERIC, gridSize, crosshairTex, screenSize, m.Vec4.white, renderQueue);
 
@@ -1210,9 +1279,9 @@ export fn onAnimationFrame(memory: *wasm_app.Memory, width: c_int, height: c_int
 
     var yMax: i32 = 0;
     if (isVertical) {
-        yMax = drawMobile(state, deltaS, scrollYF, screenSizeF, &renderQueue, tempAllocator);
+        yMax = drawMobile(state, deltaS, scrollYF, screenSizeF, screenResize, &renderQueue, tempAllocator);
     } else {
-        yMax = drawDesktop(state, deltaMs, scrollYF, screenSizeF, &renderQueue, tempAllocator, screenResize);
+        yMax = drawDesktop(state, deltaMs, scrollYF, screenSizeF, screenResize, &renderQueue, tempAllocator);
     }
     defer {
         state.yMaxPrev = yMax;

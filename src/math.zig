@@ -1,15 +1,5 @@
 const std = @import("std");
 
-pub fn lerpFloat(comptime T: type, v1: T, v2: T, t: f32) T
-{
-    return v1 * (1.0 - t) + v2 * t;
-}
-
-pub fn lerpVec(comptime T: type, v1: T, v2: T, t: f32) T
-{
-    return T.add(T.multScalar(v1, 1.0 - t), T.multScalar(v2, t));
-}
-
 pub fn isInsideRect(p: Vec2, rectOrigin: Vec2, rectSize: Vec2) bool
 {
     return p.x >= rectOrigin.x and p.x <= rectOrigin.x + rectSize.x
@@ -144,6 +134,17 @@ pub fn min(v1: anytype, v2: @TypeOf(v1)) @TypeOf(v1)
         @field(result, f.name) = @min(@field(v1, f.name), @field(v2, f.name));
     }
     return result;
+}
+
+pub fn lerpFloat(v1: anytype, v2: @TypeOf(v1), t: @TypeOf(v1)) @TypeOf(v1)
+{
+    std.debug.assert(@typeInfo(@TypeOf(v1)) == .Float);
+    return v1 * (1.0 - t) + v2 * t;
+}
+
+pub fn lerp(v1: anytype, v2: @TypeOf(v1), t: @TypeOf(v1.x)) @TypeOf(v1)
+{
+    return add(multScalar(v1, 1.0 - t), multScalar(v2, t));
 }
 
 pub const Vec2usize = packed struct {
@@ -461,6 +462,117 @@ pub const Rect = packed struct {
     pub fn size(self: Self) Vec2
     {
         return sub(self.max, self.min);
+    }
+};
+
+// Should always be unit quaternions
+pub const Quat = packed struct {
+    x: f32,
+    y: f32,
+    z: f32,
+    w: f32,
+
+    const Self = @This();
+
+    pub const one = Self {
+        .x = 0.0, .y = 0.0, .z = 0.0, .w = 1.0
+    };
+
+    // Quat QuatRotBetweenVectors(Vec3 v1, Vec3 v2)
+    // {
+    //     float32 dot = Dot(v1, v2);
+    //     if (dot > 0.99999f) {
+    //         return Quat::one;
+    //     }
+    //     else if (dot < -0.99999f) {
+    //         // TODO 180 degree rotation about any perpendicular axis
+    //         // hardcoded PI_F could be cheaper to calculate some other way
+    //         const Vec3 axis = Normalize(GetPerpendicular(v1));
+    //         return QuatFromAngleUnitAxis(PI_F, axis);
+    //     }
+
+    //     const Vec3 axis = Cross(v1, v2);
+    //     const float32 angle = Sqrt32(MagSq(v1) * MagSq(v2)) + dot;
+    //     return QuatFromAngleUnitAxis(angle, Normalize(axis));
+    // }
+
+    pub fn init(angle: f32, unitAxis: Vec3) Self
+    {
+        const cosHalfAngle = std.math.cos(angle / 2.0);
+        const sinHalfAngle = std.math.sin(angle / 2.0);
+        return Self {
+            .x = unitAxis.x * sinHalfAngle,
+            .y = unitAxis.y * sinHalfAngle,
+            .z = unitAxis.z * sinHalfAngle,
+            .w = cosHalfAngle,
+        };
+    }
+
+    // TODO is this working?
+    pub fn initFromEulerAngles(euler: Vec3) Self
+    {
+        var quat = init(euler.x, Vec3.unitX);
+        quat = mult(init(euler.y, Vec3.unitY), quat);
+        quat = mult(init(euler.z, Vec3.unitZ), quat);
+        return quat;
+    }
+
+    pub fn mult(q1: Self, q2: Self) Self
+    {
+        return Self {
+            .x = q1.w*q2.x + q1.x*q2.w + q1.y*q2.z - q1.z*q2.y,
+            .y = q1.w*q2.y + q1.y*q2.w + q1.z*q2.x - q1.x*q2.z,
+            .z = q1.w*q2.z + q1.z*q2.w + q1.x*q2.y - q1.y*q2.x,
+            .w = q1.w*q2.w - q1.x*q2.x - q1.y*q2.y - q1.z*q2.z,
+        };
+    }
+
+    pub fn magSq(q: Self) f32
+    {
+        return q.x*q.x + q.y*q.y + q.z*q.z + q.w*q.w;
+    }
+
+    pub fn mag(q: Self) f32
+    {
+        return std.math.sqrt(magSq(q));
+    }
+
+    pub fn normalize(q: Self) Self
+    {
+        const m = mag(q);
+        return Self {
+            .x = q.x / m,
+            .y = q.y / m,
+            .z = q.z / m,
+            .w = q.w / m,
+        };
+    }
+
+    // Returns a new quaternion qInv such that q * qInv = Quat::one
+    pub fn inverse(q: Self) Self
+    {
+        return Self {
+            .x = -q.x,
+            .y = -q.y,
+            .z = -q.z,
+            .w = q.w,
+        };
+    }
+
+    pub fn rotate(q: Self, v: Vec3) Vec3
+    {
+        // Treat v as a quaternion with w = 0
+        const vQ = Self { .x = v.x, .y = v.y, .z = v.z, .w = 0 };
+        // TODO Quat multiply with baked in w=0 would be faster, obviously
+        // qv.x = q.w*v.x + q.y*v.z - q.z*v.y;
+        // qv.y = q.w*v.y + q.z*v.x - q.x*v.z;
+        // qv.z = q.w*v.z + q.x*v.y - q.y*v.x;
+        // qv.w = -q.x*v.x - q.y*v.y - q.z*v.z;
+        const qv = mult(q, vQ);
+
+        const qInv = inverse(q);
+        const qvqInv = mult(qv, qInv);
+        return Vec3 { .x = qvqInv.x, .y = qvqInv.y, .z = qvqInv.z };
     }
 };
 

@@ -501,7 +501,7 @@ function wasmInit(wasmUri, memoryBytes)
             _wasmInstance.exports.onKeyDown(_memoryPtr, event.keyCode);
         }
     });
-    document.addEventListener("deviceorientation", function(event) {
+    window.addEventListener("deviceorientation", function(event) {
         if (_wasmInstance !== null) {
             _wasmInstance.exports.onDeviceOrientation(_memoryPtr, event.alpha, event.beta, event.gamma);
         }

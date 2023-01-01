@@ -3,10 +3,6 @@ const std = @import("std");
 
 const http = @import("http-common");
 const server = @import("http-server");
-const stb = @cImport({
-    @cInclude("stb_image.h");
-    @cInclude("stb_image_write.h");
-});
 
 const config = @import("config");
 
