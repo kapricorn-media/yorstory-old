@@ -35,7 +35,7 @@ fn buttonToClickType(button: c_int) input.ClickType
     };
 }
 
-export fn onInit() ?*Memory
+export fn onInit(width: c_uint, height: c_uint) ?*Memory
 {
     std.log.info("onInit", .{});
 
@@ -51,7 +51,8 @@ export fn onInit() ?*Memory
     var remaining = memory.persistent[stateSize..];
     std.log.info("memory - {*}\npersistent store - {} ({} state | {} remaining)\ntransient store - {}\ntotal - {}\nWASM pages - {}", .{memory, memory.persistent.len, stateSize, remaining.len, memory.transient.len, memoryBytes.len, @wasmMemorySize(0)});
 
-    state.load(remaining) catch |err| {
+    const screenSize = m.Vec2usize.init(width, height);
+    state.load(remaining, screenSize) catch |err| {
         std.log.err("State init failed, err {}", .{err});
         return null;
     };
@@ -81,6 +82,14 @@ export fn onKeyDown(memory: *Memory, keyCode: c_int) void
 {
     var state = memory.castPersistent(StateType);
     state.keyboardState.addKeyEvent(keyCode, true);
+}
+
+export fn onDeviceOrientation(memory: *Memory, alpha: f32, beta: f32, gamma: f32) void
+{
+    var state = memory.castPersistent(StateType);
+    state.deviceState.angles.x = alpha;
+    state.deviceState.angles.y = beta;
+    state.deviceState.angles.z = gamma;
 }
 
 export fn onTextureLoaded(memory: *Memory, textureId: c_uint, width: c_int, height: c_int) void

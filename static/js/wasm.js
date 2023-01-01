@@ -501,6 +501,11 @@ function wasmInit(wasmUri, memoryBytes)
             _wasmInstance.exports.onKeyDown(_memoryPtr, event.keyCode);
         }
     });
+    document.addEventListener("deviceorientation", function(event) {
+        if (_wasmInstance !== null) {
+            _wasmInstance.exports.onDeviceOrientation(_memoryPtr, event.alpha, event.beta, event.gamma);
+        }
+    });
 
     addEventListener("resize", function() {
         updateCanvasSize();
@@ -513,7 +518,7 @@ function wasmInit(wasmUri, memoryBytes)
 
     WebAssembly.instantiateStreaming(fetch(wasmUri), importObject).then(function(obj) {
         _wasmInstance = obj.instance;
-        _memoryPtr = _wasmInstance.exports.onInit();
+        _memoryPtr = _wasmInstance.exports.onInit(_canvas.width, _canvas.height);
 
         const onAnimationFrame = _wasmInstance.exports.onAnimationFrame;
         const dummyBackground = document.getElementById("dummyBackground");

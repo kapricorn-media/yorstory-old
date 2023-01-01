@@ -100,3 +100,7 @@ pub const KeyboardState = struct {
         return latestDown;
     }
 };
+
+pub const DeviceState = struct {
+    angles: m.Vec3,
+};

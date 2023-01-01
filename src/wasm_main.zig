@@ -32,6 +32,12 @@ const DEPTH_LANDINGBACKGROUND = 0.7;
 const DEPTH_GRIDIMAGE = 0.6;
 const DEPTH_UI_BELOWALL = 1.0;
 
+fn isVerticalAspect(screenSize: m.Vec2) bool
+{
+    const aspect = screenSize.x / screenSize.y;
+    return aspect <= 1.0;
+}
+
 // return true when pressed
 fn updateButton(topLeft: m.Vec2, size: m.Vec2, mouseState: input.MouseState, scrollY: f32, mouseHoverGlobal: *bool) bool
 {
@@ -100,10 +106,14 @@ pub const State = struct {
     timestampMsPrev: c_int,
     mouseState: input.MouseState,
     keyboardState: input.KeyboardState,
+    deviceState: input.DeviceState,
     activeParallaxSetIndex: usize,
     parallaxTX: f32,
     parallaxIdleTimeMs: c_int,
     yMaxPrev: i32,
+
+    // mobile
+    anglesRef: m.Vec3,
 
     debug: bool,
 
@@ -116,8 +126,9 @@ pub const State = struct {
         }
     }
 
-    pub fn load(self: *Self, buf: []u8) !void
+    pub fn load(self: *Self, buf: []u8, screenSize: m.Vec2usize) !void
     {
+        _ = screenSize;
         self.fbAllocator = std.heap.FixedBufferAllocator.init(buf);
 
         w.glClearColor(0.0, 0.0, 0.0, 0.0);
@@ -1195,10 +1206,7 @@ export fn onAnimationFrame(memory: *wasm_app.Memory, width: c_int, height: c_int
 
     w.glClear(w.GL_COLOR_BUFFER_BIT | w.GL_DEPTH_BUFFER_BIT);
 
-    const aspect = screenSizeF.x / screenSizeF.y;
-    const isVertical = aspect <= 1.0;
-
-    // ==== FIRST FRAME (LANDING) ====
+    const isVertical = isVerticalAspect(screenSizeF);
 
     var yMax: i32 = 0;
     if (isVertical) {
