@@ -1,6 +1,8 @@
 const std = @import("std");
 
 const png = @import("png");
+const image = png.image;
+const m = png.m;
 
 pub fn main() !void
 {
@@ -12,24 +14,29 @@ pub fn main() !void
     }
     const allocator = gpa.allocator();
 
-    const width = 4096;
-    const height = 4096;
-    const channels = 3;
-
-    var pixelData = try allocator.alloc(u8, width * height * channels);
-    defer allocator.free(pixelData);
+    var pixelData = image.PixelData {
+        .size = m.Vec2usize.init(4096, 4096),
+        .channels = 3,
+        .data = undefined,
+    };
+    pixelData.data = try allocator.alloc(u8, pixelData.size.x * pixelData.size.y * pixelData.channels);
+    defer allocator.free(pixelData.data);
 
     var y: usize = 0;
-    while (y < height) : (y += 1) {
+    while (y < pixelData.size.y) : (y += 1) {
         var x: usize = 0;
-        while (x < width) : (x += 1) {
-            const ind = (y * width + x) * channels;
-            const invY = height - y - 1;
-            pixelData[ind + 0] = @intCast(u8, x % 256);
-            pixelData[ind + 1] = @intCast(u8, invY % 256);
-            pixelData[ind + 2] = @intCast(u8, (x / 256) + (invY / 256) * 16);
+        while (x < pixelData.size.x) : (x += 1) {
+            const ind = (y * pixelData.size.x + x) * pixelData.channels;
+            const invY = pixelData.size.y - y - 1;
+            pixelData.data[ind + 0] = @intCast(u8, x % 256);
+            pixelData.data[ind + 1] = @intCast(u8, invY % 256);
+            pixelData.data[ind + 2] = @intCast(u8, (x / 256) + (invY / 256) * 16);
         }
     }
 
-    try png.writePngFile("lut.png", width, height, channels, width * channels, pixelData);
+    const slice = image.PixelDataSlice {
+        .topLeft = m.Vec2usize.zero,
+        .size = pixelData.size,
+    };
+    try png.writePngFile("lut.png", pixelData, slice);
 }

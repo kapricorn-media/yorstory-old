@@ -5,7 +5,11 @@ const stb = @cImport({
     @cInclude("stb_image_write.h");
 });
 
-pub fn writePngFile(filePath: []const u8, width: usize, height: usize, channels: u8, stride: usize, data: []const u8) !void
+// TODO these are pub because eh
+pub const image = @import("image.zig");
+pub const m = @import("math.zig");
+
+pub fn writePngFile(filePath: []const u8, data: image.PixelData, slice: image.PixelDataSlice) !void
 {
     const cwd = std.fs.cwd();
     const file = try cwd.createFile(filePath, .{});
@@ -15,7 +19,10 @@ pub fn writePngFile(filePath: []const u8, width: usize, height: usize, channels:
         .fail = false,
         .writer = file.writer(),
     };
-    const writeResult = stb.stbi_write_png_to_func(stbCallback, &cbData, @intCast(c_int, width), @intCast(c_int, height), @intCast(c_int, channels), &data[0], @intCast(c_int, stride));
+    const startIndPixels = slice.topLeft.y * data.size.x + slice.topLeft.x;
+    const startIndBytes = startIndPixels * data.channels;
+    const stride = data.size.x * data.channels;
+    const writeResult = stb.stbi_write_png_to_func(stbCallback, &cbData, @intCast(c_int, slice.size.x), @intCast(c_int, slice.size.y), @intCast(c_int, data.channels), &data.data[startIndBytes], @intCast(c_int, @intCast(c_int, stride)));
     if (writeResult == 0) {
         return error.stbWriteFail;
     }

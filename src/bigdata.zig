@@ -123,10 +123,24 @@ pub fn generate(dirPath: []const u8, allocator: std.mem.Allocator) ![]const u8
                     .topLeft = m.Vec2usize.zero,
                     .size = parallaxSize,
                 };
-                const slice = try psdFile.layers[i].getPixelDataRectBuf(null, topLeft, layerPixelData, sliceDst);
-                _ = slice;
-                const chunkSize = calculateChunkSize(m.Vec2i.initFromVec2usize(layerPixelData.size), CHUNK_SIZE_MAX);
-                const chunked = try pixelDataToPngChunkedFormat(m.Vec2i.initFromVec2usize(layerPixelData.size), layerPixelData.channels, layerPixelData.data, chunkSize, allocator);
+                _ = try psdFile.layers[i].getPixelDataRectBuf(null, topLeft, layerPixelData, sliceDst);
+
+                const sliceAll = image.PixelDataSlice {
+                    .topLeft = m.Vec2usize.zero,
+                    .size = layerPixelData.size,
+                };
+                const sliceTrim = image.trim(layerPixelData, sliceAll);
+                const slice = blk: {
+                    const offsetLeftX = sliceTrim.topLeft.x - sliceAll.topLeft.x;
+                    const offsetRightX = (sliceAll.topLeft.x + sliceAll.size.x) - (sliceTrim.topLeft.x + sliceTrim.size.x);
+                    const offsetMin = std.math.min(offsetLeftX, offsetRightX);
+                    break :blk image.PixelDataSlice {
+                        .topLeft = m.Vec2usize.init(sliceAll.topLeft.x + offsetMin, sliceAll.topLeft.y),
+                        .size = m.Vec2usize.init(sliceAll.size.x - offsetMin * 2, sliceAll.size.y),
+                    };
+                };
+                const chunkSize = calculateChunkSize(slice.size, CHUNK_SIZE_MAX);
+                const chunked = try pixelDataToPngChunkedFormat(layerPixelData, slice, chunkSize, allocator);
                 const outputDir = entry.path[0..entry.path.len - 4];
                 const uri = try std.fmt.allocPrint(allocator, "/{s}/{s}.png", .{outputDir, l.name});
                 try entries.append(Entry {
@@ -134,6 +148,10 @@ pub fn generate(dirPath: []const u8, allocator: std.mem.Allocator) ![]const u8
                     .data = chunked,
                 });
                 std.log.info("wrote chunked layer as {s} ({}K)", .{uri, chunked.len / 1024});
+
+                // const png = @import("png.zig");
+                // const testPath = try std.fmt.allocPrint(tempAllocator, "{s}.png", .{l.name});
+                // try png.writePngFile(testPath, layerPixelData, slice);
             }
         } else {
             try entries.append(Entry {
@@ -176,7 +194,7 @@ pub fn generate(dirPath: []const u8, allocator: std.mem.Allocator) ![]const u8
     return out.toOwnedSlice();
 }
 
-fn calculateChunkSize(imageSize: m.Vec2i, chunkSizeMax: usize) usize
+fn calculateChunkSize(imageSize: m.Vec2usize, chunkSizeMax: usize) usize
 {
     if (imageSize.x >= chunkSizeMax) {
         return 0;
@@ -185,8 +203,8 @@ fn calculateChunkSize(imageSize: m.Vec2i, chunkSizeMax: usize) usize
         return 0;
     }
 
-    const rows = chunkSizeMax / @intCast(usize, imageSize.x);
-    return rows * @intCast(usize, imageSize.x);
+    const rows = chunkSizeMax / imageSize.x;
+    return rows * imageSize.x;
 }
 
 // 8, 4 => 2 | 7, 4 => 2 | 9, 4 => 3
@@ -217,28 +235,27 @@ fn stbCallback(context: ?*anyopaque, data: ?*anyopaque, size: c_int) callconv(.C
     };
 }
 
-fn pixelDataToPngChunkedFormat(imageSize: m.Vec2i, channels: u8, pixelData: []const u8, chunkSize: usize, allocator: std.mem.Allocator) ![]const u8
+fn pixelDataToPngChunkedFormat(pixelData: image.PixelData, slice: image.PixelDataSlice, chunkSize: usize, allocator: std.mem.Allocator) ![]const u8
 {
     var outBuf = std.ArrayList(u8).init(allocator);
     defer outBuf.deinit();
 
     const sizeType = u64;
     var widthBytes = try outBuf.addManyAsArray(@sizeOf(sizeType));
-    std.mem.writeIntBig(sizeType, widthBytes, @intCast(sizeType, imageSize.x));
+    std.mem.writeIntBig(sizeType, widthBytes, @intCast(sizeType, slice.size.x));
     var heightBytes = try outBuf.addManyAsArray(@sizeOf(sizeType));
-    std.mem.writeIntBig(sizeType, heightBytes, @intCast(sizeType, imageSize.y));
+    std.mem.writeIntBig(sizeType, heightBytes, @intCast(sizeType, slice.size.y));
     var chunkSizeBytes = try outBuf.addManyAsArray(@sizeOf(sizeType));
     std.mem.writeIntBig(sizeType, chunkSizeBytes, chunkSize);
 
     var pngDataBuf = std.ArrayList(u8).init(allocator);
     defer pngDataBuf.deinit();
 
-    const imageSizeXUsize = @intCast(usize, imageSize.x);
-    if (chunkSize % imageSizeXUsize != 0) {
+    if (chunkSize % slice.size.x != 0) {
         return error.ChunkSizeBadModulo;
     }
-    const chunkRows = if (chunkSize == 0) @intCast(usize, imageSize.y) else chunkSize / imageSizeXUsize;
-    const dataSizePixels = @intCast(usize, imageSize.x * imageSize.y);
+    const chunkRows = if (chunkSize == 0) slice.size.y else chunkSize / slice.size.x;
+    const dataSizePixels = slice.size.x * slice.size.y;
     const n = if (chunkSize == 0) 1 else integerCeilingDivide(dataSizePixels, chunkSize);
 
     var numChunksBytes = try outBuf.addManyAsArray(@sizeOf(sizeType));
@@ -247,21 +264,21 @@ fn pixelDataToPngChunkedFormat(imageSize: m.Vec2i, channels: u8, pixelData: []co
     var i: usize = 0;
     while (i < n) : (i += 1) {
         const rowStart = chunkRows * i;
-        const rowEnd = std.math.min(chunkRows * (i + 1), imageSize.y);
+        const rowEnd = std.math.min(chunkRows * (i + 1), slice.size.y);
         std.debug.assert(rowEnd > rowStart);
         const rows = rowEnd - rowStart;
 
-        const chunkStart = rowStart * imageSizeXUsize * channels;
-        const chunkEnd = rowEnd * imageSizeXUsize * channels;
-        const chunkBytes = pixelData[chunkStart..chunkEnd];
+        const chunkStart = ((rowStart + slice.topLeft.y) * pixelData.size.x + slice.topLeft.x) * pixelData.channels;
+        const chunkEnd = ((rowEnd + slice.topLeft.y) * pixelData.size.x + slice.topLeft.x) * pixelData.channels;
+        const chunkBytes = pixelData.data[chunkStart..chunkEnd];
 
         pngDataBuf.clearRetainingCapacity();
         var cbData = StbCallbackData {
             .fail = false,
             .writer = pngDataBuf.writer(),
         };
-        const pngStride = imageSizeXUsize * channels;
-        const writeResult = stb.stbi_write_png_to_func(stbCallback, &cbData, imageSize.x, @intCast(c_int, rows), @intCast(c_int, channels), &chunkBytes[0], @intCast(c_int, pngStride));
+        const pngStride = pixelData.size.x * pixelData.channels;
+        const writeResult = stb.stbi_write_png_to_func(stbCallback, &cbData, @intCast(c_int, slice.size.x), @intCast(c_int, rows), @intCast(c_int, pixelData.channels), &chunkBytes[0], @intCast(c_int, pngStride));
         if (writeResult == 0) {
             return error.stbWriteFail;
         }
@@ -287,7 +304,7 @@ fn pngToChunkedFormat(pngData: []const u8, chunkSizeMax: usize, allocator: std.m
         return error.stbiInfoFail;
     }
 
-    const imageSize = m.Vec2i.init(width, height);
+    const imageSize = m.Vec2usize.initFromVec2i(m.Vec2i.init(width, height));
     const chunkSize = calculateChunkSize(imageSize, chunkSizeMax);
 
     if (chunkSize != 0) {
@@ -298,11 +315,18 @@ fn pngToChunkedFormat(pngData: []const u8, chunkSizeMax: usize, allocator: std.m
         defer stb.stbi_image_free(d);
 
         const channelsU8 = @intCast(u8, channels);
-        const dataSizePixels = @intCast(usize, imageSize.x * imageSize.y);
-        const dataSizeBytes = dataSizePixels * channelsU8;
+        const dataSizeBytes = imageSize.x * imageSize.y * channelsU8;
 
-        const pixelData = d[0..dataSizeBytes];
-        return pixelDataToPngChunkedFormat(imageSize, channelsU8, pixelData, chunkSize, allocator);
+        const pixelData = image.PixelData {
+            .size = imageSize,
+            .channels = channelsU8,
+            .data = d[0..dataSizeBytes],
+        };
+        const slice = image.PixelDataSlice {
+            .topLeft = m.Vec2usize.zero,
+            .size = imageSize,
+        };
+        return pixelDataToPngChunkedFormat(pixelData, slice, chunkSize, allocator);
     } else {
         var outBuf = std.ArrayList(u8).init(allocator);
         defer outBuf.deinit();

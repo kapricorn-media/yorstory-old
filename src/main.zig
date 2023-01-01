@@ -107,7 +107,7 @@ pub const State = struct {
     debug: bool,
 
     const Self = @This();
-    const PARALLAX_SET_INDEX_START = 5;
+    const PARALLAX_SET_INDEX_START = 6;
     const PARALLAX_SET_SWAP_SECONDS = 6;
     comptime {
         if (PARALLAX_SET_INDEX_START >= parallax.PARALLAX_SETS.len) {
