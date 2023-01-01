@@ -25,7 +25,7 @@ pub const Portfolio = struct {
 
 pub const PORTFOLIO_LIST = [_]Portfolio {
     .{
-        .title = "HALO",
+        .title = "HALO&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;MICROSOFT",
         .uri = "/halo",
         .cover = "/images/HALO/cover.png",
         .landing = "/images/HALO/landing.png",

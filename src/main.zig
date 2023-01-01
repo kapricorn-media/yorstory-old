@@ -276,7 +276,7 @@ fn drawImageGrid(images: []const GridImage, indexOffset: usize, itemsPerRow: usi
     for (images) |img, i| {
         const rowF = @intToFloat(f32, i / itemsPerRow);
         const colF = @intToFloat(f32, i % itemsPerRow);
-        const spacingY = if (img.title) |_| spacing * 4 else spacing;
+        const spacingY = if (img.title) |_| spacing * 6 else spacing;
         const itemPos = m.Vec2.init(
             topLeft.x + colF * (itemSize.x + spacing),
             topLeft.y + rowF * (itemSize.y + spacingY)
@@ -301,7 +301,7 @@ fn drawImageGrid(images: []const GridImage, indexOffset: usize, itemsPerRow: usi
         if (img.title) |title| {
             const textPos = m.Vec2.init(
                 itemPos.x,
-                itemPos.y + itemSize.y + spacing * 2
+                itemPos.y + itemSize.y + spacing * 4
             );
             renderQueue.textLine(
                 title, textPos, fontSize, 0.0, fontColor, "HelveticaBold"
@@ -814,7 +814,7 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
     switch (state.pageData) {
         .Home => {
             const section3Start = section1Height + section2Height;
-            const section3Height = screenSizeF.y * 1.3;
+            const section3Height = screenSizeF.y * 1.15;
             const section3YScrolling = section3Start;
             const section3YStillForever = if (scrollYF >= section3Start) scrollYF else section3Start;
             const section3YStill = blk: {
@@ -854,7 +854,7 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
 
             const contentHeaderPos = m.Vec2.init(
                 contentMarginX,
-                section3Start + gridSize * (15.0 - 0.33),
+                section3Start + gridSize * (12.0 - 0.33),
             );
             const fontSize = 180 / refSize.y * screenSizeF.y;
             renderQueue.textLine(
@@ -885,7 +885,7 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
             const itemsPerRow = 3;
             const topLeft = m.Vec2.init(
                 contentMarginX,
-                section3Start + gridSize * 17.0,
+                section3Start + gridSize * 14.0,
             );
             const spacing = gridSize * 0.25;
             const gridWidth = screenSizeF.x - contentMarginX * 2;
