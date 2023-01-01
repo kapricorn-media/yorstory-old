@@ -133,8 +133,7 @@ pub const State = struct {
     debug: bool,
 
     const Self = @This();
-    // const PARALLAX_SET_INDEX_START = 3;
-    const PARALLAX_SET_INDEX_START = 6;
+    const PARALLAX_SET_INDEX_START = 3;
     comptime {
         if (PARALLAX_SET_INDEX_START >= parallax.PARALLAX_SETS.len) {
             @compileError("start parallax index out of bounds");
