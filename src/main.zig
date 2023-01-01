@@ -39,7 +39,6 @@ fn updateButton(topLeft: m.Vec2, size: m.Vec2, mouseState: input.MouseState, scr
     if (m.isInsideRect(mousePosF, topLeftScroll, size)) {
         mouseHoverGlobal.* = true;
         for (mouseState.clickEvents[0..mouseState.numClickEvents]) |clickEvent| {
-            std.log.info("{}", .{clickEvent});
             const clickPosF = m.Vec2.initFromVec2i(clickEvent.pos);
             if (!clickEvent.down and clickEvent.clickType == input.ClickType.Left and m.isInsideRect(clickPosF, topLeftScroll, size)) {
                 return true;
@@ -114,9 +113,9 @@ pub const State = struct {
         }
     }
 
-    pub fn init(buf: []u8, uri: []const u8) !Self
+    pub fn load(self: *Self, buf: []u8) !void
     {
-        var fbAllocator = std.heap.FixedBufferAllocator.init(buf);
+        self.fbAllocator = std.heap.FixedBufferAllocator.init(buf);
 
         w.glClearColor(0.0, 0.0, 0.0, 0.0);
         w.glEnable(w.GL_DEPTH_TEST);
@@ -127,28 +126,27 @@ pub const State = struct {
 
         ww.setCursor("auto");
 
-        var self = Self {
-            .fbAllocator = fbAllocator,
+        self.renderState = try render.RenderState.init();
+        self.fbTexture = 0;
+        self.fbDepthRenderbuffer = 0;
+        self.fb = 0;
 
-            .renderState = try render.RenderState.init(),
-            .fbTexture = 0,
-            .fbDepthRenderbuffer = 0,
-            .fb = 0,
+        self.assets.load(self.fbAllocator.allocator());
 
-            .assets = wasm_asset.Assets(asset.Texture, 256, asset.Font).init(fbAllocator.allocator()),
+        var uriBuf: [64]u8 = undefined;
+        const uriLen = ww.getUri(&uriBuf);
+        const uri = uriBuf[0..uriLen];
+        self.pageData = try uriToPageData(uri);
+        self.screenSizePrev = m.Vec2i.zero;
+        self.scrollYPrev = -1;
+        self.timestampMsPrev = 0;
+        self.mouseState = input.MouseState.init();
+        self.keyboardState = input.KeyboardState.init();
+        self.activeParallaxSetIndex = PARALLAX_SET_INDEX_START;
+        self.parallaxTX = 0;
+        self.parallaxIdleTimeMs = 0;
 
-            .pageData = try uriToPageData(uri),
-            .screenSizePrev = m.Vec2i.zero,
-            .scrollYPrev = -1,
-            .timestampMsPrev = 0,
-            .mouseState = input.MouseState.init(),
-            .keyboardState = input.KeyboardState.init(),
-            .activeParallaxSetIndex = PARALLAX_SET_INDEX_START,
-            .parallaxTX = 0,
-            .parallaxIdleTimeMs = 0,
-
-            .debug = false,
-        };
+        self.debug = false;
 
         // _ = try self.assets.register(.{ .Static = asset.Texture.Lut1 },
         //     "/images/LUTs/identity.png", defaultTextureWrap, defaultTextureFilter, 1
@@ -209,8 +207,6 @@ pub const State = struct {
             .Entry => {
             },
         }
-
-        return self;
     }
 
     pub fn deinit(self: Self) void
@@ -312,7 +308,7 @@ fn getImageUrlFromIndex(entryData: anytype, index: usize) ?[]const u8
     return null;
 }
 
-fn drawCrosshairCorners(pos: m.Vec2, size: m.Vec2, depth: f32, gridSize: f32, decalTopLeft: wasm_asset.TextureData, screenSize: m.Vec2, color: m.Vec4, renderQueue: *render.RenderQueue) void
+fn drawCrosshairCorners(pos: m.Vec2, size: m.Vec2, depth: f32, gridSize: f32, decalTopLeft: *const wasm_asset.TextureData, screenSize: m.Vec2, color: m.Vec4, renderQueue: *render.RenderQueue) void
 {
     const decalMargin = gridSize * 2;
     const decalSize = getTextureScaledSize(decalTopLeft.size, screenSize);
@@ -393,67 +389,45 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
     const contentMarginX = marginX + gridSize * 9;
 
     if (screenResize) {
+        const helveticaBold = @embedFile("HelveticaNeueLTCom-Bd.ttf");
+        const helveticaMedium = @embedFile("HelveticaNeueLTCom-Md.ttf");
+        const helveticaLight = @embedFile("HelveticaNeueLTCom-Lt.ttf");
+
+        const categoryFontSize = gridSize * 0.6;
+        const categoryKerning = 0;
+        const categoryLineHeight = categoryFontSize;
+        state.assets.registerStaticFont(asset.Font.Category, helveticaBold, categoryFontSize, categoryKerning, categoryLineHeight, allocator) catch |err| {
+            std.log.err("registerStaticFont failed err={}", .{err});
+        };
+
         const titleFontSize = gridSize * 4.0;
         const titleKerning = -gridSize * 0.2;
         const titleLineHeight = gridSize * 3.8;
-        state.assets.registerStaticFont(asset.Font.Title, @embedFile("HelveticaNeueLTCom-Bd.ttf"), titleFontSize, titleKerning, titleLineHeight, allocator) catch |err| {
+        state.assets.registerStaticFont(asset.Font.Title, helveticaBold, titleFontSize, titleKerning, titleLineHeight, allocator) catch |err| {
             std.log.err("registerStaticFont failed err={}", .{err});
         };
 
         const subtitleFontSize = gridSize * 1.25;
         const subtitleKerning = -gridSize * 0.05;
         const subtitleLineHeight = subtitleFontSize;
-        state.assets.registerStaticFont(asset.Font.Subtitle, @embedFile("HelveticaNeueLTCom-Lt.ttf"), subtitleFontSize, subtitleKerning, subtitleLineHeight, allocator) catch |err| {
+        state.assets.registerStaticFont(asset.Font.Subtitle, helveticaLight, subtitleFontSize, subtitleKerning, subtitleLineHeight, allocator) catch |err| {
             std.log.err("registerStaticFont failed err={}", .{err});
         };
 
         const textFontSize = gridSize * 0.4;
         const textKerning = 0;
         const textLineHeight = textFontSize * 1.4;
-        state.assets.registerStaticFont(asset.Font.Text, @embedFile("HelveticaNeueLTCom-Md.ttf"), textFontSize, textKerning, textLineHeight, allocator) catch |err| {
+        state.assets.registerStaticFont(asset.Font.Text, helveticaMedium, textFontSize, textKerning, textLineHeight, allocator) catch |err| {
             std.log.err("registerStaticFont failed err={}", .{err});
         };
 
-        // const numberFontSize = gridSize * 1.8;
-        // const numberKerning = 0;
-        // const numberLineHeight = numberFontSize;
-        // state.assets.registerStaticFont(asset.Font.Number, @embedFile("HelveticaNeueLTCom-Bd.ttf"), numberFontSize, numberKerning, numberLineHeight, allocator) catch |err| {
-        //     std.log.err("registerStaticFont failed err={}", .{err});
-        // };
+        const numberFontSize = gridSize * 1.8;
+        const numberKerning = 0;
+        const numberLineHeight = numberFontSize;
+        state.assets.registerStaticFont(asset.Font.Number, helveticaBold, numberFontSize, numberKerning, numberLineHeight, allocator) catch |err| {
+            std.log.err("registerStaticFont failed err={}", .{err});
+        };
     }
-
-    var allIconsLoaded = true;
-    const categoriesText = state.assets.getStaticTextureData(asset.Texture.CategoriesText);
-
-    const decalTopLeft = state.assets.getStaticTextureData(asset.Texture.DecalTopLeft);
-    const stickerMain = blk: {
-        switch (state.pageData) {
-            .Home => break :blk state.assets.getStaticTextureData(asset.Texture.StickerMainHome),
-            .Entry => |entryData| {
-                const pf = portfolio.PORTFOLIO_LIST[entryData.portfolioIndex];
-                if (state.assets.getTextureData(.{.DynamicUrl = pf.sticker})) |tex| {
-                    break :blk tex;
-                } else {
-                    _ = state.assets.register(.{ .DynamicUrl = pf.sticker},
-                        pf.sticker, defaultTextureWrap, defaultTextureFilter, 5
-                    ) catch |err| {
-                        std.log.err("failed to register {s}, err {}", .{pf.sticker, err});
-                        return 0;
-                    };
-
-                    if (state.assets.getTextureData(.{.DynamicUrl = pf.sticker})) |tex| {
-                        break :blk tex;
-                    } else {
-                        std.log.err("no texture data after register for {s}", .{pf.sticker});
-                        return 0;
-                    }
-                }
-            },
-        }
-    };
-    const stickerShiny = state.assets.getStaticTextureData(asset.Texture.StickerShiny);
-
-    var allLandingAssetsLoaded = allIconsLoaded and categoriesText.loaded() and decalTopLeft.loaded() and stickerMain.loaded() and stickerShiny.loaded();
 
     const parallaxIndex = blk: {
         switch (state.pageData) {
@@ -492,6 +466,35 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
     const targetParallaxTX = mousePosF.x / screenSizeF.x * 2.0 - 1.0; // -1 to 1
     state.parallaxTX = targetParallaxTX;
 
+    const decalTopLeft = state.assets.getStaticTextureData(asset.Texture.DecalTopLeft);
+    const stickerMain = blk: {
+        switch (state.pageData) {
+            .Home => break :blk state.assets.getStaticTextureData(asset.Texture.StickerMainHome),
+            .Entry => |entryData| {
+                const pf = portfolio.PORTFOLIO_LIST[entryData.portfolioIndex];
+                if (state.assets.getTextureData(.{.DynamicUrl = pf.sticker})) |tex| {
+                    break :blk tex;
+                } else {
+                    _ = state.assets.register(.{ .DynamicUrl = pf.sticker},
+                        pf.sticker, defaultTextureWrap, defaultTextureFilter, 5
+                    ) catch |err| {
+                        std.log.err("failed to register {s}, err {}", .{pf.sticker, err});
+                        return 0;
+                    };
+
+                    if (state.assets.getTextureData(.{.DynamicUrl = pf.sticker})) |tex| {
+                        break :blk tex;
+                    } else {
+                        std.log.err("no texture data after register for {s}", .{pf.sticker});
+                        return 0;
+                    }
+                }
+            },
+        }
+    };
+    const stickerShiny = state.assets.getStaticTextureData(asset.Texture.StickerShiny);
+
+    var allLandingAssetsLoaded = decalTopLeft.loaded() and stickerMain.loaded() and stickerShiny.loaded();
     if (allLandingAssetsLoaded) {
         if (activeParallaxSet) |parallaxSet| {
             const landingImagePos = m.Vec2.init(
@@ -551,19 +554,45 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
     const loadingGlyphs = state.assets.getStaticTextureData(asset.Texture.LoadingGlyphs);
 
     if (allLandingAssetsLoaded) {
-        if (categoriesText.loaded()) {
-            const categoriesSize = getTextureScaledSize(categoriesText.size, screenSizeF);
-            const categoriesPos = m.Vec2.init(
-                contentMarginX,
-                gridSize * 5,
-            );
-            renderQueue.quadTex(categoriesPos, categoriesSize, DEPTH_UI_GENERIC, 0, categoriesText.id, colorUi);
+        const CategoryInfo = struct {
+            name: []const u8,
+            uri: ?[]const u8,
+        };
+        const categories = [_]CategoryInfo {
+            .{
+                .name = "home",
+                .uri = "/",
+            },
+            .{
+                .name = "yorstory",
+                .uri = null,
+            },
+            .{
+                .name = "portfolio",
+                .uri = null,
+            },
+            .{
+                .name = "contact",
+                .uri = null,
+            },
+        };
+        var x = contentMarginX;
+        for (categories) |c| {
+            const categorySize = render.text2Size(&state.assets, c.name, asset.Font.Category);
+            const categoryPos = m.Vec2.init(x, gridSize * 5.5);
+            renderQueue.text2(c.name, categoryPos, DEPTH_UI_GENERIC, asset.Font.Category, colorUi);
 
-            const homeSize = m.Vec2.init(categoriesSize.x / 6.0, categoriesSize.y);
-            if (updateButton(categoriesPos, homeSize, state.mouseState, scrollYF, &mouseHoverGlobal)) {
-                ww.setUri("/");
+            const categoryButtonSize = m.Vec2.init(categorySize.x * 1.2, categorySize.y * 2.0);
+            const categoryButtonPos = m.Vec2.init(categoryPos.x - categorySize.x * 0.1, categoryPos.y - categorySize.y);
+            if (c.uri) |uri| {
+                if (updateButton(categoryButtonPos, categoryButtonSize, state.mouseState, scrollYF, &mouseHoverGlobal)) {
+                    ww.setUri(uri);
+                }
             }
+
+            x += categorySize.x + gridSize * 2.2;
         }
+
         // sticker (main)
         const stickerSize = getTextureScaledSize(stickerMain.size, screenSizeF);
         const stickerPos = m.Vec2.init(
@@ -592,7 +621,10 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
         renderQueue.quadTex(stickerShinyPos, stickerShinySize, DEPTH_UI_GENERIC, 0, stickerShiny.id, m.Vec4.white);
     } else {
         // show loading indicator, if that is loaded
+        std.log.info("{}", .{loadingGlyphs});
+        std.log.info("{}", .{stickerCircle});
         if (stickerCircle.loaded() and loadingGlyphs.loaded()) {
+            std.log.info("preload showing", .{});
             const circleSize = getTextureScaledSize(stickerCircle.size, screenSizeF);
             const circlePos = m.Vec2.init(
                 screenSizeF.x / 2.0 - circleSize.x / 2.0,
@@ -922,10 +954,10 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
                 }
                 const numStr = std.fmt.allocPrint(allocator, "{}", .{i + 1}) catch unreachable;
                 const numberTextPos = m.Vec2.init(
-                    numberPos.x + numberSize.x / 3,
-                    numberPos.y + numberSize.y * 0.7
+                    numberPos.x + numberSize.x * 0.28,
+                    numberPos.y + numberSize.y * 0.75
                 );
-                renderQueue.text2(numStr, numberTextPos, DEPTH_UI_GENERIC - 0.01, asset.Font.Subtitle, m.Vec4.black);
+                renderQueue.text2(numStr, numberTextPos, DEPTH_UI_GENERIC - 0.01, asset.Font.Number, m.Vec4.black);
 
                 renderQueue.text2(sub.name, m.Vec2.init(x, yGallery), DEPTH_UI_GENERIC, asset.Font.Subtitle, colorUi);
                 yGallery += gridSize * 1;
@@ -1117,39 +1149,13 @@ fn drawMobile(state: *State, deltaS: f32, scrollY: f32, screenSize: m.Vec2, rend
     return @floatToInt(i32, screenSize.y);
 }
 
-export fn onInit() void
-{
-    std.log.info("onInit", .{});
-
-    core._memory = std.heap.page_allocator.create(core.Memory) catch |err| {
-        std.log.err("Failed to allocate WASM memory, error {}", .{err});
-        return;
-    };
-    var memoryBytes = std.mem.asBytes(core._memory);
-    std.mem.set(u8, memoryBytes, 0);
-
-    var buf: [64]u8 = undefined;
-    const uriLen = ww.getUri(&buf);
-    const uri = buf[0..uriLen];
-
-    var state = core._memory.castPersistent(State);
-    const stateSize = @sizeOf(State);
-    var remaining = core._memory.persistent[stateSize..];
-    std.log.info("memory - {*}\npersistent store - {} ({} state | {} remaining)\ntransient store - {}\ntotal - {}", .{core._memory, core._memory.persistent.len, stateSize, remaining.len, core._memory.transient.len, memoryBytes.len});
-
-    state.* = State.init(remaining, uri) catch |err| {
-        std.log.err("State init failed, err {}", .{err});
-        return;
-    };
-}
-
-export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestampMs: c_int) c_int
+export fn onAnimationFrame(memory: *core.Memory, width: c_int, height: c_int, scrollY: c_int, timestampMs: c_int) c_int
 {
     const screenSizeI = m.Vec2i.init(@intCast(i32, width), @intCast(i32, height));
     const screenSizeF = m.Vec2.initFromVec2i(screenSizeI);
     const scrollYF = @intToFloat(f32, scrollY);
 
-    var state = core._memory.castPersistent(State);
+    var state = memory.castPersistent(State);
     defer {
         state.timestampMsPrev = timestampMs;
         state.scrollYPrev = scrollY;
@@ -1188,7 +1194,7 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
     const deltaMs = if (state.timestampMsPrev > 0) (timestampMs - state.timestampMsPrev) else 0;
     const deltaS = @intToFloat(f32, deltaMs) / 1000.0;
 
-    var tempAllocatorObj = core._memory.getTransientAllocator();
+    var tempAllocatorObj = memory.getTransientAllocator();
     const tempAllocator = tempAllocatorObj.allocator();
 
     var renderQueue = render.RenderQueue.init(tempAllocator);
@@ -1251,14 +1257,4 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
     state.assets.loadQueued(maxInflight);
 
     return yMax;
-}
-
-export fn onTextureLoaded(textureId: c_uint, width: c_int, height: c_int) void
-{
-    std.log.info("onTextureLoaded {}: {} x {}", .{textureId, width, height});
-
-    var state = core._memory.castPersistent(State);
-    state.assets.onTextureLoaded(textureId, m.Vec2i.init(width, height)) catch |err| {
-        std.log.err("onTextureLoaded error {}", .{err});
-    };
 }

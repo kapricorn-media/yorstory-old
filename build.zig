@@ -36,14 +36,11 @@ pub fn build(b: *std.build.Builder) void
     server.install();
 
     const wasm = b.addSharedLibrary(PROJECT_NAME, "src/main.zig", .unversioned);
-    wasm.setBuildMode(.Debug); // TODO wasm release mode build not working
+    wasm.setBuildMode(mode);
     wasm.setTarget(.{
         .cpu_arch = .wasm32,
         .os_tag = .freestanding,
     });
-    // wasm.import_memory = true;
-    // wasm.initial_memory = 4 * 1024 * 1024;
-    // wasm.max_memory = 4 * 1024 * 1024;
     wasm.addIncludePath("deps/stb");
     wasm.addCSourceFiles(&[_][]const u8{
         "deps/stb/stb_rect_pack_impl.c",

@@ -23,5 +23,6 @@ pub const Font = enum {
     Title,
     Subtitle,
     Text,
-    // Number,
+    Number,
+    Category,
 };

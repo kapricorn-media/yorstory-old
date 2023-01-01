@@ -15,7 +15,7 @@ pub const Memory = struct {
 
     pub fn castPersistent(self: *Self, comptime T: type) *T
     {
-        return @ptrCast(*T, &self.persistent[0]);
+        return @ptrCast(*T, &self.persistent);
     }
 
     pub fn getTransientAllocator(self: *Self) std.heap.FixedBufferAllocator
@@ -23,8 +23,6 @@ pub const Memory = struct {
         return std.heap.FixedBufferAllocator.init(&self.transient);
     }
 };
-
-pub var _memory: *Memory align(8) = undefined;
 
 fn buttonToClickType(button: c_int) input.ClickType
 {
@@ -45,28 +43,62 @@ pub fn log(
     bindings.log(message_level, scope, format, args);
 }
 
-export fn onMouseMove(x: c_int, y: c_int) void
+export fn onInit() ?*Memory
 {
-    var state = _memory.castPersistent(StateType);
+    std.log.info("onInit", .{});
+
+    var memory = std.heap.page_allocator.create(Memory) catch |err| {
+        std.log.err("Failed to allocate WASM memory, error {}", .{err});
+        return null;
+    };
+    var memoryBytes = std.mem.asBytes(memory);
+    std.mem.set(u8, memoryBytes, 0);
+
+    var state = memory.castPersistent(StateType);
+    const stateSize = @sizeOf(StateType);
+    var remaining = memory.persistent[stateSize..];
+    std.log.info("memory - {*}\npersistent store - {} ({} state | {} remaining)\ntransient store - {}\ntotal - {}\nWASM pages - {}", .{memory, memory.persistent.len, stateSize, remaining.len, memory.transient.len, memoryBytes.len, @wasmMemorySize(0)});
+
+    state.load(remaining) catch |err| {
+        std.log.err("State init failed, err {}", .{err});
+        return null;
+    };
+
+    return memory;
+}
+
+export fn onMouseMove(memory: *Memory, x: c_int, y: c_int) void
+{
+    var state = memory.castPersistent(StateType);
     state.mouseState.pos = m.Vec2i.init(x, y);
 }
 
-export fn onMouseDown(button: c_int, x: c_int, y: c_int) void
+export fn onMouseDown(memory: *Memory, button: c_int, x: c_int, y: c_int) void
 {
-    var state = _memory.castPersistent(StateType);
+    var state = memory.castPersistent(StateType);
     state.mouseState.addClickEvent(m.Vec2i.init(x, y), buttonToClickType(button), true);
 }
 
-export fn onMouseUp(button: c_int, x: c_int, y: c_int) void
+export fn onMouseUp(memory: *Memory, button: c_int, x: c_int, y: c_int) void
 {
-    var state = _memory.castPersistent(StateType);
+    var state = memory.castPersistent(StateType);
     state.mouseState.addClickEvent(m.Vec2i.init(x, y), buttonToClickType(button), false);
 }
 
-export fn onKeyDown(keyCode: c_int) void
+export fn onKeyDown(memory: *Memory, keyCode: c_int) void
 {
-    var state = _memory.castPersistent(StateType);
+    var state = memory.castPersistent(StateType);
     state.keyboardState.addKeyEvent(keyCode, true);
+}
+
+export fn onTextureLoaded(memory: *Memory, textureId: c_uint, width: c_int, height: c_int) void
+{
+    std.log.info("onTextureLoaded {}: {} x {}", .{textureId, width, height});
+
+    var state = memory.castPersistent(StateType);
+    state.assets.onTextureLoaded(textureId, m.Vec2i.init(width, height)) catch |err| {
+        std.log.err("onTextureLoaded error {}", .{err});
+    };
 }
 
 // for stb library link

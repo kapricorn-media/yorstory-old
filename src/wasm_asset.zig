@@ -128,22 +128,23 @@ pub fn Assets(comptime StaticTextureEnum: type, comptime maxDynamicTextures: usi
             return self.dynamicTextures[0..self.dynamicTexturesSize];
         }
 
-        fn getDynamicTexturesConst(self: Self) []const TextureData
+        fn getDynamicTexturesConst(self: *const Self) []const TextureData
         {
             return self.dynamicTextures[0..self.dynamicTexturesSize];
         }
 
-        fn getDynamicTextureData(self: Self, id: usize) ?TextureData
+        fn getDynamicTextureData(self: *const Self, id: usize) ?*const TextureData
         {
             if (id >= self.dynamicTexturesSize) {
                 return null;
             }
-            return self.dynamicTextures[id];
+            return &self.dynamicTextures[id];
         }
 
         fn registerStaticTexture(self: *Self, texture: StaticTextureEnum, textureData: TextureData) !void
         {
             self.staticTextures[@enumToInt(texture)] = textureData;
+            std.log.info("{} set\nARG ARG {}\nNEW NEW {}", .{texture, textureData, self.staticTextures[@enumToInt(texture)]});
         }
 
         fn registerDynamicTexture(self: *Self, url: []const u8, textureData: TextureData) !usize
@@ -178,27 +179,24 @@ pub fn Assets(comptime StaticTextureEnum: type, comptime maxDynamicTextures: usi
             self.textureLoadQueueSize += 1;
         }
 
-        pub fn init(allocator: std.mem.Allocator) Self
+        pub fn load(self: *Self, allocator: std.mem.Allocator) void
         {
-            return Self {
-                .allocator = allocator,
-                .staticTextures = undefined,
-                .dynamicTexturesSize = 0,
-                .dynamicTextures = undefined,
-                .textureLoadQueueSize = 0,
-                .textureLoadQueue = undefined,
-                .textureInflight = 0,
-                .textureIdMap = std.StringHashMap(usize).init(allocator),
-                .staticFonts = undefined,
-            };
+            for (self.staticTextures) |*t| {
+                t.id = 9999; // 0 is a valid texture ID, so don't risk it
+            }
+            self.allocator = allocator;
+            self.dynamicTexturesSize = 0;
+            self.textureLoadQueueSize = 0;
+            self.textureInflight = 0;
+            self.textureIdMap = std.StringHashMap(usize).init(allocator);
         }
 
-        pub fn getStaticTextureData(self: Self, texture: StaticTextureEnum) TextureData
+        pub fn getStaticTextureData(self: *const Self, texture: StaticTextureEnum) *const TextureData
         {
-            return self.staticTextures[@enumToInt(texture)];
+            return &self.staticTextures[@enumToInt(texture)];
         }
 
-        pub fn getTextureData(self: Self, id: TextureId) ?TextureData
+        pub fn getTextureData(self: *const Self, id: TextureId) ?*const TextureData
         {
             switch (id) {
                 .Static => |t| return self.getStaticTextureData(t),
@@ -287,7 +285,7 @@ pub fn Assets(comptime StaticTextureEnum: type, comptime maxDynamicTextures: usi
             try self.staticFonts[@enumToInt(font)].load(fontFile, size, kerning, lineHeight, allocator);
         }
 
-        pub fn getStaticFontData(self: Self, font: StaticFontEnum) *const FontData
+        pub fn getStaticFontData(self: *const Self, font: StaticFontEnum) *const FontData
         {
             return &self.staticFonts[@enumToInt(font)];
         }

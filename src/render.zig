@@ -4,6 +4,40 @@ const m = @import("math.zig");
 const w = @import("wasm_bindings.zig");
 const asset = @import("asset.zig"); // TODO: STOGLY
 
+pub fn text2Size(assets: anytype, text: []const u8, font: asset.Font) m.Vec2
+{
+    const fontData = assets.getStaticFontData(font);
+
+    var pos = m.Vec2.zero;
+    var min = m.Vec2.zero;
+    var max = m.Vec2.zero;
+    for (text) |c| {
+        if (c == '\n') {
+            pos.y -= fontData.lineHeight;
+            pos.x = 0.0;
+
+            min.y = std.math.min(min.y, pos.y);
+            max.y = std.math.max(max.y, pos.y);
+        } else {
+            const charData = fontData.charData[c];
+            pos.x += charData.advanceX + fontData.kerning;
+
+            min.x = std.math.min(min.x, pos.x);
+            max.x = std.math.max(max.x, pos.x + charData.size.x);
+            min.y = std.math.min(min.y, pos.y);
+            max.y = std.math.max(max.y, pos.y + charData.size.y);
+
+            const offsetPos = m.Vec2.add(pos, charData.offset);
+            min.x = std.math.min(min.x, offsetPos.x);
+            max.x = std.math.max(max.x, offsetPos.x + charData.size.x);
+            min.y = std.math.min(min.y, offsetPos.y);
+            max.y = std.math.max(max.y, offsetPos.y + charData.size.y);
+        }
+    }
+
+    return m.Vec2.sub(max, min);
+}
+
 const TextAlign = enum {
     Left,
     Center,
@@ -454,67 +488,6 @@ const TextState = struct {
             .colorUniLoc = try getUniformLocation(programId, "u_color"),
         };
     }
-
-    // pub fn draw(
-    //     self: Self,
-    //     posPixels: m.Vec2,
-    //     sizePixels: m.Vec2,
-    //     depth: f32,
-    //     atlasTexture: c_uint,
-    //     color: m.Vec4,
-    //     screenSize: m.Vec2) void
-    // {
-    //     w.glUseProgram(self.programId);
-
-    //     w.glEnableVertexAttribArray(@intCast(c_uint, self.posAttrLoc));
-    //     w.glBindBuffer(w.GL_ARRAY_BUFFER, self.posBuffer);
-    //     w.glVertexAttribPointer(@intCast(c_uint, self.posAttrLoc), 2, w.GL_f32, 0, 0, 0);
-
-    //     var buffer: [maxInstances]m.Vec2 = undefined;
-    //     for (buffer) |*v| {
-    //         v.* = m.Vec2.zero;
-    //     }
-
-    //     buffer[0] = posPixels;
-    //     buffer[1] = m.Vec2.add(posPixels, m.Vec2.init(200, 0));
-    //     w.glEnableVertexAttribArray(@intCast(c_uint, self.posPixelsAttrLoc));
-    //     w.glBindBuffer(w.GL_ARRAY_BUFFER, self.posPixelsBuffer);
-    //     w.glBufferSubData(w.GL_ARRAY_BUFFER, 0, &buffer[0].x, buffer.len * 2);
-    //     w.glVertexAttribPointer(@intCast(c_uint, self.posPixelsAttrLoc), 2, w.GL_f32, 0, 0, 0);
-    //     w.vertexAttribDivisorANGLE(self.posPixelsAttrLoc, 1);
-
-    //     buffer[0] = sizePixels;
-    //     buffer[1] = sizePixels;
-    //     w.glEnableVertexAttribArray(@intCast(c_uint, self.sizePixelsAttrLoc));
-    //     w.glBindBuffer(w.GL_ARRAY_BUFFER, self.sizePixelsBuffer);
-    //     w.glBufferSubData(w.GL_ARRAY_BUFFER, 0, &buffer[0].x, buffer.len * 2);
-    //     w.glVertexAttribPointer(@intCast(c_uint, self.sizePixelsAttrLoc), 2, w.GL_f32, 0, 0, 0);
-    //     w.vertexAttribDivisorANGLE(self.sizePixelsAttrLoc, 1);
-
-    //     buffer[0] = m.Vec2.zero;
-    //     buffer[1] = m.Vec2.zero;
-    //     w.glEnableVertexAttribArray(@intCast(c_uint, self.uvOffsetAttrLoc));
-    //     w.glBindBuffer(w.GL_ARRAY_BUFFER, self.uvOffsetBuffer);
-    //     w.glBufferSubData(w.GL_ARRAY_BUFFER, 0, &buffer[0].x, buffer.len * 2);
-    //     w.glVertexAttribPointer(@intCast(c_uint, self.uvOffsetAttrLoc), 2, w.GL_f32, 0, 0, 0);
-    //     w.vertexAttribDivisorANGLE(self.uvOffsetAttrLoc, 1);
-
-    //     w.glUniform2fv(self.screenSizeUniLoc, screenSize.x, screenSize.y);
-    //     w.glUniform1fv(self.depthUniLoc, depth);
-    //     w.glUniform4fv(self.colorUniLoc, color.x, color.y, color.z, color.w);
-
-    //     w.glActiveTexture(w.GL_TEXTURE0);
-    //     w.glBindTexture(w.GL_TEXTURE_2D, atlasTexture);
-    //     w.glUniform1i(self.samplerUniLoc, 0);
-
-    //     w.drawArraysInstancedANGLE(w.GL_TRIANGLES, 0, POS_UNIT_SQUARE.len, 2);
-
-    //     w.vertexAttribDivisorANGLE(0, 0);
-    //     w.vertexAttribDivisorANGLE(1, 0);
-    //     w.vertexAttribDivisorANGLE(2, 0);
-    //     w.vertexAttribDivisorANGLE(3, 0);
-    //     w.vertexAttribDivisorANGLE(4, 0);
-    // }
 };
 
 const PostProcessState = struct {

@@ -42,7 +42,7 @@ function doLoadTextureJob(job) {
         job.loaded[job.i] = true;
         const allLoaded = job.loaded.every(function(el) { return el; });
         if (allLoaded) {
-            _wasmInstance.exports.onTextureLoaded(job.textureId, job.width, job.height);
+            _wasmInstance.exports.onTextureLoaded(_memoryPtr, job.textureId, job.width, job.height);
         }
     };
     uint8ArrayToImageSrcAsync(job.pngData, function(src) {
@@ -325,7 +325,7 @@ function loadTexture(textureId, imgUrlPtr, imgUrlLen, wrap, filter) {
     httpGet(uri, function(status, data) {
         if (status !== 200) {
             console.log(`webgl_png failed with status ${status} for URL ${imgUrl}`);
-            _wasmInstance.exports.onTextureLoaded(textureId, 0, 0);
+            _wasmInstance.exports.onTextureLoaded(_memoryPtr, textureId, 0, 0);
             return;
         }
 
@@ -527,22 +527,22 @@ function wasmInit(wasmUri, memoryBytes)
 
     document.addEventListener("mousemove", function(event) {
         if (_wasmInstance !== null) {
-            _wasmInstance.exports.onMouseMove(event.clientX, event.clientY);
+            _wasmInstance.exports.onMouseMove(_memoryPtr, event.clientX, event.clientY);
         }
     });
     document.addEventListener("mousedown", function(event) {
         if (_wasmInstance !== null) {
-            _wasmInstance.exports.onMouseDown(event.button, event.clientX, event.clientY);
+            _wasmInstance.exports.onMouseDown(_memoryPtr, event.button, event.clientX, event.clientY);
         }
     });
     document.addEventListener("mouseup", function(event) {
         if (_wasmInstance !== null) {
-            _wasmInstance.exports.onMouseUp(event.button, event.clientX, event.clientY);
+            _wasmInstance.exports.onMouseUp(_memoryPtr, event.button, event.clientX, event.clientY);
         }
     });
     document.addEventListener("keydown", function(event) {
         if (_wasmInstance !== null) {
-            _wasmInstance.exports.onKeyDown(event.keyCode);
+            _wasmInstance.exports.onKeyDown(_memoryPtr, event.keyCode);
         }
     });
 
@@ -569,7 +569,7 @@ function wasmInit(wasmUri, memoryBytes)
         // if (pages < memoryPages) {
         //     _wasmInstance.exports.memory.grow(memoryPages - pages);
         // }
-        _wasmInstance.exports.onInit();
+        _memoryPtr = _wasmInstance.exports.onInit();
 
         const onAnimationFrame = _wasmInstance.exports.onAnimationFrame;
         const dummyBackground = document.getElementById("dummyBackground");
@@ -578,7 +578,7 @@ function wasmInit(wasmUri, memoryBytes)
             doNextLoadTextureJob(); // TODO make fancier?
 
             const scrollY = window.scrollY;
-            const totalHeight = onAnimationFrame(_canvas.width, _canvas.height, scrollY, timestamp);
+            const totalHeight = onAnimationFrame(_memoryPtr, _canvas.width, _canvas.height, scrollY, timestamp);
             if (totalHeight !== 0 && _currentHeight !== totalHeight) {
                 _currentHeight = totalHeight;
                 dummyBackground.style.height = px(totalHeight);
