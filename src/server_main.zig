@@ -15,6 +15,7 @@ const m = @import("math.zig");
 const portfolio = @import("portfolio.zig");
 
 const WASM_PATH = if (config.DEBUG) "zig-out/yorstory.wasm" else "yorstory.wasm";
+const WASM_PATH_WORKER = if (config.DEBUG) "zig-out/worker.wasm" else "worker.wasm";
 const SERVER_IP = "0.0.0.0";
 
 pub const log_level: std.log.Level = switch (builtin.mode) {
@@ -104,6 +105,8 @@ fn serverCallback(
                 try writer.writeAll(data);
             } else if (std.mem.eql(u8, request.uri, "/yorstory.wasm")) {
                 try server.writeFileResponse(writer, WASM_PATH, allocator);
+            } else if (std.mem.eql(u8, request.uri, "/worker.wasm")) {
+                try server.writeFileResponse(writer, WASM_PATH_WORKER, allocator);
             } else {
                 const uri = if (std.mem.eql(u8, request.uri, "/") or isPortfolioUri) "/wasm.html" else request.uri;
                 if (config.DEBUG) {
@@ -117,6 +120,9 @@ fn serverCallback(
                     };
                     try server.writeCode(writer, ._200);
                     try server.writeContentLength(writer, data.len);
+                    if (server.getFileContentType(uri)) |contentType| {
+                        try server.writeContentType(writer, contentType);
+                    }
                     try server.writeEndHeader(writer);
                     try writer.writeAll(data);
                 }

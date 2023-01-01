@@ -101,7 +101,7 @@ pub fn build(b: *std.build.Builder) void
     server.override_dest_dir = installDirRoot;
     server.install();
 
-    const wasm = b.addSharedLibrary(PROJECT_NAME, "src/main.zig", .unversioned);
+    const wasm = b.addSharedLibrary(PROJECT_NAME, "src/wasm_main.zig", .unversioned);
     wasm.setBuildMode(mode);
     wasm.setTarget(.{
         .cpu_arch = .wasm32,
@@ -115,6 +115,21 @@ pub fn build(b: *std.build.Builder) void
     wasm.linkLibC();
     wasm.override_dest_dir = installDirRoot;
     wasm.install();
+
+    const wasmWorker = b.addSharedLibrary("worker", "src/wasm_workermain.zig", .unversioned);
+    wasmWorker.setBuildMode(mode);
+    wasmWorker.setTarget(.{
+        .cpu_arch = .wasm32,
+        .os_tag = .freestanding,
+    });
+    wasmWorker.addIncludePath("deps/stb");
+    wasmWorker.addCSourceFiles(&[_][]const u8{
+        "deps/stb/stb_rect_pack_impl.c",
+        "deps/stb/stb_truetype_impl.c",
+    }, &[_][]const u8{"-std=c99"});
+    wasmWorker.linkLibC();
+    wasmWorker.override_dest_dir = installDirRoot;
+    wasmWorker.install();
 
     if (!isDebug) {
         const installDirScripts = std.build.InstallDir {

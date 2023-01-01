@@ -42,34 +42,29 @@ pub const FontCharData = struct {
     advanceX: f32,
 };
 
-pub const FontData = struct {
-    textureId: c_uint,
+pub const FontLoadData = struct {
     size: f32,
-    kerning: f32,
-    lineHeight: f32,
     charData: [256]FontCharData,
 
     const Self = @This();
 
-    pub fn load(self: *Self, fontFile: []const u8, size: f32, kerning: f32, lineHeight: f32, allocator: std.mem.Allocator) !void
+    pub fn load(self: *Self, atlasSize: usize, fontFileData: []const u8, size: f32, allocator: std.mem.Allocator) ![]const u8
     {
         self.size = size;
-        self.kerning = kerning;
-        self.lineHeight = lineHeight;
 
-        const width = 4096;
-        const height = 4096;
+        const width = atlasSize;
+        const height = atlasSize;
         var pixelBytes = try allocator.alloc(u8, width * height);
         std.mem.set(u8, pixelBytes, 0);
         var context: stb.stbtt_pack_context = undefined;
-        if (stb.stbtt_PackBegin(&context, &pixelBytes[0], width, height, width, 1, null) != 1) {
+        if (stb.stbtt_PackBegin(&context, &pixelBytes[0], @intCast(c_int, width), @intCast(c_int, height), @intCast(c_int, width), 1, null) != 1) {
             return error.stbtt_PackBegin;
         }
         const oversampleN = 1;
         stb.stbtt_PackSetOversampling(&context, oversampleN, oversampleN);
 
         var charData = try allocator.alloc(stb.stbtt_packedchar, self.charData.len);
-        if (stb.stbtt_PackFontRange(&context, &fontFile[0], 0, size, 0, @intCast(c_int, charData.len), &charData[0]) != 1) {
+        if (stb.stbtt_PackFontRange(&context, &fontFileData[0], 0, size, 0, @intCast(c_int, charData.len), &charData[0]) != 1) {
             return error.stbtt_PackFontRange;
         }
 
@@ -81,13 +76,46 @@ pub const FontData = struct {
                 .offset = m.Vec2.init(cd.xoff, -(sizeF.y + cd.yoff)),
                 .size = sizeF,
                 .uvOffset = m.Vec2.init(
-                    @intToFloat(f32, cd.x0) / width,
-                    @intToFloat(f32, height - cd.y1) / height, // TODO should do -1 ?
+                    @intToFloat(f32, cd.x0) / @intToFloat(f32, width),
+                    @intToFloat(f32, height - cd.y1) / @intToFloat(f32, height), // TODO should do -1 ?
                 ),
                 .advanceX = cd.xadvance,
             };
         }
-        self.textureId = w.createTextureWithData(width, height, 1, &pixelBytes[0], pixelBytes.len, w.GL_CLAMP_TO_EDGE, w.GL_LINEAR);
+
+        return pixelBytes;
+    }
+};
+
+pub const FontData = struct {
+    loaded: bool,
+    textureId: c_uint,
+    size: f32,
+    kerning: f32,
+    lineHeight: f32,
+    charData: [256]FontCharData,
+
+    const Self = @This();
+
+    pub fn load(self: *Self, fontUrl: []const u8, size: f32, kerning: f32, lineHeight: f32) !void
+    {
+        const atlasSize = 4096;
+        if (self.loaded) {
+            self.loaded = false;
+        }
+        self.textureId = w.loadFontDataJs(&fontUrl[0], fontUrl.len, size, atlasSize);
+        self.size = size;
+        self.kerning = kerning;
+        self.lineHeight = lineHeight;
+    }
+
+    pub fn writeFontLoadData(self: *Self, fontLoadData: *const FontLoadData) !void
+    {
+        if (self.size != fontLoadData.size) {
+            return error.FontSizeMismatch;
+        }
+        std.mem.copy(FontCharData, &self.charData, &fontLoadData.charData);
+        self.loaded = true;
     }
 };
 
@@ -180,14 +208,21 @@ pub fn Assets(comptime StaticTextureEnum: type, comptime maxDynamicTextures: usi
 
         pub fn load(self: *Self, allocator: std.mem.Allocator) void
         {
+            const nullTextureId = 99969; // 0 is a valid texture ID, so init to something big
+
             for (self.staticTextures) |*t| {
-                t.id = 9999; // 0 is a valid texture ID, so don't risk it
+                t.id = nullTextureId; 
             }
             self.allocator = allocator;
             self.dynamicTexturesSize = 0;
             self.textureLoadQueueSize = 0;
             self.textureInflight = 0;
             self.textureIdMap = std.StringHashMap(usize).init(allocator);
+
+            for (self.staticFonts) |*f| {
+                f.loaded = false;
+                f.textureId = nullTextureId;
+            }
         }
 
         pub fn getStaticTextureData(self: *const Self, texture: StaticTextureEnum) *const TextureData
@@ -279,14 +314,27 @@ pub fn Assets(comptime StaticTextureEnum: type, comptime maxDynamicTextures: usi
             }
         }
 
-        pub fn registerStaticFont(self: *Self, font: StaticFontEnum, fontFile: []const u8, size: f32, kerning: f32, lineHeight: f32, allocator: std.mem.Allocator) !void
+        pub fn registerStaticFont(self: *Self, font: StaticFontEnum, fontUrl: []const u8, size: f32, kerning: f32, lineHeight: f32) !void
         {
-            try self.staticFonts[@enumToInt(font)].load(fontFile, size, kerning, lineHeight, allocator);
+            try self.staticFonts[@enumToInt(font)].load(fontUrl, size, kerning, lineHeight);
         }
 
-        pub fn getStaticFontData(self: *const Self, font: StaticFontEnum) *const FontData
+        pub fn getStaticFontData(self: *const Self, font: StaticFontEnum) ?*const FontData
         {
-            return &self.staticFonts[@enumToInt(font)];
+            const f = &self.staticFonts[@enumToInt(font)];
+            return if (f.loaded) f else null;
+        }
+
+        pub fn onFontLoaded(self: *Self, atlasTextureId: c_uint, fontLoadData: *const FontLoadData) !void
+        {
+            var found = false;
+            for (self.staticFonts) |*font| {
+                if (font.textureId == atlasTextureId) {
+                    try font.writeFontLoadData(fontLoadData);
+                    found = true;
+                    break;
+                }
+            }
         }
     };
 

@@ -1,20 +1,21 @@
 const std = @import("std");
 
-const core = @import("wasm_core.zig");
-
 const asset = @import("asset.zig");
-const wasm_asset = @import("wasm_asset.zig");
 const input = @import("wasm_input.zig");
 const m = @import("math.zig");
 const parallax = @import("parallax.zig");
 const portfolio = @import("portfolio.zig");
 const render = @import("render.zig");
 const w = @import("wasm_bindings.zig");
+const wasm_app = @import("wasm_app.zig");
+const wasm_asset = @import("wasm_asset.zig");
+const wasm_core = @import("wasm_core.zig");
 const ww = @import("wasm.zig");
 
 // Set up wasm export functions and logging.
-usingnamespace core;
-pub const log = core.log;
+pub const log = wasm_core.log;
+usingnamespace wasm_app;
+usingnamespace wasm_core;
 
 const defaultTextureWrap = w.GL_CLAMP_TO_EDGE;
 const defaultTextureFilter = w.GL_LINEAR;
@@ -151,9 +152,9 @@ pub const State = struct {
 
         self.debug = false;
 
-        _ = try self.assets.register(.{ .Static = asset.Texture.Lut1 },
-            "/images/LUTs/identity.png", defaultTextureWrap, defaultTextureFilter, 2
-        );
+        // _ = try self.assets.register(.{ .Static = asset.Texture.Lut1 },
+        //     "/images/LUTs/identity.png", defaultTextureWrap, defaultTextureFilter, 2
+        // );
 
         _ = try self.assets.register(.{ .Static = asset.Texture.StickerCircle },
             "/images/sticker-circle.png", defaultTextureWrap, defaultTextureFilter, 2
@@ -393,100 +394,45 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
     const contentMarginX = marginX + gridSize * 9;
 
     if (screenResize) {
-        const helveticaBold = @embedFile("HelveticaNeueLTCom-Bd.ttf");
-        const helveticaMedium = @embedFile("HelveticaNeueLTCom-Md.ttf");
-        const helveticaLight = @embedFile("HelveticaNeueLTCom-Lt.ttf");
-
-        var tempAllocatorArena = std.heap.ArenaAllocator.init(allocator);
-        var tempAllocator = tempAllocatorArena.allocator();
+        const helveticaBoldUrl = "/fonts/HelveticaNeueLTCom-Bd.ttf";
+        const helveticaMediumUrl = "/fonts/HelveticaNeueLTCom-Md.ttf";
+        const helveticaLightUrl = "/fonts/HelveticaNeueLTCom-Lt.ttf";
 
         const categoryFontSize = gridSize * 0.6;
         const categoryKerning = 0;
         const categoryLineHeight = categoryFontSize;
-        state.assets.registerStaticFont(asset.Font.Category, helveticaBold, categoryFontSize, categoryKerning, categoryLineHeight, tempAllocator) catch |err| {
+        state.assets.registerStaticFont(asset.Font.Category, helveticaBoldUrl, categoryFontSize, categoryKerning, categoryLineHeight) catch |err| {
             std.log.err("registerStaticFont failed err={}", .{err});
         };
-
-        tempAllocatorArena.deinit();
-        tempAllocatorArena = std.heap.ArenaAllocator.init(allocator);
-        tempAllocator = tempAllocatorArena.allocator();
 
         const titleFontSize = gridSize * 4.0;
         const titleKerning = -gridSize * 0.15;
         const titleLineHeight = gridSize * 3.6;
-        state.assets.registerStaticFont(asset.Font.Title, helveticaBold, titleFontSize, titleKerning, titleLineHeight, tempAllocator) catch |err| {
+        state.assets.registerStaticFont(asset.Font.Title, helveticaBoldUrl, titleFontSize, titleKerning, titleLineHeight) catch |err| {
             std.log.err("registerStaticFont failed err={}", .{err});
         };
-
-        tempAllocatorArena.deinit();
-        tempAllocatorArena = std.heap.ArenaAllocator.init(allocator);
-        tempAllocator = tempAllocatorArena.allocator();
 
         const subtitleFontSize = gridSize * 1.25;
         const subtitleKerning = -gridSize * 0.05;
         const subtitleLineHeight = subtitleFontSize;
-        state.assets.registerStaticFont(asset.Font.Subtitle, helveticaLight, subtitleFontSize, subtitleKerning, subtitleLineHeight, tempAllocator) catch |err| {
+        state.assets.registerStaticFont(asset.Font.Subtitle, helveticaLightUrl, subtitleFontSize, subtitleKerning, subtitleLineHeight) catch |err| {
             std.log.err("registerStaticFont failed err={}", .{err});
         };
-
-        tempAllocatorArena.deinit();
-        tempAllocatorArena = std.heap.ArenaAllocator.init(allocator);
-        tempAllocator = tempAllocatorArena.allocator();
 
         const textFontSize = gridSize * 0.4;
         const textKerning = 0;
         const textLineHeight = textFontSize * 1.4;
-        state.assets.registerStaticFont(asset.Font.Text, helveticaMedium, textFontSize, textKerning, textLineHeight, tempAllocator) catch |err| {
+        state.assets.registerStaticFont(asset.Font.Text, helveticaMediumUrl, textFontSize, textKerning, textLineHeight) catch |err| {
             std.log.err("registerStaticFont failed err={}", .{err});
         };
-
-        tempAllocatorArena.deinit();
-        tempAllocatorArena = std.heap.ArenaAllocator.init(allocator);
-        tempAllocator = tempAllocatorArena.allocator();
 
         const numberFontSize = gridSize * 1.8;
         const numberKerning = 0;
         const numberLineHeight = numberFontSize;
-        state.assets.registerStaticFont(asset.Font.Number, helveticaBold, numberFontSize, numberKerning, numberLineHeight, tempAllocator) catch |err| {
+        state.assets.registerStaticFont(asset.Font.Number, helveticaBoldUrl, numberFontSize, numberKerning, numberLineHeight) catch |err| {
             std.log.err("registerStaticFont failed err={}", .{err});
         };
     }
-
-    const parallaxIndex = blk: {
-        switch (state.pageData) {
-            .Home => break :blk state.activeParallaxSetIndex,
-            .Entry => |entryData| {
-                const pf = portfolio.PORTFOLIO_LIST[entryData.portfolioIndex];
-                break :blk pf.parallaxIndex;
-            },
-        }
-    };
-
-    // Determine whether the active parallax set is loaded
-    var activeParallaxSet = parallax.tryLoadAndGetParallaxSet(&state.assets, parallaxIndex, 5, defaultTextureWrap, defaultTextureFilter);
-
-    // Load later sets
-    if (state.pageData == .Home and activeParallaxSet != null) {
-        state.parallaxIdleTimeMs += deltaMs;
-        const nextSetIndex = (parallaxIndex + 1) % parallax.PARALLAX_SETS.len;
-        var nextParallaxSet = parallax.tryLoadAndGetParallaxSet(&state.assets, nextSetIndex, 20, defaultTextureWrap, defaultTextureFilter);
-        if (nextParallaxSet) |_| {
-            if (state.parallaxIdleTimeMs >= State.PARALLAX_SET_SWAP_SECONDS * 1000) {
-                state.parallaxIdleTimeMs = 0;
-                state.activeParallaxSetIndex = nextSetIndex;
-                activeParallaxSet = nextParallaxSet;
-            } else {
-                for (parallax.PARALLAX_SETS) |_, i| {
-                    if (parallax.tryLoadAndGetParallaxSet(&state.assets, i, 20, defaultTextureWrap, defaultTextureFilter) == null) {
-                        break;
-                    }
-                }
-            }
-        }
-    }
-
-    const targetParallaxTX = mousePosF.x / screenSizeF.x * 2.0 - 1.0; // -1 to 1
-    state.parallaxTX = targetParallaxTX;
 
     const decalTopLeft = state.assets.getStaticTextureData(asset.Texture.DecalTopLeft);
     const stickerMain = blk: {
@@ -516,8 +462,52 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
     };
     const stickerShiny = state.assets.getStaticTextureData(asset.Texture.StickerShiny);
 
-    var allLandingAssetsLoaded = decalTopLeft.loaded() and stickerMain.loaded() and stickerShiny.loaded();
+    const allFontsLoaded = blk: {
+        var loaded = true;
+        inline for (std.meta.tags(asset.Font)) |f| {
+            const fontData = state.assets.getStaticFontData(f);
+            loaded = loaded and fontData != null;
+        }
+        break :blk loaded;
+    };
+    var allLandingAssetsLoaded = decalTopLeft.loaded() and stickerMain.loaded() and stickerShiny.loaded() and allFontsLoaded;
     if (allLandingAssetsLoaded) {
+        const parallaxIndex = blk: {
+            switch (state.pageData) {
+                .Home => break :blk state.activeParallaxSetIndex,
+                .Entry => |entryData| {
+                    const pf = portfolio.PORTFOLIO_LIST[entryData.portfolioIndex];
+                    break :blk pf.parallaxIndex;
+                },
+            }
+        };
+
+        // Determine whether the active parallax set is loaded
+        var activeParallaxSet = parallax.tryLoadAndGetParallaxSet(&state.assets, parallaxIndex, 5, defaultTextureWrap, defaultTextureFilter);
+
+        // Load later sets
+        if (state.pageData == .Home and activeParallaxSet != null) {
+            state.parallaxIdleTimeMs += deltaMs;
+            const nextSetIndex = (parallaxIndex + 1) % parallax.PARALLAX_SETS.len;
+            var nextParallaxSet = parallax.tryLoadAndGetParallaxSet(&state.assets, nextSetIndex, 20, defaultTextureWrap, defaultTextureFilter);
+            if (nextParallaxSet) |_| {
+                if (state.parallaxIdleTimeMs >= State.PARALLAX_SET_SWAP_SECONDS * 1000) {
+                    state.parallaxIdleTimeMs = 0;
+                    state.activeParallaxSetIndex = nextSetIndex;
+                    activeParallaxSet = nextParallaxSet;
+                } else {
+                    for (parallax.PARALLAX_SETS) |_, i| {
+                        if (parallax.tryLoadAndGetParallaxSet(&state.assets, i, 20, defaultTextureWrap, defaultTextureFilter) == null) {
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        const targetParallaxTX = mousePosF.x / screenSizeF.x * 2.0 - 1.0; // -1 to 1
+        state.parallaxTX = targetParallaxTX;
+
         if (activeParallaxSet) |parallaxSet| {
             const landingImagePos = m.Vec2.init(
                 marginX + gridSize * 1,
@@ -600,7 +590,7 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
         };
         var x = contentMarginX;
         for (categories) |c| {
-            const categoryRect = render.text2Rect(&state.assets, c.name, asset.Font.Category);
+            const categoryRect = render.text2Rect(&state.assets, c.name, asset.Font.Category) orelse break;
             const categorySize = categoryRect.size();
             const categoryPos = m.Vec2.init(x, gridSize * 5.5);
             renderQueue.text2(c.name, categoryPos, DEPTH_UI_GENERIC, asset.Font.Category, colorUi);
@@ -749,7 +739,7 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
             wasPosBaseY + gridSize * 10.8
         );
         const wasText = "We are\nStorytellers.";
-        const wasRect = render.text2Rect(&state.assets, wasText, asset.Font.Title);
+        const wasRect = render.text2Rect(&state.assets, wasText, asset.Font.Title) orelse unreachable;
         renderQueue.text2(wasText, wasPos, DEPTH_UI_GENERIC, asset.Font.Title, colorUi);
 
         const wasTextPos1 = m.Vec2.init(
@@ -862,7 +852,7 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
                 contentMarginX,
                 yMax + gridSize * 4.0,
             );
-            const contentHeaderRect = render.text2Rect(&state.assets, pf.contentHeader, asset.Font.Title);
+            const contentHeaderRect = render.text2Rect(&state.assets, pf.contentHeader, asset.Font.Title) orelse unreachable;
             renderQueue.text2(pf.contentHeader, contentHeaderPos, DEPTH_UI_GENERIC, asset.Font.Title, colorUi);
 
             const contentSubPos = m.Vec2.init(
@@ -897,11 +887,11 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
                 );
                 renderQueue.text2(numStr, numberTextPos, DEPTH_UI_GENERIC + 0.01, asset.Font.Number, m.Vec4.black);
 
-                const subNameRect = render.text2Rect(&state.assets, sub.name, asset.Font.Subtitle);
+                const subNameRect = render.text2Rect(&state.assets, sub.name, asset.Font.Subtitle) orelse unreachable;
                 renderQueue.text2(sub.name, m.Vec2.init(x, yGallery), DEPTH_UI_GENERIC, asset.Font.Subtitle, colorUi);
                 yGallery += -subNameRect.min.y + gridSize * 2.0;
 
-                const subDescriptionRect = render.text2Rect(&state.assets, sub.description, asset.Font.Text);
+                const subDescriptionRect = render.text2Rect(&state.assets, sub.description, asset.Font.Text) orelse unreachable;
                 renderQueue.text2(sub.description, m.Vec2.init(x, yGallery), DEPTH_UI_GENERIC, asset.Font.Text, colorUi);
                 yGallery += -subDescriptionRect.min.y + gridSize * 2.0;
 
@@ -1130,7 +1120,7 @@ fn drawMobile(state: *State, deltaS: f32, scrollY: f32, screenSize: m.Vec2, rend
     return @floatToInt(i32, screenSize.y);
 }
 
-export fn onAnimationFrame(memory: *core.Memory, width: c_int, height: c_int, scrollY: c_int, timestampMs: c_int) c_int
+export fn onAnimationFrame(memory: *wasm_app.Memory, width: c_int, height: c_int, scrollY: c_int, timestampMs: c_int) c_int
 {
     const screenSizeI = m.Vec2i.init(@intCast(i32, width), @intCast(i32, height));
     const screenSizeF = m.Vec2.initFromVec2i(screenSizeI);
@@ -1230,9 +1220,9 @@ export fn onAnimationFrame(memory: *core.Memory, width: c_int, height: c_int, sc
     w.bindNullFramebuffer();
     w.glClear(w.GL_COLOR_BUFFER_BIT | w.GL_DEPTH_BUFFER_BIT);
     const lut1 = state.assets.getStaticTextureData(asset.Texture.Lut1);
-    if (lut1.loaded()) {
+    // if (lut1.loaded()) {
         state.renderState.postProcessState.draw(state.fbTexture, lut1.id, screenSizeF);
-    }
+    // }
 
     const maxInflight = 8;
     state.assets.loadQueued(maxInflight);

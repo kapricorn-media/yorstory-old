@@ -1,38 +1,9 @@
-const root = @import("root");
 const std = @import("std");
 
 const bindings = @import("wasm_bindings.zig");
 const input = @import("wasm_input.zig");
 const m = @import("math.zig");
-
-const StateType = if (@hasDecl(root, "State")) root.State else @compileError("no State type");
-
-pub const Memory = struct {
-    persistent: [128 * 1024]u8 align(8),
-    transient: [256 * 1024 * 1024]u8 align(8),
-
-    const Self = @This();
-
-    pub fn castPersistent(self: *Self, comptime T: type) *T
-    {
-        return @ptrCast(*T, &self.persistent);
-    }
-
-    pub fn getTransientAllocator(self: *Self) std.heap.FixedBufferAllocator
-    {
-        return std.heap.FixedBufferAllocator.init(&self.transient);
-    }
-};
-
-fn buttonToClickType(button: c_int) input.ClickType
-{
-    return switch (button) {
-        0 => input.ClickType.Left,
-        1 => input.ClickType.Middle,
-        2 => input.ClickType.Right,
-        else => input.ClickType.Other,
-    };
-}
+const wasm = @import("wasm.zig");
 
 pub fn log(
     comptime message_level: std.log.Level,
@@ -40,65 +11,7 @@ pub fn log(
     comptime format: []const u8,
     args: anytype) void
 {
-    bindings.log(message_level, scope, format, args);
-}
-
-export fn onInit() ?*Memory
-{
-    std.log.info("onInit", .{});
-
-    var memory = std.heap.page_allocator.create(Memory) catch |err| {
-        std.log.err("Failed to allocate WASM memory, error {}", .{err});
-        return null;
-    };
-    var memoryBytes = std.mem.asBytes(memory);
-    std.mem.set(u8, memoryBytes, 0);
-
-    var state = memory.castPersistent(StateType);
-    const stateSize = @sizeOf(StateType);
-    var remaining = memory.persistent[stateSize..];
-    std.log.info("memory - {*}\npersistent store - {} ({} state | {} remaining)\ntransient store - {}\ntotal - {}\nWASM pages - {}", .{memory, memory.persistent.len, stateSize, remaining.len, memory.transient.len, memoryBytes.len, @wasmMemorySize(0)});
-
-    state.load(remaining) catch |err| {
-        std.log.err("State init failed, err {}", .{err});
-        return null;
-    };
-
-    return memory;
-}
-
-export fn onMouseMove(memory: *Memory, x: c_int, y: c_int) void
-{
-    var state = memory.castPersistent(StateType);
-    state.mouseState.pos = m.Vec2i.init(x, y);
-}
-
-export fn onMouseDown(memory: *Memory, button: c_int, x: c_int, y: c_int) void
-{
-    var state = memory.castPersistent(StateType);
-    state.mouseState.addClickEvent(m.Vec2i.init(x, y), buttonToClickType(button), true);
-}
-
-export fn onMouseUp(memory: *Memory, button: c_int, x: c_int, y: c_int) void
-{
-    var state = memory.castPersistent(StateType);
-    state.mouseState.addClickEvent(m.Vec2i.init(x, y), buttonToClickType(button), false);
-}
-
-export fn onKeyDown(memory: *Memory, keyCode: c_int) void
-{
-    var state = memory.castPersistent(StateType);
-    state.keyboardState.addKeyEvent(keyCode, true);
-}
-
-export fn onTextureLoaded(memory: *Memory, textureId: c_uint, width: c_int, height: c_int) void
-{
-    std.log.info("onTextureLoaded {}: {} x {}", .{textureId, width, height});
-
-    var state = memory.castPersistent(StateType);
-    state.assets.onTextureLoaded(textureId, m.Vec2i.init(width, height)) catch |err| {
-        std.log.err("onTextureLoaded error {}", .{err});
-    };
+    wasm.log(message_level, scope, format, args);
 }
 
 // for stb library link

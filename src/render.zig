@@ -4,9 +4,9 @@ const m = @import("math.zig");
 const w = @import("wasm_bindings.zig");
 const asset = @import("asset.zig"); // TODO: STOGLY
 
-pub fn text2Rect(assets: anytype, text: []const u8, font: asset.Font) m.Rect
+pub fn text2Rect(assets: anytype, text: []const u8, font: asset.Font) ?m.Rect
 {
-    const fontData = assets.getStaticFontData(font);
+    const fontData = assets.getStaticFontData(font) orelse return null;
 
     var pos = m.Vec2.zero;
     var min = m.Vec2.zero;
@@ -782,7 +782,7 @@ pub const RenderQueue = struct
 
         var buffer: [TextState.maxInstances]m.Vec2 = undefined;
         for (self.texts.items) |e| {
-            const fontData = assets.getStaticFontData(e.font);
+            const fontData = assets.getStaticFontData(e.font) orelse continue;
             const n = std.math.min(e.text.len, TextState.maxInstances);
             const text = e.text[0..n];
 

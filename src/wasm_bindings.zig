@@ -3,6 +3,13 @@ const std = @import("std");
 // Debug
 pub extern fn consoleMessage(isError: bool, messagePtr: *const u8, messageLen: c_uint) void;
 
+// Custom
+pub extern fn fillDataBuffer(buf: *const u8, len: c_uint) c_int; // 1 success, 0 error
+pub extern fn addReturnValueFloat(value: f32) c_int;
+pub extern fn addReturnValueInt(value: c_int) c_int;
+pub extern fn addReturnValueBuf(ptr: *const u8, len: c_uint) c_int;
+pub extern fn loadFontDataJs(fontUrlPtr: *const u8, fontUrlLen: c_uint, fontSize: f32, atlasSize: c_int) c_uint;
+
 // browser / DOM
 pub extern fn clearAllEmbeds() void;
 pub extern fn addYoutubeEmbed(left: c_int, top: c_int, width: c_int, height: c_int, youtubeIdPtr: *const u8, youtubeIdLen: c_uint) void;
@@ -57,6 +64,7 @@ pub extern fn glBufferSubData(_: c_uint, _: c_uint, _: *const f32,  _: c_uint) v
 pub extern fn glCreateTexture() c_uint;
 pub extern fn glBindTexture(_: c_uint, _: c_uint) void;
 pub extern fn glActiveTexture(_: c_uint) void;
+pub extern fn glDeleteTexture(_: c_uint) void;
 
 pub extern fn glUseProgram(_: c_uint) void;
 
@@ -102,25 +110,3 @@ pub const GL_FRAMEBUFFER: c_uint = 36160;
 pub const GL_RENDERBUFFER: c_uint = 36161;
 
 pub const GL_DEPTH_COMPONENT16: c_uint = 33189;
-
-pub fn log(
-    comptime message_level: std.log.Level,
-    comptime scope: @Type(.EnumLiteral),
-    comptime format: []const u8,
-    args: anytype) void
-{
-    _ = scope;
-
-    var buf: [2048]u8 = undefined;
-    const message = std.fmt.bufPrint(&buf, format, args) catch {
-        const errMsg = "bufPrint failed for format: " ++ format;
-        consoleMessage(true, &errMsg[0], errMsg.len);
-        return;
-    };
-
-    const isError = switch (message_level) {
-        .err, .warn => true, 
-        .info, .debug => false,
-    };
-    consoleMessage(isError, &message[0], message.len);
-}

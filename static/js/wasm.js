@@ -1,11 +1,14 @@
 let gl = null;
 let _ext = null;
-let _wasmInstance = null;
 let _memoryPtr = null;
 let _canvas = null;
 
 let _currentHeight = null;
 let _loadTextureJobs = [];
+
+function readUint8Array(ptr, len) {
+    return new Uint8Array(_wasmInstance.exports.memory.buffer, ptr, len);
+}
 
 function createLoadTextureJob(width, height, chunkSize, textureId, pngData, i, loaded) {
     return {
@@ -57,39 +60,6 @@ function doNextLoadTextureJob() {
     doLoadTextureJob(job);
 }
 
-function consoleMessage(isError, messagePtr, messageLen) {
-    const message = readCharStr(messagePtr, messageLen);
-    if (isError) {
-        console.error(message);
-    } else {
-        console.log(message);
-    }
-}
-
-function isPowerOfTwo(x) {
-    return (Math.log(x)/Math.log(2)) % 1 === 0;
-}
-
-function readUint8Array(ptr, len) {
-    return new Uint8Array(_wasmInstance.exports.memory.buffer, ptr, len);
-}
-
-function readCharStr(ptr, len) {
-    const bytes = new Uint8Array(_wasmInstance.exports.memory.buffer, ptr, len);
-    return new TextDecoder("utf-8").decode(bytes);
-};
-
-function writeCharStr(ptr, len, toWrite) {
-    if (toWrite.length > len) {
-        return 0;
-    }
-    const bytes = new Uint8Array(_wasmInstance.exports.memory.buffer, ptr, len);
-    for (let i = 0; i < toWrite.length; i++) {
-        bytes[i] = toWrite.charCodeAt(i);
-    }
-    return toWrite.length;
-};
-
 function clearAllEmbeds()
 {
     Array.from(document.getElementsByClassName("_wasmEmbedAll")).forEach(function(el) {
@@ -102,7 +72,7 @@ function addYoutubeEmbed(left, top, width, height, youtubeIdPtr, youtubeIdLen)
     const youtubeId = readCharStr(youtubeIdPtr, youtubeIdLen);
 
     const div = document.createElement("div");
-    div.classList.add("_wasmTextAll");
+    div.classList.add("_wasmEmbedAll");
     div.classList.add("_wasmYoutubeEmbed");
     div.style.left = px(toDevicePx(left));
     div.style.top = px(toDevicePx(top));
@@ -155,7 +125,7 @@ function compileShader(sourcePtr, sourceLen, type) {
 
     _glShaders.push(shader);
     return _glShaders.length - 1;
-};
+}
 
 function linkShaderProgram(vertexShaderId, fragmentShaderId) {
     const program = gl.createProgram();
@@ -168,7 +138,7 @@ function linkShaderProgram(vertexShaderId, fragmentShaderId) {
 
     _glPrograms.push(program);
     return _glPrograms.length - 1;
-};
+}
 
 function createTexture(width, height, wrap, filter) {
     const textureId = env.glCreateTexture();
@@ -288,7 +258,60 @@ function loadTexture(textureId, imgUrlPtr, imgUrlLen, wrap, filter) {
             queueLoadTextureJob(width, height, chunkSize, textureId, chunkData, i, loaded);
         }
     });
-};
+}
+
+function loadFontDataJs(fontUrlPtr, fontUrlLen, fontSize, atlasSize)
+{
+    const fontUrl = readCharStr(fontUrlPtr, fontUrlLen);
+
+    const atlasTextureId = env.glCreateTexture();
+    const texture = _glTextures[atlasTextureId];
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+
+    const level = 0;
+    const internalFormat = gl.LUMINANCE;
+    const border = 0;
+    const srcFormat = internalFormat;
+    const srcType = gl.UNSIGNED_BYTE;
+    const data = new Uint8Array(atlasSize * atlasSize);
+    gl.texImage2D(gl.TEXTURE_2D, level, internalFormat, atlasSize, atlasSize, border, srcFormat, srcType, data);
+    // TODO pass wrap + filter as params?
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+
+    httpGet(fontUrl, function(status, data) {
+        if (status !== 200) {
+            console.error(`Failed to get font ${fontUrl} status ${status}`);
+            return;
+        }
+
+        const worker = new Worker("/js/wasm_worker.js");
+        worker.postMessage(["/worker.wasm", "loadFontData", atlasSize, data, fontSize]);
+        worker.onmessage = function(e) {
+            worker.terminate();
+
+            const success = e.data[0];
+            if (success !== 1) {
+                console.error(`Failed to load font data for ${fontUrl}`);
+                return;
+            }
+            const pixelData = e.data[1];
+            const fontData = e.data[2];
+
+            const xOffset = 0;
+            const yOffset = 0;
+            const pixelData2 = new Uint8Array(pixelData);
+            gl.bindTexture(gl.TEXTURE_2D, texture);
+            gl.texSubImage2D(gl.TEXTURE_2D, level, xOffset, yOffset, atlasSize, atlasSize, srcFormat, srcType, pixelData2);
+
+            callWasmFunction(_wasmInstance.exports.onFontLoaded, [_memoryPtr, atlasTextureId, fontData]);
+        };
+    });
+
+    return atlasTextureId;
+}
 
 function bindNullFramebuffer() {
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
@@ -305,6 +328,10 @@ function drawArraysInstancedANGLE(mode, first, count, primcount) {
 const env = {
     // Debug functions
     consoleMessage,
+
+    // Custom
+    fillDataBuffer,
+    loadFontDataJs,
 
     // browser / DOM functions
     clearAllEmbeds,
@@ -388,6 +415,9 @@ function fillGlFunctions(env)
     };
     env.glBindTexture = function(type, id) {
         gl.bindTexture(type, _glTextures[id]);
+    };
+    env.glDeleteTexture = function(id) {
+        gl.deleteTexture(_glTextures[id]);
     };
 
     env.glUseProgram = function(programId) {

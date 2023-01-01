@@ -1,25 +1,3 @@
-@font-face {
-    font-family: HelveticaMedium;
-    src: url("../fonts/HelveticaNeueLTCom-Md.ttf") format("opentype");
-}
-@font-face {
-    font-family: HelveticaBold;
-    src: url("../fonts/HelveticaNeueLTCom-Bd.ttf") format("opentype");
-}
-@font-face {
-    font-family: HelveticaHeavy;
-    src: url("../fonts/HelveticaNeueLTCom-Hv.ttf") format("opentype");
-}
-@font-face {
-    font-family: HelveticaLight;
-    src: url("../fonts/HelveticaNeueLTCom-Lt.ttf") format("opentype");
-}
-
-@font-face {
-    font-family: SegoeUiEmoji;
-    src: url("../fonts/SegoeUI_Emoji.ttf") format("opentype");
-}
-
 html, body {
     margin: 0;
     padding: 0;
@@ -36,19 +14,6 @@ html, body {
     position: relative;
     width: 100%;
     overflow-x: hidden;
-}
-
-._wasmTextOuter {
-    position: absolute;
-}
-._wasmTextInner {
-}
-._wasmTextStrut {
-    display: inline-block;
-}
-
-._wasmTextBox {
-    position: absolute;
 }
 
 ._wasmYoutubeEmbed {
