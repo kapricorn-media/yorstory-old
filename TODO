@@ -1,4 +1,10 @@
 CRITICAL
+- space between "boarding the mechanics" and text should be the same as home
+- grid with blank squares
+- "other projects" with a frame
+- number stickers on top of subtitle
+- font rasterizing is slow
+- "Projects" module should keep scrolling, not stop
 
 HIGH
 - gallery changes (layout)
@@ -7,7 +13,8 @@ HIGH
 - lag on Chrome (getTextureData? memcpy??)
 
 MEDIUM
-- make font more crisp
+- sticker on top of "we are storytellers"
+- try font oversampling
 - fix kerning
 - flare layer, opacity sine wave 100% <-> 20% 
 - lively details (react on hover, fade in as you scroll, etc)

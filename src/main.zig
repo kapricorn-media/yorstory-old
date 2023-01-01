@@ -107,6 +107,7 @@ pub const State = struct {
 
     const Self = @This();
     const PARALLAX_SET_INDEX_START = 5;
+    const PARALLAX_SET_SWAP_SECONDS = 6;
     comptime {
         if (PARALLAX_SET_INDEX_START >= parallax.PARALLAX_SETS.len) {
             @compileError("start parallax index out of bounds");
@@ -162,9 +163,6 @@ pub const State = struct {
             "/images/decal-topleft.png", defaultTextureWrap, defaultTextureFilter, 2
         );
 
-        _ = try self.assets.register(.{ .Static = asset.Texture.CategoriesText },
-            "/images/categories-text.png", defaultTextureWrap, defaultTextureFilter, 5
-        );
         _ = try self.assets.register(.{ .Static = asset.Texture.StickerShiny },
             "/images/sticker-shiny.png", defaultTextureWrap, defaultTextureFilter, 5
         );
@@ -402,7 +400,7 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
 
         const titleFontSize = gridSize * 4.0;
         const titleKerning = -gridSize * 0.2;
-        const titleLineHeight = gridSize * 3.8;
+        const titleLineHeight = gridSize * 3.6;
         state.assets.registerStaticFont(asset.Font.Title, helveticaBold, titleFontSize, titleKerning, titleLineHeight, allocator) catch |err| {
             std.log.err("registerStaticFont failed err={}", .{err});
         };
@@ -448,8 +446,7 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
         const nextSetIndex = (parallaxIndex + 1) % parallax.PARALLAX_SETS.len;
         var nextParallaxSet = parallax.tryLoadAndGetParallaxSet(&state.assets, nextSetIndex, 20, defaultTextureWrap, defaultTextureFilter);
         if (nextParallaxSet) |_| {
-            const parallaxSetSwapSeconds = 6;
-            if (state.parallaxIdleTimeMs >= parallaxSetSwapSeconds * 1000) {
+            if (state.parallaxIdleTimeMs >= State.PARALLAX_SET_SWAP_SECONDS * 1000) {
                 state.parallaxIdleTimeMs = 0;
                 state.activeParallaxSetIndex = nextSetIndex;
                 activeParallaxSet = nextParallaxSet;
@@ -724,7 +721,9 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
             contentMarginX - gridSize * 0.3,
             wasPosBaseY + gridSize * 10.8
         );
-        renderQueue.text2("We are\nStorytellers.", wasPos, DEPTH_UI_GENERIC, asset.Font.Title, colorUi);
+        const wasText = "We are\nStorytellers.";
+        // const wasSize = render.text2Size(&state.assets, wasText, asset.Font.Title);
+        renderQueue.text2(wasText, wasPos, DEPTH_UI_GENERIC, asset.Font.Title, colorUi);
 
         const wasTextPos1 = m.Vec2.init(
             contentMarginX - gridSize * 0.3,
@@ -930,7 +929,7 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
 
             const contentSubPos = m.Vec2.init(
                 contentMarginX,
-                contentHeaderPos.y + headerSizeYExtra + gridSize * 2.0,
+                contentHeaderPos.y + headerSizeYExtra + gridSize * 5.0,
             );
             renderQueue.text2(pf.contentDescription, contentSubPos, DEPTH_UI_GENERIC, asset.Font.Text, colorUi);
 

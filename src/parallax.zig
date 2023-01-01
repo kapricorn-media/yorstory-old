@@ -152,6 +152,22 @@ pub const PARALLAX_SETS = [_]ParallaxSet {
             ParallaxImage.init("/images/marvel/parallax/6.png", 1.2),
         },
     },
+    .{
+        .bgColor = .{
+            .Color = colorHexToVec4("#000000") catch unreachable,
+        },
+        .images = &[_]ParallaxImage{
+            ParallaxImage.init("/images/parallax/newbg/1-bg.png", 0.01),
+            ParallaxImage.init("/images/parallax/newbg/2-hill.png", 0.05),
+            ParallaxImage.init("/images/parallax/newbg/3-tree-back.png", 0.1),
+            ParallaxImage.init("/images/parallax/newbg/4-person-back.png", 0.35),
+            ParallaxImage.init("/images/parallax/newbg/5-glow1.png", 0.0),
+            ParallaxImage.init("/images/parallax/newbg/6-person-front.png", 0.85),
+            ParallaxImage.init("/images/parallax/newbg/7-glow2.png", 0.0),
+            ParallaxImage.init("/images/parallax/newbg/8-tree-front1.png", 1.2),
+            ParallaxImage.init("/images/parallax/newbg/9-tree-front2.png", 1.3),
+        },
+    },
 };
 
 pub fn tryLoadAndGetParallaxSet(assets: anytype, index: usize, priority: u32, textureWrap: c_uint, textureFilter: c_uint) ?*const ParallaxSet

@@ -1,5 +1,4 @@
 pub const Texture = enum(usize) {
-    CategoriesText,
     DecalTopLeft,
     LoadingGlyphs,
     LogosAll,

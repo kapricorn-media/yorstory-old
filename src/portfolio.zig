@@ -2,6 +2,8 @@ const std = @import("std");
 
 const m = @import("math.zig");
 
+const titleSpaces = "        ";
+
 pub const Subproject = struct {
     name: []const u8,
     description: []const u8,
@@ -24,7 +26,7 @@ pub const Portfolio = struct {
 
 pub const PORTFOLIO_LIST = [_]Portfolio {
     .{
-        .title = "HALO        MICROSOFT",
+        .title = "HALO" ++ titleSpaces ++ "MICROSOFT",
         .uri = "/halo",
         .cover = "/images/HALO/cover.png",
         .sticker = "/images/HALO/sticker-main.png",
@@ -174,7 +176,7 @@ pub const PORTFOLIO_LIST = [_]Portfolio {
         },
     },
     .{
-        .title = "Marvel: Contest of Champions",
+        .title = "MAD TITAN'S WRATH" ++ titleSpaces ++ "MARVEL",
         .uri = "/marvel-contest-of-champions",
         .cover = "/images/marvel/cover.png",
         .sticker = "/images/marvel/sticker-main.png",
