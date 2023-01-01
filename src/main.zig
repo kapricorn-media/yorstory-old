@@ -102,6 +102,7 @@ pub const State = struct {
     activeParallaxSetIndex: usize,
     parallaxTX: f32,
     parallaxIdleTimeMs: c_int,
+    yMaxPrev: i32,
 
     debug: bool,
 
@@ -146,6 +147,7 @@ pub const State = struct {
         self.activeParallaxSetIndex = PARALLAX_SET_INDEX_START;
         self.parallaxTX = 0;
         self.parallaxIdleTimeMs = 0;
+        self.yMaxPrev = 0;
 
         self.debug = false;
 
@@ -592,7 +594,7 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
                 }
             }
 
-            x += categorySize.x + gridSize * 2.2;
+            x += categorySize.x + gridSize * 1.4;
         }
 
         // sticker (main)
@@ -851,7 +853,7 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
             );
             renderQueue.text2(pf.contentDescription, contentSubPos, DEPTH_UI_GENERIC, asset.Font.Text, colorUi);
 
-            yMax = contentSubPos.y + gridSize * 6.0;
+            yMax = contentSubPos.y + gridSize * 4.0;
 
             var galleryImages = std.ArrayList(GridImage).init(allocator);
 
@@ -877,11 +879,13 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
                 );
                 renderQueue.text2(numStr, numberTextPos, DEPTH_UI_GENERIC + 0.01, asset.Font.Number, m.Vec4.black);
 
+                const subNameRect = render.text2Rect(&state.assets, sub.name, asset.Font.Subtitle);
                 renderQueue.text2(sub.name, m.Vec2.init(x, yGallery), DEPTH_UI_GENERIC, asset.Font.Subtitle, colorUi);
-                yGallery += gridSize * 1;
+                yGallery += -subNameRect.min.y + gridSize * 2.0;
 
+                const subDescriptionRect = render.text2Rect(&state.assets, sub.name, asset.Font.Subtitle);
                 renderQueue.text2(sub.description, m.Vec2.init(x, yGallery), DEPTH_UI_GENERIC, asset.Font.Text, colorUi);
-                yGallery += gridSize * 2;
+                yGallery += -subDescriptionRect.min.y + gridSize * 2.0;
 
                 galleryImages.clearRetainingCapacity();
                 for (sub.images) |img| {
@@ -1196,9 +1200,12 @@ export fn onAnimationFrame(memory: *core.Memory, width: c_int, height: c_int, sc
     } else {
         yMax = drawDesktop(state, deltaMs, scrollYF, screenSizeF, &renderQueue, tempAllocator, screenResize);
     }
+    defer {
+        state.yMaxPrev = yMax;
+    }
 
     renderQueue.renderShapes(state.renderState, &state.assets, screenSizeF, scrollYF);
-    if (!m.Vec2i.eql(state.screenSizePrev, screenSizeI)) {
+    if (!m.Vec2i.eql(state.screenSizePrev, screenSizeI) or yMax != state.yMaxPrev) {
         std.log.info("resize, clearing text", .{});
         w.clearAllText();
         renderQueue.renderText();

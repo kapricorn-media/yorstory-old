@@ -184,12 +184,12 @@ pub const PORTFOLIO_LIST = [_]Portfolio {
         .colorUi = m.Vec4.init(165.0 / 255.0, 56.0 / 255.0, 1.0, 1.0),
         .colorSticker = m.Vec4.init(165.0 / 255.0, 56.0 / 255.0, 1.0, 1.0),
         .youtubeId = "Bilb5i7tCk0",
-        .contentHeader = "Mad Titan's Wrath",
-        .contentDescription = "This trailer was to celebrate the 3rd anniversary of Marvel Contest of Champions.  It features a huge cast of Marvel characters in an all-out war, set to The Sword's \"Apocryphon.\"",
+        .contentHeader = "Mad Titan's\nWrath",
+        .contentDescription = "This trailer was to celebrate the 3rd anniversary of Marvel Contest of Champions. It features a huge cast of Marvel characters in an all-out war,\nset to The Sword's \"Apocryphon.\"",
         .subprojects = &[_]Subproject {
             .{
-                .name = "Act 1",
-                .description = "Spiderman is on the run in the Battlerealm, and quickly we realize that his pursuer is none other than the Mad Titan himself, Thanos, wielding the power of 3 of the 6 infinity stones.",
+                .name = "ACT 1",
+                .description = "Spiderman is on the run in the Battlerealm, and quickly we realize that his pursuer is none other than the Mad Titan himself, Thanos, wielding the power\nof 3 of the 6 infinity stones.",
                 .images = &[_][]const u8{
                     "/images/marvel/act1/Mad_Titan_0001_02.png",
                     "/images/marvel/act1/Mad_Titan_0002_03.png",
@@ -206,8 +206,8 @@ pub const PORTFOLIO_LIST = [_]Portfolio {
                 },
             },
             .{
-                .name = "Act 2",
-                .description = "Just in the nick of time, a series of heroes arrives to save Spidey, but despite him being able to flee, Thanos is able to harness the power of the Infinity Stones to turn his attackers to stone.",
+                .name = "ACT 2",
+                .description = "Just in the nick of time, a series of heroes arrives to save Spidey, but despite him being able to flee, Thanos is able to harness the power\nof the Infinity Stones to turn his attackers to stone.",
                 .images = &[_][]const u8{
                     "/images/marvel/act2/Mad_Titan_0029_30.png",
                     "/images/marvel/act2/Mad_Titan_0030_31.png",
@@ -224,7 +224,7 @@ pub const PORTFOLIO_LIST = [_]Portfolio {
                 },
             },
             .{
-                .name = "Act 3",
+                .name = "ACT 3",
                 .description = "Thanos catches up with Spiderman, wounded and now on his last legs. Before the killing blow can be struck, the Civil Warrior arrives with the cavalry.\nSpiderman reveals that he has been carrying one of the lost infinity stones this entire time! As the team of heroes are able to push Thanos back, Spiderman flees with the stone,\ninciting the Mad Titan's Wrath!",
                 .images = &[_][]const u8{
                     "/images/marvel/act3/Mad_Titan_0071_72.png",

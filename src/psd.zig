@@ -72,8 +72,6 @@ pub const LayerData = struct {
             .size = dstSizeCapped,
         };
 
-        std.log.info("topLeft={} self.topLeft={} self.size={} topLeftMax={} sliceSrc={} sliceDstAdjusted={} buf.size={}", .{topLeft, self.topLeft, self.size, topLeftMax, sliceSrc, sliceDstAdjusted, buf.size});
-
         for (self.channels) |c| {
             if (channel) |cc| {
                 if (cc != c.id) {

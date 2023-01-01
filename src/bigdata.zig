@@ -109,9 +109,10 @@ pub fn generate(dirPath: []const u8, allocator: std.mem.Allocator) ![]const u8
                 }
                 if (!allNumbers) continue;
 
-                const sizeX = 5000;
+                const safeAspect = 3;
+                const sizeX = @floatToInt(usize, @intToFloat(f32, psdFile.canvasSize.y) * safeAspect);
                 const parallaxSize = m.Vec2usize.init(sizeX, psdFile.canvasSize.y);
-                const topLeft = m.Vec2i.init(@divTrunc((@intCast(i32, psdFile.canvasSize.x) - sizeX), 2), 0);
+                const topLeft = m.Vec2i.init(@divTrunc((@intCast(i32, psdFile.canvasSize.x) - @intCast(i32, sizeX)), 2), 0);
                 const layerPixelData = image.PixelData {
                     .size = parallaxSize,
                     .channels = 4,
@@ -124,9 +125,6 @@ pub fn generate(dirPath: []const u8, allocator: std.mem.Allocator) ![]const u8
                 };
                 const slice = try psdFile.layers[i].getPixelDataRectBuf(null, topLeft, layerPixelData, sliceDst);
                 _ = slice;
-                std.log.info("layer {} - {s}", .{i, l.name});
-                std.log.info("{}", .{layerPixelData.size});
-                std.log.info("{}", .{layerPixelData.channels});
                 const chunkSize = calculateChunkSize(m.Vec2i.initFromVec2usize(layerPixelData.size), CHUNK_SIZE_MAX);
                 const chunked = try pixelDataToPngChunkedFormat(m.Vec2i.initFromVec2usize(layerPixelData.size), layerPixelData.channels, layerPixelData.data, chunkSize, allocator);
                 const outputDir = entry.path[0..entry.path.len - 4];
@@ -135,12 +133,7 @@ pub fn generate(dirPath: []const u8, allocator: std.mem.Allocator) ![]const u8
                     .uri = uri,
                     .data = chunked,
                 });
-                std.log.info("wrote chunked layer as {s}", .{uri});
-
-                // const testfilename = try std.fmt.allocPrint(tempAllocator, "{s}.png", .{l.name});
-                // const png = @import("png.zig");
-                // try png.writePngFile(testfilename, layerPixelData.size.x, layerPixelData.size.y, layerPixelData.channels, layerPixelData.size.x * layerPixelData.channels, layerPixelData.data);
-                // std.log.info("wrote test file {s}", .{testfilename});
+                std.log.info("wrote chunked layer as {s} ({}K)", .{uri, chunked.len});
             }
         } else {
             try entries.append(Entry {

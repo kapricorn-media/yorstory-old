@@ -1,19 +1,18 @@
 CRITICAL
+- parallax scene loading is slow (images are massive)
 - font rasterizing is slow
-- finish & deploy LUT
 
 HIGH
-- parallax images are massive
 - gallery changes (layout + popup)
 - grid size3
+- sticker on top of "we are storytellers"
 
 MEDIUM
-- sticker on top of "we are storytellers"
+- lively details (react on hover, fade in as you scroll, etc)
+- flare layer, opacity sine wave 100% <-> 20% 
+- smarter should-redraw logic
 - try font oversampling
 - fix kerning
-- flare layer, opacity sine wave 100% <-> 20% 
-- lively details (react on hover, fade in as you scroll, etc)
-- smarter should-redraw logic
 - space between "boarding the mechanics" and text should be the same as home (based on baseline, not pure text bounding box size)
 
 LOW
