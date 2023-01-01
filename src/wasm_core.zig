@@ -9,7 +9,7 @@ const StateType = if (@hasDecl(root, "State")) root.State else @compileError("no
 
 pub const Memory = struct {
     persistent: [128 * 1024]u8 align(8),
-    transient: [64 * 1024 * 1024]u8 align(8),
+    transient: [256 * 1024 * 1024]u8 align(8),
 
     const Self = @This();
 

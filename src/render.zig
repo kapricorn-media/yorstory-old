@@ -645,27 +645,6 @@ const RenderEntryText = struct {
     color: m.Vec4,
 };
 
-const RenderEntryTextLine = struct {
-    text: []const u8,
-    baselineLeft: m.Vec2,
-    fontSize: f32,
-    letterSpacing: f32,
-    color: m.Vec4,
-    fontFamily: []const u8
-};
-
-const RenderEntryTextBox = struct {
-    text: []const u8,
-    topLeft: m.Vec2,
-    width: f32,
-    fontSize: f32,
-    lineHeight: f32,
-    letterSpacing: f32,
-    color: m.Vec4,
-    fontFamily: []const u8,
-    textAlign: TextAlign,
-};
-
 const RenderEntryYoutubeEmbed = struct {
     topLeft: m.Vec2,
     size: m.Vec2,
@@ -686,8 +665,6 @@ pub const RenderQueue = struct
     quadTexs: std.ArrayList(RenderEntryQuadTex),
     roundedFrames: std.ArrayList(RenderEntryRoundedFrame),
     texts: std.ArrayList(RenderEntryText),
-    textLines: std.ArrayList(RenderEntryTextLine),
-    textBoxes: std.ArrayList(RenderEntryTextBox),
     youtubeEmbeds: std.ArrayList(RenderEntryYoutubeEmbed),
 
     const Self = @This();
@@ -699,8 +676,6 @@ pub const RenderQueue = struct
             .quadTexs = std.ArrayList(RenderEntryQuadTex).init(allocator),
             .roundedFrames = std.ArrayList(RenderEntryRoundedFrame).init(allocator),
             .texts = std.ArrayList(RenderEntryText).init(allocator),
-            .textLines = std.ArrayList(RenderEntryTextLine).init(allocator),
-            .textBoxes = std.ArrayList(RenderEntryTextBox).init(allocator),
             .youtubeEmbeds = std.ArrayList(RenderEntryYoutubeEmbed).init(allocator),
         };
     }
@@ -711,8 +686,6 @@ pub const RenderQueue = struct
         self.quadTexs.deinit();
         self.roundedFrames.deinit();
         self.texts.deinit();
-        self.textLines.deinit();
-        self.textBoxes.deinit();
         self.youtubeEmbeds.deinit();
     }
 
@@ -778,33 +751,6 @@ pub const RenderQueue = struct
         };
     }
 
-    pub fn textLine(self: *Self, text: []const u8, baselineLeft: m.Vec2, fontSize: f32, letterSpacing: f32, color: m.Vec4, fontFamily: []const u8) void
-    {
-        (self.textLines.addOne() catch return).* = RenderEntryTextLine {
-            .text = text,
-            .baselineLeft = baselineLeft,
-            .fontSize = fontSize,
-            .letterSpacing = letterSpacing,
-            .color = color,
-            .fontFamily = fontFamily,
-        };
-    }
-
-    pub fn textBox(self: *Self, text: []const u8, topLeft: m.Vec2, width: f32, fontSize: f32, lineHeight: f32, letterSpacing: f32, color: m.Vec4, fontFamily: []const u8, textAlign: TextAlign) void
-    {
-        (self.textBoxes.addOne() catch return).* = RenderEntryTextBox {
-            .text = text,
-            .topLeft = topLeft,
-            .width = width,
-            .fontSize = fontSize,
-            .lineHeight = lineHeight,
-            .letterSpacing = letterSpacing,
-            .color = color,
-            .fontFamily = fontFamily,
-            .textAlign = textAlign,
-        };
-    }
-
     pub fn embedYoutube(self: *Self, topLeft: m.Vec2, size: m.Vec2, youtubeId: []const u8) void
     {
         (self.youtubeEmbeds.addOne() catch return).* = RenderEntryYoutubeEmbed {
@@ -814,7 +760,7 @@ pub const RenderQueue = struct
         };
     }
 
-    pub fn renderShapes(self: Self, renderState: RenderState, assets: anytype, screenSize: m.Vec2, scrollY: f32) void
+    pub fn render(self: Self, renderState: RenderState, assets: anytype, screenSize: m.Vec2, scrollY: f32) void
     {
         // TODO fix depth/blend madness
 
@@ -911,33 +857,7 @@ pub const RenderQueue = struct
         }
     }
 
-    pub fn renderText(self: Self) void
-    {
-        var buf: [32]u8 = undefined;
-        for (self.textLines.items) |e| {
-            const hexColor = colorToHexString(&buf, e.color) catch continue;
-            w.addTextLine(
-                &e.text[0], e.text.len,
-                @floatToInt(c_int, e.baselineLeft.x), @floatToInt(c_int, e.baselineLeft.y),
-                @floatToInt(c_int, e.fontSize), e.letterSpacing,
-                &hexColor[0], hexColor.len, &e.fontFamily[0], e.fontFamily.len
-            );
-        }
-        for (self.textBoxes.items) |e| {
-            const textAlign = textAlignToString(e.textAlign);
-            const hexColor = colorToHexString(&buf, e.color) catch continue;
-            w.addTextBox(
-                &e.text[0], e.text.len,
-                @floatToInt(c_int, e.topLeft.x), @floatToInt(c_int, e.topLeft.y),
-                @floatToInt(c_int, e.width),
-                @floatToInt(c_int, e.fontSize), @floatToInt(c_int, e.lineHeight), e.letterSpacing,
-                &hexColor[0], hexColor.len, &e.fontFamily[0], e.fontFamily.len,
-                &textAlign[0], textAlign.len
-            );
-        }
-    }
-
-    pub fn renderEmbeds(self: Self) void
+    pub fn renderHtml(self: Self) void
     {
         for (self.youtubeEmbeds.items) |e| {
             w.addYoutubeEmbed(

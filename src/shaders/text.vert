@@ -11,7 +11,7 @@ uniform float u_depth;
 
 varying highp vec2 v_uv;
 
-float ATLAS_SIZE = 2048.0;
+float ATLAS_SIZE = 4096.0;
 
 vec2 posPixelsToNdc(vec2 pos, vec2 screenSize)
 {

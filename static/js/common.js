@@ -3,6 +3,16 @@ function px(n)
     return n.toString() + "px";
 }
 
+function toDevicePx(realPx)
+{
+    return realPx / window.devicePixelRatio;
+}
+
+function toRealPx(devicePx)
+{
+    return devicePx * window.devicePixelRatio;
+}
+
 function httpGet(url, callback)
 {
     const request = new XMLHttpRequest();

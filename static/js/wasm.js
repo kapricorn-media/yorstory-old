@@ -1,7 +1,6 @@
 let gl = null;
 let _ext = null;
 let _wasmInstance = null;
-let _memory = null;
 let _memoryPtr = null;
 let _canvas = null;
 
@@ -91,79 +90,6 @@ function writeCharStr(ptr, len, toWrite) {
     return toWrite.length;
 };
 
-function clearAllText() {
-    Array.from(document.getElementsByClassName("_wasmTextAll")).forEach(function(el) {
-        el.remove();
-    });
-}
-
-function setAllTextOpacity(opacity) {
-    Array.from(document.getElementsByClassName("_wasmTextAll")).forEach(function(el) {
-        el.style.opacity = opacity;
-    });
-}
-
-// there is a margin on the left of text boxes for some reason - return an estimate of that "gap"
-// TODO might depend on font family...
-function getTextLeftGap(fontSize) {
-    return fontSize * 0.08;
-}
-
-function addTextLine(
-    textPtr, textLen, left, baselineFromTop, fontSize, letterSpacing,
-    hexColorPtr, hexColorLen, fontFamilyPtr, fontFamilyLen) {
-    const text = readCharStr(textPtr, textLen);
-    const hexColor = readCharStr(hexColorPtr, hexColorLen);
-    const fontFamily = readCharStr(fontFamilyPtr, fontFamilyLen);
-
-    const outer = document.createElement("div");
-    outer.classList.add("_wasmTextAll");
-    outer.classList.add("_wasmTextOuter");
-    outer.style.left = px(left - getTextLeftGap(fontSize));
-    outer.style.top = px(baselineFromTop - fontSize);
-    outer.style.height = px(fontSize);
-
-    const inner = document.createElement("div");
-    inner.classList.add("_wasmTextInner");
-    inner.style.fontFamily = fontFamily;
-    inner.style.color = hexColor;
-    inner.style.fontSize = px(fontSize);
-    inner.style.lineHeight = px(fontSize);
-    inner.style.letterSpacing = px(letterSpacing);
-    inner.innerHTML = text;
-    const strut = document.createElement("div");
-    strut.classList.add("_wasmTextStrut");
-    strut.style.height = px(fontSize);
-    inner.appendChild(strut);
-
-    outer.appendChild(inner);
-    document.getElementById("dummyBackground").appendChild(outer);
-}
-
-function addTextBox(
-    textPtr, textLen, left, top, width, fontSize, lineHeight, letterSpacing,
-    hexColorPtr, hexColorLen, fontFamilyPtr, fontFamilyLen, textAlignPtr, textAlignLen) {
-    const text = readCharStr(textPtr, textLen);
-    const hexColor = readCharStr(hexColorPtr, hexColorLen);
-    const fontFamily = readCharStr(fontFamilyPtr, fontFamilyLen);
-    const textAlign = readCharStr(textAlignPtr, textAlignLen);
-
-    const div = document.createElement("div");
-    div.classList.add("_wasmTextAll");
-    div.classList.add("_wasmTextBox");
-    div.style.left = px(left - getTextLeftGap(fontSize));
-    div.style.top = px(top);
-    div.style.width = px(width);
-    div.style.fontFamily = fontFamily;
-    div.style.color = hexColor;
-    div.style.fontSize = px(fontSize);
-    div.style.lineHeight = px(lineHeight);
-    div.style.letterSpacing = px(letterSpacing);
-    div.style.textAlign = textAlign;
-    div.innerHTML = text;
-    document.getElementById("dummyBackground").appendChild(div);
-}
-
 function clearAllEmbeds()
 {
     Array.from(document.getElementsByClassName("_wasmEmbedAll")).forEach(function(el) {
@@ -178,10 +104,10 @@ function addYoutubeEmbed(left, top, width, height, youtubeIdPtr, youtubeIdLen)
     const div = document.createElement("div");
     div.classList.add("_wasmTextAll");
     div.classList.add("_wasmYoutubeEmbed");
-    div.style.left = px(left);
-    div.style.top = px(top);
-    div.style.width = px(width);
-    div.style.height = px(height);
+    div.style.left = px(toDevicePx(left));
+    div.style.top = px(toDevicePx(top));
+    div.style.width = px(toDevicePx(width));
+    div.style.height = px(toDevicePx(height));
 
     const iframe = document.createElement("iframe");
     iframe.style.width = "100%";
@@ -381,10 +307,6 @@ const env = {
     consoleMessage,
 
     // browser / DOM functions
-    clearAllText,
-    setAllTextOpacity,
-    addTextLine,
-    addTextBox,
     clearAllEmbeds,
     addYoutubeEmbed,
     setCursor,
@@ -500,8 +422,10 @@ function fillGlFunctions(env)
 
 function updateCanvasSize()
 {
-    _canvas.width = window.innerWidth * window.devicePixelRatio;
-    _canvas.height = window.innerHeight * window.devicePixelRatio;
+    _canvas.style.width = px(window.innerWidth);
+    _canvas.style.height = px(window.innerHeight);
+    _canvas.width = toRealPx(window.innerWidth);
+    _canvas.height = toRealPx(window.innerHeight);
     gl.viewport(0, 0, _canvas.width, _canvas.height);
     console.log(`canvas resize: ${_canvas.width} x ${_canvas.height}`);
 }
@@ -523,17 +447,23 @@ function wasmInit(wasmUri, memoryBytes)
 
     document.addEventListener("mousemove", function(event) {
         if (_wasmInstance !== null) {
-            _wasmInstance.exports.onMouseMove(_memoryPtr, event.clientX, event.clientY);
+            _wasmInstance.exports.onMouseMove(
+                _memoryPtr, toRealPx(event.clientX), toRealPx(event.clientY)
+            );
         }
     });
     document.addEventListener("mousedown", function(event) {
         if (_wasmInstance !== null) {
-            _wasmInstance.exports.onMouseDown(_memoryPtr, event.button, event.clientX, event.clientY);
+            _wasmInstance.exports.onMouseDown(
+                _memoryPtr, event.button, toRealPx(event.clientX), toRealPx(event.clientY)
+            );
         }
     });
     document.addEventListener("mouseup", function(event) {
         if (_wasmInstance !== null) {
-            _wasmInstance.exports.onMouseUp(_memoryPtr, event.button, event.clientX, event.clientY);
+            _wasmInstance.exports.onMouseUp(
+                _memoryPtr, event.button, toRealPx(event.clientX), toRealPx(event.clientY)
+            );
         }
     });
     document.addEventListener("keydown", function(event) {
@@ -546,14 +476,6 @@ function wasmInit(wasmUri, memoryBytes)
         updateCanvasSize();
     });
 
-    // const WASM_PAGE_SIZE = 64 * 1024;
-    // const memoryPages = Math.ceil(memoryBytes / WASM_PAGE_SIZE);
-    // _memory = new WebAssembly.Memory({
-    //     initial: memoryPages,
-    //     maximum: memoryPages,
-    // });
-    // console.log(`Allocated ${memoryPages} wasm pages`);
-
     let importObject = {
         env: env,
     };
@@ -561,10 +483,6 @@ function wasmInit(wasmUri, memoryBytes)
 
     WebAssembly.instantiateStreaming(fetch(wasmUri), importObject).then(function(obj) {
         _wasmInstance = obj.instance;
-        // const pages = Math.round(_wasmInstance.exports.memory.buffer.byteLength / WASM_PAGE_SIZE);
-        // if (pages < memoryPages) {
-        //     _wasmInstance.exports.memory.grow(memoryPages - pages);
-        // }
         _memoryPtr = _wasmInstance.exports.onInit();
 
         const onAnimationFrame = _wasmInstance.exports.onAnimationFrame;
@@ -573,11 +491,12 @@ function wasmInit(wasmUri, memoryBytes)
         function step(timestamp) {
             doNextLoadTextureJob(); // TODO make fancier?
 
-            const scrollY = window.scrollY;
+            const scrollY = toRealPx(window.scrollY);
             const totalHeight = onAnimationFrame(_memoryPtr, _canvas.width, _canvas.height, scrollY, timestamp);
-            if (totalHeight !== 0 && _currentHeight !== totalHeight) {
-                _currentHeight = totalHeight;
-                dummyBackground.style.height = px(totalHeight);
+            const totalHeightDevice = toDevicePx(totalHeight);
+            if (totalHeightDevice !== 0 && _currentHeight !== totalHeightDevice) {
+                _currentHeight = totalHeightDevice;
+                dummyBackground.style.height = px(totalHeightDevice);
             }
             window.requestAnimationFrame(step);
         }

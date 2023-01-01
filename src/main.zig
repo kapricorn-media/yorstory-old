@@ -397,38 +397,57 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
         const helveticaMedium = @embedFile("HelveticaNeueLTCom-Md.ttf");
         const helveticaLight = @embedFile("HelveticaNeueLTCom-Lt.ttf");
 
+        var tempAllocatorArena = std.heap.ArenaAllocator.init(allocator);
+        var tempAllocator = tempAllocatorArena.allocator();
+
         const categoryFontSize = gridSize * 0.6;
         const categoryKerning = 0;
         const categoryLineHeight = categoryFontSize;
-        state.assets.registerStaticFont(asset.Font.Category, helveticaBold, categoryFontSize, categoryKerning, categoryLineHeight, allocator) catch |err| {
+        state.assets.registerStaticFont(asset.Font.Category, helveticaBold, categoryFontSize, categoryKerning, categoryLineHeight, tempAllocator) catch |err| {
             std.log.err("registerStaticFont failed err={}", .{err});
         };
 
+        tempAllocatorArena.deinit();
+        tempAllocatorArena = std.heap.ArenaAllocator.init(allocator);
+        tempAllocator = tempAllocatorArena.allocator();
+
         const titleFontSize = gridSize * 4.0;
-        const titleKerning = -gridSize * 0.2;
+        const titleKerning = -gridSize * 0.15;
         const titleLineHeight = gridSize * 3.6;
-        state.assets.registerStaticFont(asset.Font.Title, helveticaBold, titleFontSize, titleKerning, titleLineHeight, allocator) catch |err| {
+        state.assets.registerStaticFont(asset.Font.Title, helveticaBold, titleFontSize, titleKerning, titleLineHeight, tempAllocator) catch |err| {
             std.log.err("registerStaticFont failed err={}", .{err});
         };
+
+        tempAllocatorArena.deinit();
+        tempAllocatorArena = std.heap.ArenaAllocator.init(allocator);
+        tempAllocator = tempAllocatorArena.allocator();
 
         const subtitleFontSize = gridSize * 1.25;
         const subtitleKerning = -gridSize * 0.05;
         const subtitleLineHeight = subtitleFontSize;
-        state.assets.registerStaticFont(asset.Font.Subtitle, helveticaLight, subtitleFontSize, subtitleKerning, subtitleLineHeight, allocator) catch |err| {
+        state.assets.registerStaticFont(asset.Font.Subtitle, helveticaLight, subtitleFontSize, subtitleKerning, subtitleLineHeight, tempAllocator) catch |err| {
             std.log.err("registerStaticFont failed err={}", .{err});
         };
+
+        tempAllocatorArena.deinit();
+        tempAllocatorArena = std.heap.ArenaAllocator.init(allocator);
+        tempAllocator = tempAllocatorArena.allocator();
 
         const textFontSize = gridSize * 0.4;
         const textKerning = 0;
         const textLineHeight = textFontSize * 1.4;
-        state.assets.registerStaticFont(asset.Font.Text, helveticaMedium, textFontSize, textKerning, textLineHeight, allocator) catch |err| {
+        state.assets.registerStaticFont(asset.Font.Text, helveticaMedium, textFontSize, textKerning, textLineHeight, tempAllocator) catch |err| {
             std.log.err("registerStaticFont failed err={}", .{err});
         };
+
+        tempAllocatorArena.deinit();
+        tempAllocatorArena = std.heap.ArenaAllocator.init(allocator);
+        tempAllocator = tempAllocatorArena.allocator();
 
         const numberFontSize = gridSize * 1.8;
         const numberKerning = 0;
         const numberLineHeight = numberFontSize;
-        state.assets.registerStaticFont(asset.Font.Number, helveticaBold, numberFontSize, numberKerning, numberLineHeight, allocator) catch |err| {
+        state.assets.registerStaticFont(asset.Font.Number, helveticaBold, numberFontSize, numberKerning, numberLineHeight, tempAllocator) catch |err| {
             std.log.err("registerStaticFont failed err={}", .{err});
         };
     }
@@ -826,7 +845,6 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
             }
             if (theState.pageData.Entry.galleryImageIndex == null) {
                 theState.pageData.Entry.galleryImageIndex = index;
-                w.setAllTextOpacity(0.0);
             }
         }
     };
@@ -948,7 +966,6 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
                                         or posF.y < (gridSize * 2.0)
                                         or posF.y > (screenSizeF.y - gridSize * 2.0)) {
                                         state.pageData.Entry.galleryImageIndex = null;
-                                        w.setAllTextOpacity(1.0);
                                     }
                                 }
                             }
@@ -1004,9 +1021,9 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
         section3Start + gridSize * 14.0,
     );
     const spacing = gridSize * 0.25;
-    const y = drawImageGrid(images.items, 0, itemsPerRow, gridTopLeft, contentSubWidth, spacing, asset.Font.Text, colorUi, state, scrollYF, &mouseHoverGlobal, renderQueue, CB.home);
+    const projectGridY = drawImageGrid(images.items, 0, itemsPerRow, gridTopLeft, contentSubWidth, spacing, asset.Font.Text, colorUi, state, scrollYF, &mouseHoverGlobal, renderQueue, CB.home);
 
-    const section3Height = gridTopLeft.y - section3Start + y + gridSize * 8.0;
+    const section3Height = gridTopLeft.y - section3Start + projectGridY + gridSize * 8.0;
 
     // draw moving gradient
     const gradientColor = m.Vec4.init(86.0 / 255.0, 0.0, 214.0 / 255.0, 1.0);
@@ -1137,7 +1154,6 @@ export fn onAnimationFrame(memory: *core.Memory, width: c_int, height: c_int, sc
         const imageCount = getImageCount(state.pageData.Entry);
         if (state.keyboardState.keyDown(keyCodeEscape)) {
             state.pageData.Entry.galleryImageIndex = null;
-            w.setAllTextOpacity(1.0);
         } else if (state.keyboardState.keyDown(keyCodeArrowLeft)) {
             if (state.pageData.Entry.galleryImageIndex.? == 0) {
                 state.pageData.Entry.galleryImageIndex.? = imageCount - 1;
@@ -1204,13 +1220,11 @@ export fn onAnimationFrame(memory: *core.Memory, width: c_int, height: c_int, sc
         state.yMaxPrev = yMax;
     }
 
-    renderQueue.renderShapes(state.renderState, &state.assets, screenSizeF, scrollYF);
+    renderQueue.render(state.renderState, &state.assets, screenSizeF, scrollYF);
     if (!m.Vec2i.eql(state.screenSizePrev, screenSizeI) or yMax != state.yMaxPrev) {
-        std.log.info("resize, clearing text", .{});
-        w.clearAllText();
-        renderQueue.renderText();
+        std.log.info("resize, clearing HTML elements", .{});
         w.clearAllEmbeds();
-        renderQueue.renderEmbeds();
+        renderQueue.renderHtml();
     }
 
     w.bindNullFramebuffer();
@@ -1220,7 +1234,7 @@ export fn onAnimationFrame(memory: *core.Memory, width: c_int, height: c_int, sc
         state.renderState.postProcessState.draw(state.fbTexture, lut1.id, screenSizeF);
     }
 
-    const maxInflight = 4;
+    const maxInflight = 8;
     state.assets.loadQueued(maxInflight);
 
     return yMax;

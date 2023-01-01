@@ -4,20 +4,6 @@ const std = @import("std");
 pub extern fn consoleMessage(isError: bool, messagePtr: *const u8, messageLen: c_uint) void;
 
 // browser / DOM
-pub extern fn clearAllText() void;
-pub extern fn setAllTextOpacity(opacity: f32) void;
-pub extern fn addTextLine(
-    textPtr: *const u8, textLen: c_uint,
-    left: c_int, baselineFromTop: c_int, fontSize: c_int, letterSpacing: f32,
-    hexColorPtr: *const u8, hexColorLen: c_uint,
-    fontFamilyPtr: *const u8, fontFamilyLen: c_uint) void;
-pub extern fn addTextBox(
-    textPtr: *const u8, textLen: c_uint,
-    left: c_int, top: c_int, width: c_int, fontSize: c_int, lineHeight: c_int, letterSpacing: f32,
-    hexColorPtr: *const u8, hexColorLen: c_uint,
-    fontFamilyPtr: *const u8, fontFamilyLen: c_uint,
-    textAlignPtr: *const u8, textAlignLen: c_uint) void;
-
 pub extern fn clearAllEmbeds() void;
 pub extern fn addYoutubeEmbed(left: c_int, top: c_int, width: c_int, height: c_int, youtubeIdPtr: *const u8, youtubeIdLen: c_uint) void;
 

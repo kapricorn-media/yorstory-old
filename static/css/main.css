@@ -29,14 +29,13 @@ html, body {
 #canvas {
     position: fixed;
     left: 0;
-    width: 100%;
     top: 0;
-    height: 100%;
 }
 
 #dummyBackground {
     position: relative;
     width: 100%;
+    overflow-x: hidden;
 }
 
 ._wasmTextOuter {

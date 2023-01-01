@@ -57,8 +57,8 @@ pub const FontData = struct {
         self.kerning = kerning;
         self.lineHeight = lineHeight;
 
-        const width = 2048;
-        const height = 2048;
+        const width = 4096;
+        const height = 4096;
         var pixelBytes = try allocator.alloc(u8, width * height);
         std.mem.set(u8, pixelBytes, 0);
         var context: stb.stbtt_pack_context = undefined;
