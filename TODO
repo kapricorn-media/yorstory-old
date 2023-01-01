@@ -1,20 +1,21 @@
 CRITICAL
 
 HIGH
-- flare layer, opacity sine wave 100% <-> 20% 
 - gallery changes (layout)
+- number stickers off center
 - grid size3
-- text instead of icons? (home, contact, etc)
 - lag on Chrome (getTextureData? memcpy??)
 
 MEDIUM
-- mobile parallax ?
+- flare layer, opacity sine wave 100% <-> 20% 
 - lively details (react on hover, fade in as you scroll, etc)
+- mobile parallax ?
 - smarter should-redraw logic
 - release mode crash
 - better UI for gallery
 
 LOW
+- grid images face cursor
 - film grain
 - LUT
 - animation of loading dots

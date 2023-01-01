@@ -29,6 +29,7 @@ pub extern fn setUri(uriPtr: *const u8, uriLen: c_uint) void;
 pub extern fn compileShader(source: *const u8 , len: c_uint, type: c_uint) c_uint;
 pub extern fn linkShaderProgram(vertexShaderId: c_uint, fragmentShaderId: c_uint) c_uint;
 pub extern fn createTexture(width: c_int, height: c_int, wrapMode: c_uint, filter: c_uint) c_uint;
+pub extern fn createTextureWithData(width: c_int, height: c_int, channels: c_int, dataPtr: *u8, dataLen: c_uint, wrapMode: c_uint, filter: c_uint) c_uint;
 pub extern fn loadTexture(textureId: c_uint, imgUrlPtr: *const u8, imgUrlLen: c_uint, wrapMode: c_uint, filter: c_uint) void;
 pub extern fn bindNullFramebuffer() void;
 
@@ -94,6 +95,7 @@ pub const GL_DEPTH_BUFFER_BIT: c_uint = 256;
 
 pub const GL_TEXTURE_2D: c_uint = 3553;
 pub const GL_TEXTURE0: c_uint = 33984;
+pub const GL_TEXTURE1: c_uint = 33985;
 
 pub const GL_REPEAT: c_uint = 10497;
 pub const GL_CLAMP_TO_EDGE: c_uint = 33071;

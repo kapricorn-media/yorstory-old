@@ -27,9 +27,10 @@ pub fn build(b: *std.build.Builder) void
     server.addIncludePath("deps/stb");
     server.addCSourceFiles(&[_][]const u8{
         "deps/stb/stb_image_impl.c",
-        "deps/stb/stb_image_write_impl.c"
+        "deps/stb/stb_image_write_impl.c",
+        "deps/stb/stb_rect_pack_impl.c",
+        "deps/stb/stb_truetype_impl.c",
     }, &[_][]const u8{"-std=c99"});
-    server.linkLibC();
     server.linkLibC();
     server.override_dest_dir = installDirRoot;
     server.install();
@@ -43,6 +44,12 @@ pub fn build(b: *std.build.Builder) void
     // wasm.import_memory = true;
     // wasm.initial_memory = 4 * 1024 * 1024;
     // wasm.max_memory = 4 * 1024 * 1024;
+    wasm.addIncludePath("deps/stb");
+    wasm.addCSourceFiles(&[_][]const u8{
+        "deps/stb/stb_rect_pack_impl.c",
+        "deps/stb/stb_truetype_impl.c",
+    }, &[_][]const u8{"-std=c99"});
+    wasm.linkLibC();
     wasm.override_dest_dir = installDirRoot;
     wasm.install();
 
@@ -78,4 +85,15 @@ pub fn build(b: *std.build.Builder) void
         tests.linkLibC();
         runTests.dependOn(&tests.step);
     }
+
+    const genLut = b.addExecutable("gen_lut", "src/tools/gen_lut.zig");
+    genLut.setBuildMode(mode);
+    genLut.setTarget(target);
+    genLut.addIncludePath("deps/stb");
+    genLut.addCSourceFiles(&[_][]const u8{
+        "deps/stb/stb_image_write_impl.c"
+    }, &[_][]const u8{"-std=c99"});
+    genLut.linkLibC();
+    genLut.override_dest_dir = installDirRoot;
+    genLut.install();
 }

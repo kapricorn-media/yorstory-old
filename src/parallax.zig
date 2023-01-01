@@ -61,31 +61,7 @@ pub const ParallaxSet = struct {
     images: []const ParallaxImage,
 };
 
-pub const PARALLAX_SETS = [_]ParallaxSet{
-    .{
-        .bgColor = .{
-            .Color = colorHexToVec4("#101010") catch unreachable,
-        },
-        .images = &[_]ParallaxImage{
-            ParallaxImage.init("/images/parallax/parallax1-1.png", 0.01),
-            ParallaxImage.init("/images/parallax/parallax1-2.png", 0.05),
-            ParallaxImage.init("/images/parallax/parallax1-3.png", 0.2),
-            ParallaxImage.init("/images/parallax/parallax1-4.png", 0.5),
-            ParallaxImage.init("/images/parallax/parallax1-5.png", 0.9),
-            ParallaxImage.init("/images/parallax/parallax1-6.png", 1.2),
-        },
-    },
-    .{
-        .bgColor = .{
-            .Color = colorHexToVec4("#000000") catch unreachable,
-        },
-        .images = &[_]ParallaxImage{
-            ParallaxImage.init("/images/parallax/parallax2-1.png", 0.05),
-            ParallaxImage.init("/images/parallax/parallax2-2.png", 0.1),
-            ParallaxImage.init("/images/parallax/parallax2-3.png", 0.25),
-            ParallaxImage.init("/images/parallax/parallax2-4.png", 1.0),
-        },
-    },
+pub const PARALLAX_SETS = [_]ParallaxSet {
     .{
         .bgColor = .{
             .Color = colorHexToVec4("#212121") catch unreachable,

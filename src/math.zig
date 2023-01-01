@@ -212,6 +212,8 @@ pub const Vec4 = packed struct {
 
     pub const zero  = init(0.0, 0.0, 0.0, 0.0);
     pub const one   = init(1.0, 1.0, 1.0, 1.0);
+    pub const white = one;
+    pub const black = init(0.0, 0.0, 0.0, 1.0);
 
     pub fn init(x: f32, y: f32, z: f32, w: f32) Self
     {

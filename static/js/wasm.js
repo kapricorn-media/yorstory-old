@@ -70,6 +70,10 @@ function isPowerOfTwo(x) {
     return (Math.log(x)/Math.log(2)) % 1 === 0;
 }
 
+function readUint8Array(ptr, len) {
+    return new Uint8Array(_wasmInstance.exports.memory.buffer, ptr, len);
+}
+
 function readCharStr(ptr, len) {
     const bytes = new Uint8Array(_wasmInstance.exports.memory.buffer, ptr, len);
     return new TextDecoder("utf-8").decode(bytes);
@@ -259,6 +263,34 @@ function createTexture(width, height, wrap, filter) {
     return textureId;
 }
 
+function createTextureWithData(width, height, channels, dataPtr, dataLen, wrap, filter) {
+    const textureId = env.glCreateTexture();
+    const texture = _glTextures[textureId];
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+
+    const level = 0;
+    let internalFormat = gl.RGBA;
+    if (channels === 1) {
+        internalFormat = gl.LUMINANCE;
+    } else if (channels === 3) {
+        internalFormat = gl.RGB;
+    } else if (channels !== 4) {
+        throw `Unexpected channels=${channels}`;
+    }
+    const border = 0;
+    const srcFormat = internalFormat;
+    const srcType = gl.UNSIGNED_BYTE;
+    const data = readUint8Array(dataPtr, dataLen);
+    gl.texImage2D(gl.TEXTURE_2D, level, internalFormat, width, height, border, srcFormat, srcType, data);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrap);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, wrap);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, filter);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, filter);
+
+    return textureId;
+}
+
 function initBufferIt(buffer)
 {
     return {
@@ -354,6 +386,7 @@ const env = {
     compileShader,
     linkShaderProgram,
     createTexture,
+    createTextureWithData,
     loadTexture,
     bindNullFramebuffer
 };

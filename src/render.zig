@@ -441,6 +441,7 @@ const PostProcessState = struct {
 
     samplerUniLoc: c_int,
     screenSizeUniLoc: c_int,
+    lutSamplerUniLoc: c_int,
 
     const vert = @embedFile("shaders/post.vert");
     const frag = @embedFile("shaders/post.frag");
@@ -474,17 +475,6 @@ const PostProcessState = struct {
             return error.MissingAttrLoc;
         }
 
-        const u_sampler = "u_sampler";
-        const samplerUniLoc = w.glGetUniformLocation(programId, &u_sampler[0], u_sampler.len);
-        if (samplerUniLoc == -1) {
-            return error.MissingUniformLoc;
-        }
-        const u_screenSize = "u_screenSize";
-        const screenSizeUniLoc = w.glGetUniformLocation(programId, &u_screenSize[0], u_screenSize.len);
-        if (screenSizeUniLoc == -1) {
-            return error.MissingUniformLoc;
-        }
-
         return Self {
             .positionBuffer = positionBuffer,
             .uvBuffer = uvBuffer,
@@ -494,12 +484,13 @@ const PostProcessState = struct {
             .positionAttrLoc = positionAttrLoc,
             .uvAttrLoc = uvAttrLoc,
 
-            .samplerUniLoc = samplerUniLoc,
-            .screenSizeUniLoc = screenSizeUniLoc,
+            .samplerUniLoc = try getUniformLocation(programId, "u_sampler"),
+            .screenSizeUniLoc = try getUniformLocation(programId, "u_screenSize"),
+            .lutSamplerUniLoc = try getUniformLocation(programId, "u_lutSampler"),
         };
     }
 
-    pub fn draw(self: Self, texture: c_uint, screenSize: m.Vec2) void
+    pub fn draw(self: Self, texture: c_uint, lutTexture: c_uint, screenSize: m.Vec2) void
     {
         w.glUseProgram(self.programId);
 
@@ -515,6 +506,10 @@ const PostProcessState = struct {
         w.glActiveTexture(w.GL_TEXTURE0);
         w.glBindTexture(w.GL_TEXTURE_2D, texture);
         w.glUniform1i(self.samplerUniLoc, 0);
+
+        w.glActiveTexture(w.GL_TEXTURE1);
+        w.glBindTexture(w.GL_TEXTURE_2D, lutTexture);
+        w.glUniform1i(self.lutSamplerUniLoc, 1);
 
         w.glDrawArrays(w.GL_TRIANGLES, 0, POS_UNIT_SQUARE.len);
     }

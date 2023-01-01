@@ -33,14 +33,9 @@ const DEPTH_UI_BELOWALL = 1.0;
 const Texture = enum(usize) {
     CategoriesText,
     DecalTopLeft,
-    // IconContact,
-    // IconHome,
-    // IconPortfolio,
-    // IconWork,
     LoadingGlyphs,
-    Logo343,
-    LogoMicrosoft,
     LogosAll,
+    Lut1,
     StickerCircle,
     StickerShiny,
     SymbolEye,
@@ -55,6 +50,10 @@ const Texture = enum(usize) {
     MobileYorstoryCompany,
 
     StickerMainHome,
+};
+
+const Font = enum {
+    HelveticaBold64,
 };
 
 // return true when pressed
@@ -118,7 +117,7 @@ pub const State = struct {
     fbDepthRenderbuffer: c_uint,
     fb: c_uint,
 
-    assets: wasm_asset.Assets(Texture, 256),
+    assets: wasm_asset.Assets(Texture, 256, Font),
 
     pageData: PageData,
     screenSizePrev: m.Vec2i,
@@ -133,7 +132,7 @@ pub const State = struct {
     debug: bool,
 
     const Self = @This();
-    const PARALLAX_SET_INDEX_START = 3;
+    const PARALLAX_SET_INDEX_START = 5;
     comptime {
         if (PARALLAX_SET_INDEX_START >= parallax.PARALLAX_SETS.len) {
             @compileError("start parallax index out of bounds");
@@ -144,7 +143,7 @@ pub const State = struct {
     {
         var fbAllocator = std.heap.FixedBufferAllocator.init(buf);
 
-        w.glClearColor(0.0, 0.0, 0.0, 1.0);
+        w.glClearColor(0.0, 0.0, 0.0, 0.0);
         w.glEnable(w.GL_DEPTH_TEST);
         w.glDepthFunc(w.GL_LEQUAL);
 
@@ -161,7 +160,7 @@ pub const State = struct {
             .fbDepthRenderbuffer = 0,
             .fb = 0,
 
-            .assets = wasm_asset.Assets(Texture, 256).init(fbAllocator.allocator()),
+            .assets = wasm_asset.Assets(Texture, 256, Font).init(fbAllocator.allocator()),
 
             .pageData = try uriToPageData(uri),
             .screenSizePrev = m.Vec2i.zero,
@@ -176,6 +175,15 @@ pub const State = struct {
             .debug = false,
         };
 
+        var tempAllocatorObj = core._memory.getTransientAllocator();
+        const tempAllocator = tempAllocatorObj.allocator();
+
+        try self.assets.registerStaticFont(Font.HelveticaBold64, @embedFile("HelveticaNeueLTCom-Bd.ttf"), 64.0, tempAllocator);
+
+        _ = try self.assets.register(.{ .Static = Texture.Lut1 },
+            "/images/LUTs/identity.png", defaultTextureWrap, defaultTextureFilter, 1
+        );
+
         _ = try self.assets.register(.{ .Static = Texture.StickerCircle },
             "/images/sticker-circle.png", defaultTextureWrap, defaultTextureFilter, 2
         );
@@ -189,19 +197,6 @@ pub const State = struct {
         _ = try self.assets.register(.{ .Static = Texture.CategoriesText },
             "/images/categories-text.png", defaultTextureWrap, defaultTextureFilter, 5
         );
-
-        // _ = try self.assets.register(.{ .Static = Texture.IconContact },
-        //     "/images/icon-contact.png", defaultTextureWrap, defaultTextureFilter, 5
-        // );
-        // _ = try self.assets.register(.{ .Static = Texture.IconHome },
-        //     "/images/icon-home.png", defaultTextureWrap, defaultTextureFilter, 5
-        // );
-        // _ = try self.assets.register(.{ .Static = Texture.IconPortfolio },
-        //     "/images/icon-portfolio.png", defaultTextureWrap, defaultTextureFilter, 5
-        // );
-        // _ = try self.assets.register(.{ .Static = Texture.IconWork },
-        //     "/images/icon-work.png", defaultTextureWrap, defaultTextureFilter, 5
-        // );
         _ = try self.assets.register(.{ .Static = Texture.StickerShiny },
             "/images/sticker-shiny.png", defaultTextureWrap, defaultTextureFilter, 5
         );
@@ -216,16 +211,16 @@ pub const State = struct {
                     "/images/sticker-main.png", defaultTextureWrap, defaultTextureFilter, 5
                 );
                 _ = try self.assets.register(.{ .Static = Texture.SymbolEye },
-                    "/images/symbol-eye.png", defaultTextureWrap, defaultTextureFilter, 8
+                    "/images/symbol-eye.png", defaultTextureWrap, defaultTextureFilter, 5
                 );
                 _ = try self.assets.register(.{ .Static = Texture.WeAreStorytellers },
-                    "/images/we-are-storytellers.png", defaultTextureWrap, defaultTextureFilter, 8
+                    "/images/we-are-storytellers.png", defaultTextureWrap, defaultTextureFilter, 5
                 );
                 _ = try self.assets.register(.{ .Static = Texture.WeAreStorytellersText },
-                    "/images/we-are-storytellers-text.png", defaultTextureWrap, defaultTextureFilter, 8
+                    "/images/we-are-storytellers-text.png", defaultTextureWrap, defaultTextureFilter, 5
                 );
                 _ = try self.assets.register(.{ .Static = Texture.YorstoryCompany },
-                    "/images/a-yorstory-company.png", defaultTextureWrap, defaultTextureFilter, 8
+                    "/images/a-yorstory-company.png", defaultTextureWrap, defaultTextureFilter, 5
                 );
 
                 _ = try self.assets.register(.{ .Static = Texture.MobileBackground },
@@ -256,7 +251,7 @@ pub const State = struct {
         self.gpa.deinit();
     }
 
-    pub fn allocator(self: Self) std.mem.Allocator
+    pub fn allocator(self: *Self) std.mem.Allocator
     {
         return self.fbAllocator.allocator();
     }
@@ -270,8 +265,9 @@ const GridImage = struct {
 
 fn drawImageGrid(images: []const GridImage, indexOffset: usize, itemsPerRow: usize, topLeft: m.Vec2, width: f32, spacing: f32, fontSize: f32, fontColor: m.Vec4, state: *State, scrollY: f32, mouseHoverGlobal: *bool,renderQueue: *render.RenderQueue, callback: *const fn(*State, GridImage, usize) void) f32
 {
+    const itemAspect = 1.74;
     const itemWidth = (width - spacing * (@intToFloat(f32, itemsPerRow) - 1)) / @intToFloat(f32, itemsPerRow);
-    const itemSize = m.Vec2.init(itemWidth, itemWidth * 0.5);
+    const itemSize = m.Vec2.init(itemWidth, itemWidth / itemAspect);
 
     for (images) |img, i| {
         const rowF = @intToFloat(f32, i / itemsPerRow);
@@ -285,7 +281,7 @@ fn drawImageGrid(images: []const GridImage, indexOffset: usize, itemsPerRow: usi
             if (tex.loaded()) {
                 const cornerRadius = spacing * 2;
                 renderQueue.quadTex(
-                    itemPos, itemSize, DEPTH_GRIDIMAGE, cornerRadius, tex.id, m.Vec4.one
+                    itemPos, itemSize, DEPTH_GRIDIMAGE, cornerRadius, tex.id, m.Vec4.white
                 );
             }
         } else {
@@ -398,8 +394,13 @@ fn drawCrosshairCorners(pos: m.Vec2, size: m.Vec2, depth: f32, gridSize: f32, de
 
 fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, renderQueue: *render.RenderQueue, allocator: std.mem.Allocator) i32
 {
-    // const colorWhite = m.Vec4.init(1.0, 1.0, 1.0, 1.0);
-    const colorBlack = m.Vec4.init(0.0, 0.0, 0.0, 1.0);
+    // TEST
+    // const helveticaBold64 = state.assets.getStaticFontData(Font.HelveticaBold64);
+    // renderQueue.quadTex(m.Vec2.zero, m.Vec2.init(500.0, 500.0), 0.0, 0.0, helveticaBold64.textureId, m.Vec4.white);
+    // const char = 'g';
+    // const charData = helveticaBold64.charData[char];
+    // renderQueue.quadTexUvOffset(m.Vec2.zero, m.Vec2.init(100.0, 100.0), 0.0, 0.0, charData.uvOffset, charData.uvSize, helveticaBold64.textureId, m.Vec4.white);
+
     const colorYellowHome = m.Vec4.init(234.0 / 255.0, 1.0, 0.0, 1.0);
     const colorUi = blk: {
         switch (state.pageData) {
@@ -419,14 +420,12 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
     var mouseHoverGlobal = false;
 
     const fontStickerSize = 124 / refSize.y * screenSizeF.y;
-    // const fontStickerSmallSize = 26 / refSize.y * screenSizeF.y;
     const fontSubtitleSize = 84 / refSize.y * screenSizeF.y;
     const fontTextSize = 30 / refSize.y * screenSizeF.y;
     const gridSize = std.math.round(gridRefSize / refSize.y * screenSizeF.y);
 
     const marginX = blk: {
         const maxLandingImageAspect = 2.15;
-        // const landingImageSize = screenSizeF;
         const landingImageSize = m.Vec2.init(
             screenSizeF.x - gridSize * 2.0,
             screenSizeF.y - gridSize * 3.0
@@ -437,21 +436,8 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
     const crosshairMarginX = marginX + gridSize * 5;
     const contentMarginX = marginX + gridSize * 9;
 
-    // get landing UI elements to see if they are loaded
-    // const iconTextures = [_]Texture {
-    //     Texture.IconHome,
-    //     Texture.IconPortfolio,
-    //     Texture.IconWork,
-    //     Texture.IconContact,
-    // };
     var allIconsLoaded = true;
     const categoriesText = state.assets.getStaticTextureData(Texture.CategoriesText);
-    // for (iconTextures) |iconTexture| {
-    //     if (!state.assets.getStaticTextureData(iconTexture).loaded()) {
-    //         allIconsLoaded = false;
-    //         break;
-    //     }
-    // }
 
     const decalTopLeft = state.assets.getStaticTextureData(Texture.DecalTopLeft);
     const stickerMain = blk: {
@@ -558,7 +544,7 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
                     screenSizeF.x / 2.0 - textureSize.x / 2.0 + parallaxOffsetX,
                     landingImagePos.y
                 );
-                renderQueue.quadTex(imgPos, textureSize, DEPTH_LANDINGIMAGE, 0.0, textureData.id, m.Vec4.one);
+                renderQueue.quadTex(imgPos, textureSize, DEPTH_LANDINGIMAGE, 0.0, textureData.id, m.Vec4.white);
             }
         } else {
             allLandingAssetsLoaded = false;
@@ -582,7 +568,6 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
         if (categoriesText.loaded()) {
             const categoriesSize = getTextureScaledSize(categoriesText.size, screenSizeF);
             const categoriesPos = m.Vec2.init(
-                // marginX + gridSize * 5,
                 contentMarginX,
                 gridSize * 5,
             );
@@ -593,34 +578,9 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
                 ww.setUri("/");
             }
         }
-        // for (iconTextures) |iconTexture, i| {
-        //     const textureData = state.assets.getStaticTextureData(iconTexture);
-
-        //     const iF = @intToFloat(f32, i);
-        //     const iconSizeF = m.Vec2.init(
-        //         gridSize * 2.162,
-        //         gridSize * 2.162,
-        //     );
-        //     const iconPos = m.Vec2.init(
-        //         marginX + gridSize * 5 + gridSize * 2.5 * iF,
-        //         gridSize * 5,
-        //     );
-        //     renderQueue.quadTex(
-        //         iconPos, iconSizeF, DEPTH_UI_GENERIC, 0, textureData.id, colorUi
-        //     );
-        //     if (updateButton(iconPos, iconSizeF, state.mouseState, scrollYF, &mouseHoverGlobal)) {
-        //         const uri = switch (iconTexture) {
-        //             .IconHome => "/",
-        //             else => continue,
-        //         };
-        //         ww.setUri(uri);
-        //     }
-        // }
-
         // sticker (main)
         const stickerSize = getTextureScaledSize(stickerMain.size, screenSizeF);
         const stickerPos = m.Vec2.init(
-            // marginX + gridSize * 5.0,
             contentMarginX,
             screenSizeF.y - gridSize * 5 - stickerSize.y
         );
@@ -643,7 +603,7 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
             screenSizeF.x - crosshairMarginX - stickerShinySize.x,
             gridSize * 5.0
         );
-        renderQueue.quadTex(stickerShinyPos, stickerShinySize, DEPTH_UI_GENERIC, 0, stickerShiny.id, m.Vec4.one);
+        renderQueue.quadTex(stickerShinyPos, stickerShinySize, DEPTH_UI_GENERIC, 0, stickerShiny.id, m.Vec4.white);
     } else {
         // show loading indicator, if that is loaded
         if (stickerCircle.loaded() and loadingGlyphs.loaded()) {
@@ -669,7 +629,7 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
                     screenSizeF.x / 2.0 - dotSize.x / 2.0 - spacing * @intToFloat(f32, i - 1),
                     screenSizeF.y / 2.0 - dotSize.y / 2.0 - gridSize * 1,
                 );
-                renderQueue.quad(dotOrigin, dotSize, DEPTH_UI_GENERIC - 0.01, 0, colorBlack);
+                renderQueue.quad(dotOrigin, dotSize, DEPTH_UI_GENERIC - 0.01, 0, m.Vec4.black);
             }
         }
     }
@@ -681,44 +641,35 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
             screenSizeF.x - marginX * 2 - gridSize * 2,
             screenSizeF.y - gridSize * 3,
         );
-        renderQueue.roundedFrame(m.Vec2.zero, screenSizeF, DEPTH_UI_OVER1, framePos, frameSize, gridSize, colorBlack);
+        renderQueue.roundedFrame(m.Vec2.zero, screenSizeF, DEPTH_UI_OVER1, framePos, frameSize, gridSize, m.Vec4.black);
     }
 
     const section1Height = screenSizeF.y;
 
     // ==== SECOND FRAME ====
 
-    const section2Height = switch (state.pageData) {
-        .Home => screenSizeF.y * 4.0,
-        .Entry => gridSize * 4.0,
-    };
-    const secondFrameYScrolling = section1Height;
-    const secondFrameYStillForever = if (scrollYF >= section1Height) scrollYF else section1Height;
-    const secondFrameYStill = blk: {
-        switch (state.pageData) {
-            .Home => {
-                if (scrollYF >= section1Height) {
-                    if (scrollYF <= section1Height + section2Height - screenSizeF.y) {
-                        break :blk scrollYF;
-                    } else {
-                        break :blk section1Height + section2Height - screenSizeF.y;
-                    }
+    var section2Height: f32 = 0;
+    if (state.pageData == .Home) {
+        section2Height = screenSizeF.y * 4.0;
+        const secondFrameYScrolling = section1Height;
+        const secondFrameYStillForever = if (scrollYF >= section1Height) scrollYF else section1Height;
+        const secondFrameYStill = blk: {
+            if (scrollYF >= section1Height) {
+                if (scrollYF <= section1Height + section2Height - screenSizeF.y) {
+                    break :blk scrollYF;
                 } else {
-                    break :blk section1Height;
+                    break :blk section1Height + section2Height - screenSizeF.y;
                 }
-            },
-            .Entry => {
+            } else {
                 break :blk section1Height;
             }
-        }
-    };
+        };
 
-    if (state.pageData == .Home) {
         // draw moving gradient
         const gradientColor = m.Vec4.init(86.0 / 255.0, 0.0, 214.0 / 255.0, 1.0);
-        const pos = m.Vec2.init(0.0, secondFrameYScrolling);
-        const size = m.Vec2.init(screenSizeF.x, section2Height - screenSizeF.y);
-        renderQueue.quadGradient(pos, size, DEPTH_LANDINGBACKGROUND, 0.0, gradientColor, gradientColor, colorBlack, colorBlack);
+        const gradientPos = m.Vec2.init(0.0, secondFrameYScrolling);
+        const gradientSize = m.Vec2.init(screenSizeF.x, section2Height - screenSizeF.y);
+        renderQueue.quadGradient(gradientPos, gradientSize, DEPTH_LANDINGBACKGROUND, 0.0, gradientColor, gradientColor, m.Vec4.black, m.Vec4.black);
 
         if (decalTopLeft.loaded()) {
             const crosshairRectPos = m.Vec2.init(marginX, secondFrameYStill);
@@ -729,156 +680,105 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
                 gridSize, decalTopLeft, screenSizeF, colorUi, renderQueue
             );
         }
+
+        const yorstoryCompany = state.assets.getStaticTextureData(Texture.YorstoryCompany);
+        if (yorstoryCompany.loaded()) {
+            const pos = m.Vec2.init(contentMarginX, secondFrameYStill + gridSize * 3.0);
+            const size = getTextureScaledSize(yorstoryCompany.size, screenSizeF);
+            renderQueue.quadTex(pos, size, DEPTH_UI_GENERIC, 0, yorstoryCompany.id, colorUi);
+        }
+
+        const weAreStorytellers = state.assets.getStaticTextureData(Texture.WeAreStorytellers);
+        const weAreStorytellersText = state.assets.getStaticTextureData(Texture.WeAreStorytellersText);
+        const logosAll = state.assets.getStaticTextureData(Texture.LogosAll);
+        const symbolEye = state.assets.getStaticTextureData(Texture.SymbolEye);
+
+        if (weAreStorytellers.loaded() and weAreStorytellersText.loaded() and symbolEye.loaded() and logosAll.loaded()) {
+            const wasPosYCheckpoint1 = section1Height;
+            const wasPosYCheckpoint2 = section1Height + screenSizeF.y * 1.0;
+            const wasPosBaseY = blk: {
+                if (scrollYF <= wasPosYCheckpoint1) {
+                    break :blk wasPosYCheckpoint1;
+                } else if (scrollYF >= wasPosYCheckpoint2) {
+                    break :blk wasPosYCheckpoint2;
+                } else {
+                    break :blk scrollYF;
+                }
+            };
+            const wasSize = getTextureScaledSize(weAreStorytellers.size, screenSizeF);
+            const wasPos = m.Vec2.init(
+                contentMarginX - gridSize * 0.3,
+                wasPosBaseY + gridSize * 8
+            );
+            renderQueue.quadTex(wasPos, wasSize, DEPTH_UI_GENERIC, 0, weAreStorytellers.id, colorUi);
+
+            const wasTextSize = getTextureScaledSize(weAreStorytellersText.size, screenSizeF);
+            const wasTextPos = m.Vec2.init(
+                contentMarginX - gridSize * 0.3,
+                wasPosBaseY + gridSize * 18
+            );
+            renderQueue.quadTex(wasTextPos, wasTextSize, DEPTH_UI_GENERIC, 0, weAreStorytellersText.id, colorUi);
+
+            const eyeSize = getTextureScaledSize(stickerCircle.size, screenSizeF);
+            const eyePosY = blk: {
+                const eyeCheckpoint1 = section1Height + screenSizeF.y * 0.1;
+                const eyeCheckpoint2 = section1Height + screenSizeF.y * 0.5;
+                const eyeOffset = gridSize * 6.95;
+
+                if (scrollYF <= eyeCheckpoint1) {
+                    break :blk scrollYF - eyeSize.y;
+                } else if (scrollYF <= eyeCheckpoint2) {
+                    const t = (scrollYF - eyeCheckpoint1) / (eyeCheckpoint2 - eyeCheckpoint1);
+                    break :blk scrollYF + m.lerpFloat(f32, -eyeSize.y, eyeOffset, t);
+                } else {
+                    break :blk wasPosBaseY + eyeOffset;
+                }
+            };
+            const eyePos = m.Vec2.init(
+                wasPos.x + gridSize * 10.4,
+                eyePosY,
+            );
+            const eyeStickerColor = m.Vec4.init(0.0, 46.0 / 255.0, 226.0 / 255.0, 1.0);
+            renderQueue.quadTex(eyePos, eyeSize, DEPTH_UI_GENERIC - 0.01, 0, stickerCircle.id, eyeStickerColor);
+            renderQueue.quadTex(eyePos, eyeSize, DEPTH_UI_GENERIC - 0.02, 0, symbolEye.id, colorUi);
+
+            const logosPosYCheckpoint1 = section1Height + section2Height - screenSizeF.y * 2.0;
+            const logosPosYCheckpoint2 = section1Height + section2Height - screenSizeF.y;
+            const logosPosBaseY = blk: {
+                if (scrollYF <= logosPosYCheckpoint1) {
+                    break :blk logosPosYCheckpoint1;
+                } else if (scrollYF >= logosPosYCheckpoint2) {
+                    break :blk logosPosYCheckpoint2;
+                } else {
+                    break :blk scrollYF;
+                }
+            };
+            const logosSize = getTextureScaledSize(logosAll.size, screenSizeF);
+            const logosPos = m.Vec2.init(
+                (screenSizeF.x - logosSize.x) / 2,
+                logosPosBaseY + ((screenSizeF.y - logosSize.y) / 2)
+            );
+            renderQueue.quadTex(logosPos, logosSize, DEPTH_UI_GENERIC, 0, logosAll.id, colorUi);
+        }
+
+        // const end2LinePos = m.Vec2.init(crosshairMarginX, secondFrameYStill + screenSizeF.y);
+        // const end2LineSize = m.Vec2.init(screenSizeF.x - crosshairMarginX * 2, 1);
+        // renderQueue.quad(end2LinePos, end2LineSize, DEPTH_UI_OVER2, 0, colorUi);
+
+        {
+            // rounded black frame
+            const framePos = m.Vec2.init(marginX + gridSize * 1, secondFrameYStill + gridSize * 1);
+            const frameSize = m.Vec2.init(
+                screenSizeF.x - marginX * 2 - gridSize * 2,
+                screenSizeF.y - gridSize * 3,
+            );
+            renderQueue.roundedFrame(m.Vec2.init(0.0, secondFrameYStill), screenSizeF, DEPTH_UI_OVER1, framePos, frameSize, gridSize, m.Vec4.black);
+            _ = secondFrameYStillForever;
+        }
     }
 
-    // const start2LinePos = m.Vec2.init(crosshairMarginX, secondFrameYStill);
-    // const start2LineSize = m.Vec2.init(screenSizeF.x - crosshairMarginX * 2, 1);
-    // renderQueue.quad(start2LinePos, start2LineSize, DEPTH_UI_OVER2, 0, colorUi);
+    // ==== THIRD FRAME ====
 
-    const lineHeight = fontTextSize * 1.5;
-    switch (state.pageData) {
-        .Home => {
-            const yorstoryCompany = state.assets.getStaticTextureData(Texture.YorstoryCompany);
-            if (yorstoryCompany.loaded()) {
-                const pos = m.Vec2.init(contentMarginX, secondFrameYStill + gridSize * 3.0);
-                const size = getTextureScaledSize(yorstoryCompany.size, screenSizeF);
-                renderQueue.quadTex(pos, size, DEPTH_UI_GENERIC, 0, yorstoryCompany.id, colorUi);
-            }
-
-            const weAreStorytellers = state.assets.getStaticTextureData(Texture.WeAreStorytellers);
-            const weAreStorytellersText = state.assets.getStaticTextureData(Texture.WeAreStorytellersText);
-            const logosAll = state.assets.getStaticTextureData(Texture.LogosAll);
-            const symbolEye = state.assets.getStaticTextureData(Texture.SymbolEye);
-
-            if (weAreStorytellers.loaded() and weAreStorytellersText.loaded() and symbolEye.loaded() and logosAll.loaded()) {
-                const wasPosYCheckpoint1 = section1Height;
-                const wasPosYCheckpoint2 = section1Height + screenSizeF.y * 1.0;
-                const wasPosBaseY = blk: {
-                    if (scrollYF <= wasPosYCheckpoint1) {
-                        break :blk wasPosYCheckpoint1;
-                    } else if (scrollYF >= wasPosYCheckpoint2) {
-                        break :blk wasPosYCheckpoint2;
-                    } else {
-                        break :blk scrollYF;
-                    }
-                };
-                const wasSize = getTextureScaledSize(weAreStorytellers.size, screenSizeF);
-                const wasPos = m.Vec2.init(
-                    contentMarginX - gridSize * 0.3,
-                    wasPosBaseY + gridSize * 8
-                );
-                renderQueue.quadTex(wasPos, wasSize, DEPTH_UI_GENERIC, 0, weAreStorytellers.id, colorUi);
-
-                const wasTextSize = getTextureScaledSize(weAreStorytellersText.size, screenSizeF);
-                const wasTextPos = m.Vec2.init(
-                    contentMarginX - gridSize * 0.3,
-                    wasPosBaseY + gridSize * 18
-                );
-                renderQueue.quadTex(wasTextPos, wasTextSize, DEPTH_UI_GENERIC, 0, weAreStorytellersText.id, colorUi);
-
-                const eyeSize = getTextureScaledSize(stickerCircle.size, screenSizeF);
-                const eyePosY = blk: {
-                    const eyeCheckpoint1 = section1Height + screenSizeF.y * 0.1;
-                    const eyeCheckpoint2 = section1Height + screenSizeF.y * 0.5;
-                    const eyeOffset = gridSize * 6.95;
-                    // const eyeCheckpoint3 = section1Height + screenSizeF.y * 1.0;
-
-                    if (scrollYF <= eyeCheckpoint1) {
-                        break :blk scrollYF - eyeSize.y;
-                    } else if (scrollYF <= eyeCheckpoint2) {
-                        const t = (scrollYF - eyeCheckpoint1) / (eyeCheckpoint2 - eyeCheckpoint1);
-                        break :blk scrollYF + m.lerpFloat(f32, -eyeSize.y, eyeOffset, t);
-                    // } else if (scrollYF <= section1Height + screenSizeF.y * 1.0) {
-                        // const t = (scrollYF - eyeCheckpoint2) / (eyeCheckpoint3 - eyeCheckpoint2);
-                        // break :blk scrollYF + m.lerpFloat(f32, gridSize * 6.95, -eyeSize.y, t);
-                    } else {
-                        break :blk wasPosBaseY + eyeOffset;
-                        // break :blk scrollYF;
-                    }
-                };
-                const eyePos = m.Vec2.init(
-                    wasPos.x + gridSize * 10.4,
-                    eyePosY,
-                    // scrollYF + gridSize * 6.95,
-                    // wasPosBaseY + gridSize * 6.95
-                );
-                const eyeStickerColor = m.Vec4.init(0.0, 46.0 / 255.0, 226.0 / 255.0, 1.0);
-                renderQueue.quadTex(eyePos, eyeSize, DEPTH_UI_GENERIC - 0.01, 0, stickerCircle.id, eyeStickerColor);
-                renderQueue.quadTex(eyePos, eyeSize, DEPTH_UI_GENERIC - 0.02, 0, symbolEye.id, colorUi);
-
-                const logosPosYCheckpoint1 = section1Height + section2Height - screenSizeF.y * 2.0;
-                const logosPosYCheckpoint2 = section1Height + section2Height - screenSizeF.y;
-                const logosPosBaseY = blk: {
-                    if (scrollYF <= logosPosYCheckpoint1) {
-                        break :blk logosPosYCheckpoint1;
-                    } else if (scrollYF >= logosPosYCheckpoint2) {
-                        break :blk logosPosYCheckpoint2;
-                    } else {
-                        break :blk scrollYF;
-                    }
-                };
-                const logosSize = getTextureScaledSize(logosAll.size, screenSizeF);
-                const logosPos = m.Vec2.init(
-                    (screenSizeF.x - logosSize.x) / 2,
-                    logosPosBaseY + ((screenSizeF.y - logosSize.y) / 2)
-                );
-                renderQueue.quadTex(logosPos, logosSize, DEPTH_UI_GENERIC, 0, logosAll.id, colorUi);
-            }
-        },
-        .Entry => {},
-    }
-
-    if (state.pageData == .Home) {
-        const end2LinePos = m.Vec2.init(crosshairMarginX, secondFrameYStill + screenSizeF.y);
-        const end2LineSize = m.Vec2.init(screenSizeF.x - crosshairMarginX * 2, 1);
-        renderQueue.quad(end2LinePos, end2LineSize, DEPTH_UI_OVER2, 0, colorUi);
-    }
-
-    {
-        // rounded black frame
-        const framePos = m.Vec2.init(marginX + gridSize * 1, secondFrameYStill + gridSize * 1);
-        const frameSize = m.Vec2.init(
-            screenSizeF.x - marginX * 2 - gridSize * 2,
-            screenSizeF.y - gridSize * 3,
-        );
-        renderQueue.roundedFrame(m.Vec2.init(0.0, secondFrameYStill), screenSizeF, DEPTH_UI_OVER1, framePos, frameSize, gridSize, colorBlack);
-        _ = secondFrameYStillForever;
-    }
-
-    // ==== REMAINDER FRAME ====
-
-    // content section
-    const baseY = section1Height + section2Height;
-    var contentHeader: []const u8 = "projects";
-    var contentDescription: []const u8 = "In alchemy, the term chrysopoeia (from Greek χρυσοποιία, khrusopoiia, \"gold-making\") refers to the artificial production of gold, most commonly by the alleged transmutation of base metals such as lead. A related term is argyropoeia (ἀργυροποιία, arguropoiia, \"silver-making\"), referring to the artificial production...";
-    if (state.pageData == .Entry) {
-        const entryData = state.pageData.Entry;
-        const pf = portfolio.PORTFOLIO_LIST[entryData.portfolioIndex];
-        contentHeader = pf.contentHeader;
-        contentDescription = pf.contentDescription;
-    }
-
-    const contentHeaderPos = m.Vec2.init(
-        contentMarginX,
-        baseY + gridSize * 3.0,
-    );
-    renderQueue.textLine(
-        contentHeader,
-        contentHeaderPos, fontStickerSize, 0.0,
-        colorUi, "HelveticaBold"
-    );
-
-    const contentSubPos = m.Vec2.init(
-        contentMarginX,
-        baseY + gridSize * 4.5,
-    );
-    const contentSubWidth = screenSizeF.x - contentMarginX * 2;
-    renderQueue.textBox(
-        contentDescription,
-        contentSubPos, contentSubWidth,
-        fontTextSize, lineHeight, 0.0,
-        colorUi, "HelveticaMedium", .Left
-    );
 
     const CB = struct {
         fn home(theState: *State, image: GridImage, index: usize) void
@@ -905,78 +805,186 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
         }
     };
 
+    var yMax: f32 = 0;
+    switch (state.pageData) {
+        .Home => {
+            const section3Start = section1Height + section2Height;
+            const section3Height = screenSizeF.y * 1.2;
+            const section3YScrolling = section3Start;
+            const section3YStillForever = if (scrollYF >= section3Start) scrollYF else section3Start;
+            const section3YStill = blk: {
+                if (scrollYF >= section3Start) {
+                    if (scrollYF <= section3Start + section3Height - screenSizeF.y) {
+                        break :blk scrollYF;
+                    } else {
+                        break :blk section3Start + section3Height - screenSizeF.y;
+                    }
+                } else {
+                    break :blk section3Start;
+                }
+            };
 
-    var yMax: f32 = baseY + gridSize * 6.5;
-    if (state.pageData == .Entry) {
-        const entryData = state.pageData.Entry;
+            // draw moving gradient
+            const gradientColor = m.Vec4.init(86.0 / 255.0, 0.0, 214.0 / 255.0, 1.0);
+            const gradientPos = m.Vec2.init(0.0, section3YScrolling);
+            const gradientSize = m.Vec2.init(screenSizeF.x, section3Height);
+            renderQueue.quadGradient(gradientPos, gradientSize, DEPTH_LANDINGBACKGROUND, 0.0, gradientColor, gradientColor, m.Vec4.black, m.Vec4.black);
 
-        const pf = portfolio.PORTFOLIO_LIST[entryData.portfolioIndex];
-        var images = std.ArrayList(GridImage).init(allocator);
+            if (decalTopLeft.loaded()) {
+                const crosshairRectPos = m.Vec2.init(marginX, section3YStill);
+                const crosshairRectSize = m.Vec2.init(screenSizeF.x - marginX * 2, screenSizeF.y);
 
-        const x = contentMarginX;
-        var y = baseY + gridSize * 9;
-        var indexOffset: usize = 0; // TODO eh...
-        for (pf.subprojects) |sub, i| {
-            const numberSizeIsh = gridSize * 2.16;
-            const numberSize = getTextureScaledSize(stickerCircle.size, screenSizeF);
-            const numberPos = m.Vec2.init(
-                marginX + gridSize * 2.5,
-                y - gridSize * 2.25,
-            );
-            if (stickerCircle.loaded()) {
-                renderQueue.quadTex(
-                    numberPos, numberSize, DEPTH_UI_GENERIC, 0, stickerCircle.id, colorRedSticker
+                drawCrosshairCorners(
+                    crosshairRectPos, crosshairRectSize, DEPTH_UI_GENERIC,
+                    gridSize, decalTopLeft, screenSizeF, colorUi, renderQueue
                 );
             }
-            const numStr = std.fmt.allocPrint(allocator, "{}", .{i + 1}) catch unreachable;
-            const numberTextPos = m.Vec2.init(
-                numberPos.x + gridSize * 0.1,
-                numberPos.y + gridSize * 0.1
-            );
-            const numberLineHeight = numberSizeIsh;
-            renderQueue.textBox(
-                numStr, numberTextPos, numberSizeIsh, fontStickerSize, numberLineHeight, 0.0,
-                colorBlack, "HelveticaBold", .Center
-            );
 
+            const yorstoryCompany = state.assets.getStaticTextureData(Texture.YorstoryCompany);
+            if (yorstoryCompany.loaded()) {
+                const pos = m.Vec2.init(contentMarginX, section3YStill + gridSize * 3.0);
+                const size = getTextureScaledSize(yorstoryCompany.size, screenSizeF);
+                renderQueue.quadTex(pos, size, DEPTH_UI_GENERIC, 0, yorstoryCompany.id, colorUi);
+            }
+
+            const contentHeaderPos = m.Vec2.init(
+                contentMarginX,
+                section3Start + gridSize * (11.0 - 0.33),
+            );
             renderQueue.textLine(
-                sub.name, m.Vec2.init(x, y), fontSubtitleSize, 0.0, colorUi, "HelveticaLight"
+                "Projects",
+                contentHeaderPos, fontStickerSize, -gridSize * 0.05,
+                colorUi, "HelveticaBold"
             );
-            y += gridSize * 1;
 
-            renderQueue.textBox(
-                sub.description, m.Vec2.init(x, y), contentSubWidth, fontTextSize, lineHeight, 0.0, colorUi, "HelveticaMedium", .Left
-            );
-            y += gridSize * 2;
-
-            images.clearRetainingCapacity();
-            for (sub.images) |img| {
+            var images = std.ArrayList(GridImage).init(allocator);
+            for (portfolio.PORTFOLIO_LIST) |pf| {
                 images.append(GridImage {
-                    .uri = img,
-                    .title = null,
-                    .goToUri = null,
+                    .uri = pf.cover,
+                    .title = pf.title,
+                    .goToUri = pf.uri,
                 }) catch |err| {
                     std.log.err("image append failed {}", .{err});
                 };
             }
 
-            const itemsPerRow = 6;
-            const topLeft = m.Vec2.init(x, y);
+            const itemsPerRow = 3;
+            const topLeft = m.Vec2.init(
+                contentMarginX,
+                section3Start + gridSize * 13.0,
+            );
             const spacing = gridSize * 0.25;
-            y += drawImageGrid(images.items, indexOffset, itemsPerRow, topLeft, contentSubWidth, spacing, fontTextSize, colorUi, state, scrollYF, &mouseHoverGlobal, renderQueue, CB.entry);
-            y += gridSize * 3;
-            indexOffset += sub.images.len;
-        }
+            const gridWidth = screenSizeF.x - contentMarginX * 2;
+            const y = drawImageGrid(images.items, 0, itemsPerRow, topLeft, gridWidth, spacing, fontTextSize, colorUi, state, scrollYF, &mouseHoverGlobal, renderQueue, CB.home);
 
-        yMax = y + gridSize * 1;
-    }
+            {
+                // rounded black frame
+                const framePos = m.Vec2.init(marginX + gridSize * 1, section3YStill + gridSize * 1);
+                const frameSize = m.Vec2.init(
+                    screenSizeF.x - marginX * 2 - gridSize * 2,
+                    screenSizeF.y - gridSize * 3,
+                );
+                renderQueue.roundedFrame(m.Vec2.init(0.0, section3YStill), screenSizeF, DEPTH_UI_OVER1, framePos, frameSize, gridSize, m.Vec4.black);
+                _ = section3YStillForever;
+            }
 
-    // video embed
-    switch (state.pageData) {
-        .Home => {},
+            // yMax += y + gridSize * 3;
+            _ = y;
+            yMax = section3Start + section3Height;
+        },
         .Entry => |entryData| {
-            const pf = portfolio.PORTFOLIO_LIST[entryData.portfolioIndex];
+            // content section
+            const baseY = section1Height + section2Height;
+            const lineHeight = fontTextSize * 1.5;
 
+            const pf = portfolio.PORTFOLIO_LIST[entryData.portfolioIndex];
+            const contentHeader = pf.contentHeader;
+            const contentDescription = pf.contentDescription;
+
+            const contentHeaderPos = m.Vec2.init(
+                contentMarginX,
+                baseY + gridSize * 3.0,
+            );
+            renderQueue.textLine(
+                contentHeader,
+                contentHeaderPos, fontStickerSize, 0.0,
+                colorUi, "HelveticaBold"
+            );
+
+            const contentSubPos = m.Vec2.init(
+                contentMarginX,
+                baseY + gridSize * 4.5,
+            );
+            const contentSubWidth = screenSizeF.x - contentMarginX * 2;
+            renderQueue.textBox(
+                contentDescription,
+                contentSubPos, contentSubWidth,
+                fontTextSize, lineHeight, 0.0,
+                colorUi, "HelveticaMedium", .Left
+            );
+
+            yMax = baseY + gridSize * 6.5;
+
+            var galleryImages = std.ArrayList(GridImage).init(allocator);
+
+            const x = contentMarginX;
+            var yGallery = baseY + gridSize * 9;
+            var indexOffset: usize = 0; // TODO eh...
+            for (pf.subprojects) |sub, i| {
+                const numberSizeIsh = gridSize * 2.16;
+                const numberSize = getTextureScaledSize(stickerCircle.size, screenSizeF);
+                const numberPos = m.Vec2.init(
+                    marginX + gridSize * 2.5,
+                    yGallery - gridSize * 2.25,
+                );
+                if (stickerCircle.loaded()) {
+                    renderQueue.quadTex(
+                        numberPos, numberSize, DEPTH_UI_GENERIC, 0, stickerCircle.id, colorRedSticker
+                    );
+                }
+                const numStr = std.fmt.allocPrint(allocator, "{}", .{i + 1}) catch unreachable;
+                const numberTextPos = m.Vec2.init(
+                    numberPos.x + gridSize * 0.1,
+                    numberPos.y + gridSize * 0.1
+                );
+                const numberLineHeight = numberSizeIsh;
+                renderQueue.textBox(
+                    numStr, numberTextPos, numberSizeIsh, fontStickerSize, numberLineHeight, 0.0,
+                    m.Vec4.black, "HelveticaBold", .Center
+                );
+
+                renderQueue.textLine(
+                    sub.name, m.Vec2.init(x, yGallery), fontSubtitleSize, 0.0, colorUi, "HelveticaLight"
+                );
+                yGallery += gridSize * 1;
+
+                renderQueue.textBox(
+                    sub.description, m.Vec2.init(x, yGallery), contentSubWidth, fontTextSize, lineHeight, 0.0, colorUi, "HelveticaMedium", .Left
+                );
+                yGallery += gridSize * 2;
+
+                galleryImages.clearRetainingCapacity();
+                for (sub.images) |img| {
+                    galleryImages.append(GridImage {
+                        .uri = img,
+                        .title = null,
+                        .goToUri = null,
+                    }) catch |err| {
+                        std.log.err("image append failed {}", .{err});
+                    };
+                }
+
+                const itemsPerRow = 6;
+                const topLeft = m.Vec2.init(x, yGallery);
+                const spacing = gridSize * 0.25;
+                yGallery += drawImageGrid(galleryImages.items, indexOffset, itemsPerRow, topLeft, contentSubWidth, spacing, fontTextSize, colorUi, state, scrollYF, &mouseHoverGlobal, renderQueue, CB.entry);
+                yGallery += gridSize * 3;
+                indexOffset += sub.images.len;
+            }
+
+            yMax = yGallery + gridSize * 1;
+
+            // video embed
             if (pf.youtubeId) |youtubeId| {
                 const embedWidth = screenSizeF.x - contentMarginX * 2;
                 const embedSize = m.Vec2.init(embedWidth, embedWidth / 2.0);
@@ -984,89 +992,84 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
                 renderQueue.embedYoutube(embedPos, embedSize, youtubeId);
                 yMax += embedSize.y + gridSize * 4;
             }
-        },
-    }
 
-    // projects
-    if (state.pageData == .Entry) {
-        const opos = m.Vec2.init(
-            contentMarginX,
-            yMax,
-        );
-        renderQueue.textLine(
-            "other projects",
-            opos, fontStickerSize, 0.0,
-            colorUi, "HelveticaBold"
-        );
+            // projects
+            const opos = m.Vec2.init(
+                contentMarginX,
+                yMax,
+            );
+            renderQueue.textLine(
+                "other projects",
+                opos, fontStickerSize, 0.0,
+                colorUi, "HelveticaBold"
+            );
 
-        yMax += gridSize * 2;
-    }
+            yMax += gridSize * 2;
 
-    var images = std.ArrayList(GridImage).init(allocator);
-    for (portfolio.PORTFOLIO_LIST) |pf, i| {
-        if (state.pageData == .Entry and state.pageData.Entry.portfolioIndex == i) {
-            continue;
-        }
+            var images = std.ArrayList(GridImage).init(allocator);
+            for (portfolio.PORTFOLIO_LIST) |p, i| {
+                if (entryData.portfolioIndex == i) {
+                    continue;
+                }
 
-        images.append(GridImage {
-            .uri = pf.cover,
-            .title = pf.title,
-            .goToUri = pf.uri,
-        }) catch |err| {
-            std.log.err("image append failed {}", .{err});
-        };
-    }
+                images.append(GridImage {
+                    .uri = p.cover,
+                    .title = p.title,
+                    .goToUri = p.uri,
+                }) catch |err| {
+                    std.log.err("image append failed {}", .{err});
+                };
+            }
 
-    const itemsPerRow = 3;
-    const topLeft = m.Vec2.init(
-        contentMarginX,
-        yMax,
-    );
-    const spacing = gridSize * 0.25;
-    const y = drawImageGrid(images.items, 0, itemsPerRow, topLeft, contentSubWidth, spacing, fontTextSize, colorUi, state, scrollYF, &mouseHoverGlobal, renderQueue, CB.home);
+            const itemsPerRow = 3;
+            const topLeft = m.Vec2.init(
+                contentMarginX,
+                yMax,
+            );
+            const spacing = gridSize * 0.25;
+            const yPortfolio = drawImageGrid(images.items, 0, itemsPerRow, topLeft, contentSubWidth, spacing, fontTextSize, colorUi, state, scrollYF, &mouseHoverGlobal, renderQueue, CB.home);
 
-    yMax += y + gridSize * 3;
+            yMax += yPortfolio + gridSize * 3;
 
-    if (state.pageData == .Entry) {
-        const entryData = state.pageData.Entry;
-        if (entryData.galleryImageIndex) |ind| {
-            const pos = m.Vec2.init(0.0, scrollYF);
-            renderQueue.quad(pos, screenSizeF, DEPTH_UI_OVER2, 0, m.Vec4.init(0.0, 0.0, 0.0, 1.0));
+            if (entryData.galleryImageIndex) |ind| {
+                const pos = m.Vec2.init(0.0, scrollYF);
+                renderQueue.quad(pos, screenSizeF, DEPTH_UI_OVER2, 0, m.Vec4.init(0.0, 0.0, 0.0, 1.0));
 
-            if (getImageUrlFromIndex(entryData, ind)) |imageUrl| {
-                std.log.info("{s}", .{imageUrl});
-                if (state.assets.getTextureData(.{.DynamicUrl = imageUrl})) |imageTex| {
-                    if (imageTex.loaded()) {
-                        const imageRefSizeF = m.Vec2.initFromVec2i(imageTex.size);
-                        const targetHeight = screenSizeF.y - gridSize * 4.0;
-                        const imageSize = m.Vec2.init(
-                            targetHeight / imageRefSizeF.y * imageRefSizeF.x,
-                            targetHeight
-                        );
-                        const imagePos = m.Vec2.init(
-                            (screenSizeF.x - imageSize.x) / 2.0,
-                            scrollYF + gridSize * 2.0
-                        );
-                        // const imagePos = m.Vec2.add(pos, m.Vec2.init(gridSize, gridSize));
-                        renderQueue.quadTex(imagePos, imageSize, DEPTH_UI_OVER2 - 0.01, 0, imageTex.id, m.Vec4.one);
+                if (getImageUrlFromIndex(entryData, ind)) |imageUrl| {
+                    std.log.info("{s}", .{imageUrl});
+                    if (state.assets.getTextureData(.{.DynamicUrl = imageUrl})) |imageTex| {
+                        if (imageTex.loaded()) {
+                            const imageRefSizeF = m.Vec2.initFromVec2i(imageTex.size);
+                            const targetHeight = screenSizeF.y - gridSize * 4.0;
+                            const imageSize = m.Vec2.init(
+                                targetHeight / imageRefSizeF.y * imageRefSizeF.x,
+                                targetHeight
+                            );
+                            const imagePos = m.Vec2.init(
+                                (screenSizeF.x - imageSize.x) / 2.0,
+                                scrollYF + gridSize * 2.0
+                            );
+                            // const imagePos = m.Vec2.add(pos, m.Vec2.init(gridSize, gridSize));
+                            renderQueue.quadTex(imagePos, imageSize, DEPTH_UI_OVER2 - 0.01, 0, imageTex.id, m.Vec4.white);
 
-                        const clickEvents = state.mouseState.clickEvents[0..state.mouseState.numClickEvents];
-                        for (clickEvents) |e| {
-                            if (e.clickType == .Left and e.down) {
-                                const posF = m.Vec2.initFromVec2i(e.pos);
-                                if (posF.x < (screenSizeF.x - imageSize.x) / 2.0
-                                    or posF.x > (screenSizeF.x + imageSize.x) / 2.0
-                                    or posF.y < (gridSize * 2.0)
-                                    or posF.y > (screenSizeF.y - gridSize * 2.0)) {
-                                    state.pageData.Entry.galleryImageIndex = null;
-                                    w.setAllTextOpacity(1.0);
+                            const clickEvents = state.mouseState.clickEvents[0..state.mouseState.numClickEvents];
+                            for (clickEvents) |e| {
+                                if (e.clickType == .Left and e.down) {
+                                    const posF = m.Vec2.initFromVec2i(e.pos);
+                                    if (posF.x < (screenSizeF.x - imageSize.x) / 2.0
+                                        or posF.x > (screenSizeF.x + imageSize.x) / 2.0
+                                        or posF.y < (gridSize * 2.0)
+                                        or posF.y > (screenSizeF.y - gridSize * 2.0)) {
+                                        state.pageData.Entry.galleryImageIndex = null;
+                                        w.setAllTextOpacity(1.0);
+                                    }
                                 }
                             }
                         }
                     }
                 }
             }
-        }
+        },
     }
 
     // TODO don't do all the time
@@ -1077,7 +1080,13 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
     }
 
     if (state.debug) {
-        renderQueue.quad(m.Vec2.init(0, baseY), m.Vec2.init(screenSizeF.x, 1), DEPTH_UI_ABOVEALL, 0, m.Vec4.one);
+        const colorMain = m.Vec4.white;
+        const colorHalf = m.Vec4.init(0.5, 0.5, 0.5, 1.0);
+        var yDebug: f32 = 0;
+        while (yDebug <= yMax) : (yDebug += gridSize) {
+            renderQueue.quad(m.Vec2.init(0, yDebug - gridSize * 0.5), m.Vec2.init(screenSizeF.x, 1), DEPTH_UI_ABOVEALL, 0, colorHalf);
+            renderQueue.quad(m.Vec2.init(0, yDebug), m.Vec2.init(screenSizeF.x, 1), DEPTH_UI_ABOVEALL, 0, colorMain);
+        }
     }
 
     return @floatToInt(i32, yMax);
@@ -1103,7 +1112,7 @@ fn drawMobile(state: *State, deltaS: f32, scrollY: f32, screenSize: m.Vec2, rend
             (screenSize.x - backgroundSize.x) / 2.0,
             (screenSize.y - backgroundSize.y) / 2.0,
         );
-        renderQueue.quadTex(backgroundPos, backgroundSize, DEPTH_LANDINGBACKGROUND, 0.0, backgroundTex.id, m.Vec4.one);
+        renderQueue.quadTex(backgroundPos, backgroundSize, DEPTH_LANDINGBACKGROUND, 0.0, backgroundTex.id, m.Vec4.white);
     }
 
     const yorTex = state.assets.getStaticTextureData(Texture.MobileYorstoryCompany);
@@ -1112,7 +1121,7 @@ fn drawMobile(state: *State, deltaS: f32, scrollY: f32, screenSize: m.Vec2, rend
         const yorPos = m.Vec2.init(
             gridSize, gridSize * 5.8
         );
-        renderQueue.quadTex(yorPos, yorSize, DEPTH_UI_GENERIC, 0.0, yorTex.id, m.Vec4.one);
+        renderQueue.quadTex(yorPos, yorSize, DEPTH_UI_GENERIC, 0.0, yorTex.id, m.Vec4.white);
     }
 
     const logoTex = state.assets.getStaticTextureData(Texture.MobileLogo);
@@ -1121,7 +1130,7 @@ fn drawMobile(state: *State, deltaS: f32, scrollY: f32, screenSize: m.Vec2, rend
         const logoPos = m.Vec2.init(
             gridSize, screenSize.y - gridSize * 3.0 - logoSize.y
         );
-        renderQueue.quadTex(logoPos, logoSize, DEPTH_UI_GENERIC, 0.0, logoTex.id, m.Vec4.one);
+        renderQueue.quadTex(logoPos, logoSize, DEPTH_UI_GENERIC, 0.0, logoTex.id, m.Vec4.white);
     }
 
     const crosshairTex = state.assets.getStaticTextureData(Texture.MobileCrosshair);
@@ -1130,11 +1139,11 @@ fn drawMobile(state: *State, deltaS: f32, scrollY: f32, screenSize: m.Vec2, rend
         const crosshairOffset = gridSize * 0.25;
         const pos = m.Vec2.init(-(gridSize + crosshairOffset), -(gridSize + crosshairOffset));
         const size = m.Vec2.init(screenSize.x + gridSize * 2.0 + crosshairOffset * 2.0, screenSize.y + gridSize * 2.0 + crosshairOffset * 2.0);
-        drawCrosshairCorners(pos, size, DEPTH_UI_GENERIC, gridSize, crosshairTex, screenSize, m.Vec4.one, renderQueue);
+        drawCrosshairCorners(pos, size, DEPTH_UI_GENERIC, gridSize, crosshairTex, screenSize, m.Vec4.white, renderQueue);
 
         const iconsSize = getTextureScaledSize(iconsTex.size, screenSize);
         const iconsPos = m.Vec2.init(screenSize.x - iconsSize.x - gridSize * 1.0, gridSize * 4.0);
-        renderQueue.quadTex(iconsPos, iconsSize, DEPTH_UI_GENERIC, 0.0, iconsTex.id, m.Vec4.one);
+        renderQueue.quadTex(iconsPos, iconsSize, DEPTH_UI_GENERIC, 0.0, iconsTex.id, m.Vec4.white);
     }
 
     return @floatToInt(i32, screenSize.y);
@@ -1264,44 +1273,13 @@ export fn onAnimationFrame(width: c_int, height: c_int, scrollY: c_int, timestam
 
     w.bindNullFramebuffer();
     w.glClear(w.GL_COLOR_BUFFER_BIT | w.GL_DEPTH_BUFFER_BIT);
-    state.renderState.postProcessState.draw(state.fbTexture, screenSizeF);
+    const lut1 = state.assets.getStaticTextureData(Texture.Lut1);
+    if (lut1.loaded()) {
+        state.renderState.postProcessState.draw(state.fbTexture, lut1.id, screenSizeF);
+    }
 
     const maxInflight = 4;
     state.assets.loadQueued(maxInflight);
-
-    // debug grid
-    // const gridSize = std.math.round(gridRefSize / refSize.y * screenSizeF.y); // TODO
-    // if (state.debug) {
-    //     const halfGridSize = gridSize / 2.0;
-    //     const colorGrid = m.Vec4.init(0.6, 0.6, 0.6, 1.0);
-    //     const colorGridHalf = m.Vec4.init(0.2, 0.2, 0.2, 1.0);
-
-    //     var i: i32 = undefined;
-
-    //     const nH = 20;
-    //     const sizeH = m.Vec2.init(screenSizeF.x, 1);
-    //     i = 0;
-    //     while (i < nH) : (i += 1) {
-    //         const iF = @intToFloat(f32, i);
-    //         const color = if (@rem(i, 2) == 0) colorGrid else colorGridHalf;
-    //         const posTop = m.Vec2.init(0, screenSizeF.y - halfGridSize * iF);
-    //         state.renderState.quadState.drawQuad(posTop, sizeH, DEPTH_UI_ABOVEALL, 0, color, screenSizeF);
-    //         const posBottom = m.Vec2.init(0, halfGridSize * iF);
-    //         state.renderState.quadState.drawQuad(posBottom, sizeH, DEPTH_UI_ABOVEALL, 0, color, screenSizeF);
-    //     }
-
-    //     const nV = 40;
-    //     const sizeV = m.Vec2.init(1, screenSizeF.y);
-    //     i = 0;
-    //     while (i < nV) : (i += 1) {
-    //         const iF = @intToFloat(f32, i);
-    //         const color = if (@rem(i, 2) == 0) colorGrid else colorGridHalf;
-    //         const posLeft = m.Vec2.init(marginX + halfGridSize * iF, 0);
-    //         state.renderState.quadState.drawQuad(posLeft, sizeV, DEPTH_UI_ABOVEALL, 0, color, screenSizeF);
-    //         const posRight = m.Vec2.init(-marginX + screenSizeF.x - halfGridSize * iF, 0);
-    //         state.renderState.quadState.drawQuad(posRight, sizeV, DEPTH_UI_ABOVEALL, 0, color, screenSizeF);
-    //     }
-    // }
 
     return yMax;
 }

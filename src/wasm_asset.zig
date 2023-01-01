@@ -1,5 +1,9 @@
 const std = @import("std");
 
+const stb = @cImport({
+    @cInclude("stb_truetype.h");
+});
+
 const m = @import("math.zig");
 const w = @import("wasm_bindings.zig");
 
@@ -31,7 +35,66 @@ pub const TextureData = struct {
     }
 };
 
-pub fn Assets(comptime StaticTextureEnum: type, comptime maxDynamicTextures: usize) type
+pub const FontCharData = struct {
+    uvOffset: m.Vec2,
+    uvSize: m.Vec2,
+    offset: m.Vec2,
+    advanceX: f32,
+};
+
+pub const FontData = struct {
+    textureId: c_uint,
+    size: f32,
+    charData: [256]FontCharData,
+
+    const Self = @This();
+
+    pub fn init(fontFile: []const u8, size: f32, allocator: std.mem.Allocator) !Self
+    {
+        var self = Self {
+            .textureId = 0,
+            .size = size,
+            .charData = undefined,
+        };
+
+        const width = 2048;
+        const height = 2048;
+        var pixelBytes = try allocator.alloc(u8, width * height);
+        std.mem.set(u8, pixelBytes, 0);
+        var context: stb.stbtt_pack_context = undefined;
+        if (stb.stbtt_PackBegin(&context, &pixelBytes[0], width, height, width, 1, null) != 1) {
+            return error.stbtt_PackBegin;
+        }
+        stb.stbtt_PackSetOversampling(&context, 1, 1);
+
+        var charData = try allocator.alloc(stb.stbtt_packedchar, self.charData.len);
+        if (stb.stbtt_PackFontRange(&context, &fontFile[0], 0, 64.0, 0, @intCast(c_int, charData.len), &charData[0]) != 1) {
+            return error.stbtt_PackFontRange;
+        }
+
+        stb.stbtt_PackEnd(&context);
+
+        for (charData) |_, i| {
+            self.charData[i] = FontCharData {
+                .uvOffset = m.Vec2.init(
+                    @intToFloat(f32, charData[i].x0) / width,
+                    @intToFloat(f32, height - charData[i].y1) / height, // TODO should do -1 ?
+                ),
+                .uvSize = m.Vec2.init(
+                    @intToFloat(f32, charData[i].x1 - charData[i].x0) / width,
+                    @intToFloat(f32, charData[i].y1 - charData[i].y0) / height,
+                ),
+                .offset = m.Vec2.init(charData[i].xoff, charData[i].yoff),
+                .advanceX = charData[i].xadvance,
+            };
+        }
+        self.textureId = w.createTextureWithData(width, height, 1, &pixelBytes[0], pixelBytes.len, w.GL_CLAMP_TO_EDGE, w.GL_LINEAR);
+
+        return self;
+    }
+};
+
+pub fn Assets(comptime StaticTextureEnum: type, comptime maxDynamicTextures: usize, comptime StaticFontEnum: type) type
 {
     const TextureIdType = enum {
         Static,
@@ -48,15 +111,18 @@ pub fn Assets(comptime StaticTextureEnum: type, comptime maxDynamicTextures: usi
         const numStaticTextures = @typeInfo(StaticTextureEnum).Enum.fields.len;
         const maxTotalTextures = numStaticTextures + maxDynamicTextures;
 
+        const numStaticFonts = @typeInfo(StaticFontEnum).Enum.fields.len;
+
         allocator: std.mem.Allocator,
         staticTextures: [numStaticTextures]TextureData,
         // TODO use BoundedArray?
         dynamicTexturesSize: usize,
         dynamicTextures: [maxDynamicTextures]TextureData,
-        loadQueueSize: usize,
-        loadQueue: [maxTotalTextures]TextureLoadEntry,
-        inflight: usize,
-        idMap: std.StringHashMap(usize),
+        textureLoadQueueSize: usize,
+        textureLoadQueue: [maxTotalTextures]TextureLoadEntry,
+        textureInflight: usize,
+        textureIdMap: std.StringHashMap(usize),
+        staticFonts: [numStaticFonts]FontData,
 
         const Self = @This();
 
@@ -93,7 +159,7 @@ pub fn Assets(comptime StaticTextureEnum: type, comptime maxDynamicTextures: usi
             self.dynamicTextures[id] = textureData;
 
             const urlCopy = try self.allocator.dupe(u8, url);
-            try self.idMap.put(urlCopy, id);
+            try self.textureIdMap.put(urlCopy, id);
 
             self.dynamicTexturesSize += 1;
             return id;
@@ -101,18 +167,18 @@ pub fn Assets(comptime StaticTextureEnum: type, comptime maxDynamicTextures: usi
 
         fn addLoadEntry(self: *Self, id: c_uint, url: []const u8, wrapMode: c_uint, filter: c_uint, priority: u32) !void
         {
-            if (self.loadQueueSize >= self.loadQueue.len) {
+            if (self.textureLoadQueueSize >= self.textureLoadQueue.len) {
                 return error.FullLoadQueue;
             }
 
-            self.loadQueue[self.loadQueueSize] = TextureLoadEntry {
+            self.textureLoadQueue[self.textureLoadQueueSize] = TextureLoadEntry {
                 .id = id,
                 .url = url,
                 .wrapMode = wrapMode,
                 .filter = filter,
                 .priority = priority,
             };
-            self.loadQueueSize += 1;
+            self.textureLoadQueueSize += 1;
         }
 
         pub fn init(allocator: std.mem.Allocator) Self
@@ -122,10 +188,11 @@ pub fn Assets(comptime StaticTextureEnum: type, comptime maxDynamicTextures: usi
                 .staticTextures = undefined,
                 .dynamicTexturesSize = 0,
                 .dynamicTextures = undefined,
-                .loadQueueSize = 0,
-                .loadQueue = undefined,
-                .inflight = 0,
-                .idMap = std.StringHashMap(usize).init(allocator),
+                .textureLoadQueueSize = 0,
+                .textureLoadQueue = undefined,
+                .textureInflight = 0,
+                .textureIdMap = std.StringHashMap(usize).init(allocator),
+                .staticFonts = undefined,
             };
         }
 
@@ -140,7 +207,7 @@ pub fn Assets(comptime StaticTextureEnum: type, comptime maxDynamicTextures: usi
                 .Static => |t| return self.getStaticTextureData(t),
                 .DynamicId => |theId| return self.getDynamicTextureData(theId),
                 .DynamicUrl => |url| {
-                    const theId = self.idMap.get(url) orelse return null;
+                    const theId = self.textureIdMap.get(url) orelse return null;
                     return self.getDynamicTextureData(theId);
                 },
             }
@@ -166,29 +233,29 @@ pub fn Assets(comptime StaticTextureEnum: type, comptime maxDynamicTextures: usi
 
         pub fn loadQueued(self: *Self, maxInflight: usize) void
         {
-            if (self.loadQueueSize == 0) {
+            if (self.textureLoadQueueSize == 0) {
                 return;
             }
 
-            const inflight = self.inflight;
-            const maxToAddInflight = if (maxInflight >= inflight) maxInflight - inflight else 0;
-            const numToLoad = std.math.min(maxToAddInflight, self.loadQueueSize);
+            const textureInflight = self.textureInflight;
+            const maxToAddInflight = if (maxInflight >= textureInflight) maxInflight - textureInflight else 0;
+            const numToLoad = std.math.min(maxToAddInflight, self.textureLoadQueueSize);
 
             var i: usize = 0;
             while (i < numToLoad) : (i += 1) {
                 var entryIndex: usize = 0;
                 var j: usize = 1;
-                while (j < self.loadQueueSize) : (j += 1) {
-                    if (self.loadQueue[j].priority < self.loadQueue[entryIndex].priority) {
+                while (j < self.textureLoadQueueSize) : (j += 1) {
+                    if (self.textureLoadQueue[j].priority < self.textureLoadQueue[entryIndex].priority) {
                         entryIndex = j;
                     }
                 }
 
-                const entry = self.loadQueue[entryIndex];
+                const entry = self.textureLoadQueue[entryIndex];
                 w.loadTexture(entry.id, &entry.url[0], entry.url.len, entry.wrapMode, entry.filter);
-                self.inflight += 1;
-                self.loadQueue[entryIndex] = self.loadQueue[self.loadQueueSize - 1];
-                self.loadQueueSize -= 1;
+                self.textureInflight += 1;
+                self.textureLoadQueue[entryIndex] = self.textureLoadQueue[self.textureLoadQueueSize - 1];
+                self.textureLoadQueueSize -= 1;
             }
         }
 
@@ -211,11 +278,21 @@ pub fn Assets(comptime StaticTextureEnum: type, comptime maxDynamicTextures: usi
                 }
             }
 
-            self.inflight -= 1;
+            self.textureInflight -= 1;
 
             if (!found) {
                 return error.TextureNotFound;
             }
+        }
+
+        pub fn registerStaticFont(self: *Self, font: StaticFontEnum, fontFile: []const u8, size: f32, allocator: std.mem.Allocator) !void
+        {
+            self.staticFonts[@enumToInt(font)] = try FontData.init(fontFile, size, allocator);
+        }
+
+        pub fn getStaticFontData(self: Self, font: StaticFontEnum) FontData
+        {
+            return self.staticFonts[@enumToInt(font)];
         }
     };
 
