@@ -38,6 +38,15 @@ fn isVerticalAspect(screenSize: m.Vec2) bool
     return aspect <= 1.0;
 }
 
+fn getGridSize(screenSize: m.Vec2) f32
+{
+    if (isVerticalAspect(screenSize)) {
+        return std.math.round(80.0 / 1920.0 * screenSize.y);
+    } else {
+        return std.math.round(gridRefSize / refSize.y * screenSize.y);
+    }
+}
+
 // return true when pressed
 fn updateButton(topLeft: m.Vec2, size: m.Vec2, mouseState: input.MouseState, scrollY: f32, mouseHoverGlobal: *bool) bool
 {
@@ -128,7 +137,6 @@ pub const State = struct {
 
     pub fn load(self: *Self, buf: []u8, screenSize: m.Vec2usize) !void
     {
-        _ = screenSize;
         self.fbAllocator = std.heap.FixedBufferAllocator.init(buf);
 
         w.glClearColor(0.0, 0.0, 0.0, 0.0);
@@ -219,6 +227,51 @@ pub const State = struct {
             .Entry => {
             },
         }
+
+        const screenSizeF = m.Vec2.initFromVec2usize(screenSize);
+        const isVertical = isVerticalAspect(screenSizeF);
+        const gridSize = getGridSize(screenSizeF);
+
+        const helveticaBoldUrl = "/fonts/HelveticaNeueLTCom-Bd.ttf";
+        const helveticaMediumUrl = "/fonts/HelveticaNeueLTCom-Md.ttf";
+        const helveticaLightUrl = "/fonts/HelveticaNeueLTCom-Lt.ttf";
+
+        if (!isVertical) {
+            const categoryFontSize = gridSize * 0.6;
+            const categoryKerning = 0;
+            const categoryLineHeight = categoryFontSize;
+            self.assets.registerStaticFont(asset.Font.Category, helveticaBoldUrl, categoryFontSize, categoryKerning, categoryLineHeight) catch |err| {
+                std.log.err("registerStaticFont failed err={}", .{err});
+            };
+
+            const titleFontSize = gridSize * 4.0;
+            const titleKerning = -gridSize * 0.15;
+            const titleLineHeight = gridSize * 3.6;
+            self.assets.registerStaticFont(asset.Font.Title, helveticaBoldUrl, titleFontSize, titleKerning, titleLineHeight) catch |err| {
+                std.log.err("registerStaticFont failed err={}", .{err});
+            };
+
+            const subtitleFontSize = gridSize * 1.25;
+            const subtitleKerning = -gridSize * 0.05;
+            const subtitleLineHeight = subtitleFontSize;
+            self.assets.registerStaticFont(asset.Font.Subtitle, helveticaLightUrl, subtitleFontSize, subtitleKerning, subtitleLineHeight) catch |err| {
+                std.log.err("registerStaticFont failed err={}", .{err});
+            };
+
+            const numberFontSize = gridSize * 1.8;
+            const numberKerning = 0;
+            const numberLineHeight = numberFontSize;
+            self.assets.registerStaticFont(asset.Font.Number, helveticaBoldUrl, numberFontSize, numberKerning, numberLineHeight) catch |err| {
+                std.log.err("registerStaticFont failed err={}", .{err});
+            };
+        }
+
+        const textFontSize = gridSize * 0.4;
+        const textKerning = 0;
+        const textLineHeight = textFontSize * 1.4;
+        self.assets.registerStaticFont(asset.Font.Text, helveticaMediumUrl, textFontSize, textKerning, textLineHeight) catch |err| {
+            std.log.err("registerStaticFont failed err={}", .{err});
+        };
     }
 
     pub fn deinit(self: Self) void
@@ -370,7 +423,7 @@ fn drawCrosshairCorners(pos: m.Vec2, size: m.Vec2, depth: f32, gridSize: f32, de
     );
 }
 
-fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, screenResize:bool, renderQueue: *render.RenderQueue, allocator: std.mem.Allocator) i32
+fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, renderQueue: *render.RenderQueue, allocator: std.mem.Allocator) i32
 {
     const colorYellowHome = m.Vec4.init(234.0 / 255.0, 1.0, 0.0, 1.0);
     const colorUi = blk: {
@@ -390,7 +443,7 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
     const mousePosF = m.Vec2.initFromVec2i(state.mouseState.pos);
     var mouseHoverGlobal = false;
 
-    const gridSize = std.math.round(gridRefSize / refSize.y * screenSizeF.y);
+    const gridSize = getGridSize(screenSizeF);
 
     const marginX = blk: {
         const maxLandingImageAspect = 2.15;
@@ -403,47 +456,6 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
     };
     const crosshairMarginX = marginX + gridSize * 5;
     const contentMarginX = marginX + gridSize * 9;
-
-    if (screenResize) {
-        const helveticaBoldUrl = "/fonts/HelveticaNeueLTCom-Bd.ttf";
-        const helveticaMediumUrl = "/fonts/HelveticaNeueLTCom-Md.ttf";
-        const helveticaLightUrl = "/fonts/HelveticaNeueLTCom-Lt.ttf";
-
-        const categoryFontSize = gridSize * 0.6;
-        const categoryKerning = 0;
-        const categoryLineHeight = categoryFontSize;
-        state.assets.registerStaticFont(asset.Font.Category, helveticaBoldUrl, categoryFontSize, categoryKerning, categoryLineHeight) catch |err| {
-            std.log.err("registerStaticFont failed err={}", .{err});
-        };
-
-        const titleFontSize = gridSize * 4.0;
-        const titleKerning = -gridSize * 0.15;
-        const titleLineHeight = gridSize * 3.6;
-        state.assets.registerStaticFont(asset.Font.Title, helveticaBoldUrl, titleFontSize, titleKerning, titleLineHeight) catch |err| {
-            std.log.err("registerStaticFont failed err={}", .{err});
-        };
-
-        const subtitleFontSize = gridSize * 1.25;
-        const subtitleKerning = -gridSize * 0.05;
-        const subtitleLineHeight = subtitleFontSize;
-        state.assets.registerStaticFont(asset.Font.Subtitle, helveticaLightUrl, subtitleFontSize, subtitleKerning, subtitleLineHeight) catch |err| {
-            std.log.err("registerStaticFont failed err={}", .{err});
-        };
-
-        const textFontSize = gridSize * 0.4;
-        const textKerning = 0;
-        const textLineHeight = textFontSize * 1.4;
-        state.assets.registerStaticFont(asset.Font.Text, helveticaMediumUrl, textFontSize, textKerning, textLineHeight) catch |err| {
-            std.log.err("registerStaticFont failed err={}", .{err});
-        };
-
-        const numberFontSize = gridSize * 1.8;
-        const numberKerning = 0;
-        const numberLineHeight = numberFontSize;
-        state.assets.registerStaticFont(asset.Font.Number, helveticaBoldUrl, numberFontSize, numberKerning, numberLineHeight) catch |err| {
-            std.log.err("registerStaticFont failed err={}", .{err});
-        };
-    }
 
     const decalTopLeft = state.assets.getStaticTextureData(asset.Texture.DecalTopLeft);
     const stickerMain = blk: {
@@ -1075,55 +1087,14 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
     return @floatToInt(i32, yMax);
 }
 
-fn drawMobile(state: *State, deltaS: f32, scrollY: f32, screenSize: m.Vec2, screenResize: bool, renderQueue: *render.RenderQueue, allocator: std.mem.Allocator) i32
+fn drawMobile(state: *State, deltaS: f32, scrollY: f32, screenSize: m.Vec2, renderQueue: *render.RenderQueue, allocator: std.mem.Allocator) i32
 {
     _ = deltaS;
     _ = scrollY;
     // _ = allocator;
 
     const aspect = screenSize.x / screenSize.y;
-    const gridSize = std.math.round(80.0 / 1920.0 * screenSize.y);
-
-    if (screenResize) {
-        // const helveticaBoldUrl = "/fonts/HelveticaNeueLTCom-Bd.ttf";
-        // const helveticaMediumUrl = "/fonts/HelveticaNeueLTCom-Md.ttf";
-        // const helveticaLightUrl = "/fonts/HelveticaNeueLTCom-Lt.ttf";
-
-        // const categoryFontSize = gridSize * 0.6;
-        // const categoryKerning = 0;
-        // const categoryLineHeight = categoryFontSize;
-        // state.assets.registerStaticFont(asset.Font.Category, helveticaBoldUrl, categoryFontSize, categoryKerning, categoryLineHeight) catch |err| {
-        //     std.log.err("registerStaticFont failed err={}", .{err});
-        // };
-
-        // const titleFontSize = gridSize * 4.0;
-        // const titleKerning = -gridSize * 0.15;
-        // const titleLineHeight = gridSize * 3.6;
-        // state.assets.registerStaticFont(asset.Font.Title, helveticaBoldUrl, titleFontSize, titleKerning, titleLineHeight) catch |err| {
-        //     std.log.err("registerStaticFont failed err={}", .{err});
-        // };
-
-        // const subtitleFontSize = gridSize * 1.25;
-        // const subtitleKerning = -gridSize * 0.05;
-        // const subtitleLineHeight = subtitleFontSize;
-        // state.assets.registerStaticFont(asset.Font.Subtitle, helveticaLightUrl, subtitleFontSize, subtitleKerning, subtitleLineHeight) catch |err| {
-        //     std.log.err("registerStaticFont failed err={}", .{err});
-        // };
-
-        // const textFontSize = gridSize * 0.4;
-        // const textKerning = 0;
-        // const textLineHeight = textFontSize * 1.4;
-        // state.assets.registerStaticFont(asset.Font.Text, helveticaMediumUrl, textFontSize, textKerning, textLineHeight) catch |err| {
-        //     std.log.err("registerStaticFont failed err={}", .{err});
-        // };
-
-        // const numberFontSize = gridSize * 1.8;
-        // const numberKerning = 0;
-        // const numberLineHeight = numberFontSize;
-        // state.assets.registerStaticFont(asset.Font.Number, helveticaBoldUrl, numberFontSize, numberKerning, numberLineHeight) catch |err| {
-        //     std.log.err("registerStaticFont failed err={}", .{err});
-        // };
-    }
+    const gridSize = getGridSize(screenSize);
 
     const eulerAngles = m.Vec3.init(state.deviceState.angles.y, state.deviceState.angles.z, state.deviceState.angles.x);
     const quat = m.Quat.initFromEulerAngles(eulerAngles);
@@ -1279,9 +1250,9 @@ export fn onAnimationFrame(memory: *wasm_app.Memory, width: c_int, height: c_int
 
     var yMax: i32 = 0;
     if (isVertical) {
-        yMax = drawMobile(state, deltaS, scrollYF, screenSizeF, screenResize, &renderQueue, tempAllocator);
+        yMax = drawMobile(state, deltaS, scrollYF, screenSizeF, &renderQueue, tempAllocator);
     } else {
-        yMax = drawDesktop(state, deltaMs, scrollYF, screenSizeF, screenResize, &renderQueue, tempAllocator);
+        yMax = drawDesktop(state, deltaMs, scrollYF, screenSizeF, &renderQueue, tempAllocator);
     }
     defer {
         state.yMaxPrev = yMax;

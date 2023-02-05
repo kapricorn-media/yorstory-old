@@ -1,5 +1,6 @@
 CRITICAL
 - parallax scene loading is slow (images are massive)
+- load yorstory.wasm immediately or ASAP
 
 HIGH
 - gallery changes (layout + popup)
