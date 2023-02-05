@@ -9,27 +9,7 @@ on:
       - main
 
 jobs:
-  release_x86_64_linux:
-    runs-on: [self-hosted, release]
-    timeout-minutes: 10
-
-    steps:
-      - name: checkout
-        uses: actions/checkout@v2
-        with:
-          submodules: 'recursive'
-
-      - name: test
-        run: ~/zig-0.10.0/zig build -Dtarget=x86_64-linux -Drelease-fast=true test
-
-      - name: build
-        run: ~/zig-0.10.0/zig build -Dtarget=x86_64-linux -Drelease-fast=true package
-
-      - name: rename
-        run: mv zig-out yorstory
-
-      - name: zip
-        run: tar -czf yorstory.tar.gz yorstory
-
-      - name: copy
-        run: cp yorstory.tar.gz ~/ci/builds/yorstory/yorstory.`date '+%s'`.tar.gz
+  release:
+    uses: kapricorn-media/github/.github/workflows/release-0.10.1.yaml@main
+    with:
+      package-name: yorstory

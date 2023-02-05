@@ -70,7 +70,7 @@ fn stepPackage(self: *std.build.Step) !void
     }
 }
 
-pub fn build(b: *std.build.Builder) void
+pub fn build(b: *std.build.Builder) !void
 {
     const mode = b.standardReleaseOptions();
     const target = b.standardTargetOptions(.{});
@@ -87,9 +87,9 @@ pub fn build(b: *std.build.Builder) void
     server.addPackagePath("config", configSrc);
     server.addPackagePath("png", "src/png.zig");
     zig_bearssl_build.addLib(server, target, "deps/zig-bearssl");
-    zig_http_build.addLibClient(server, target, "deps/zig-http");
-    zig_http_build.addLibCommon(server, target, "deps/zig-http");
-    zig_http_build.addLibServer(server, target, "deps/zig-http");
+    try zig_http_build.addLibClient(server, target, "deps/zig-http");
+    try zig_http_build.addLibCommon(server, target, "deps/zig-http");
+    try zig_http_build.addLibServer(server, target, "deps/zig-http");
     server.linkLibC();
     server.override_dest_dir = installDirRoot;
     server.install();
@@ -145,8 +145,8 @@ pub fn build(b: *std.build.Builder) void
         tests.setBuildMode(mode);
         tests.setTarget(target);
         zig_bearssl_build.addLib(tests, target, "deps/zig-bearssl");
-        zig_http_build.addLibClient(tests, target, "deps/zig-http");
-        zig_http_build.addLibCommon(tests, target, "deps/zig-http");
+        try zig_http_build.addLibClient(tests, target, "deps/zig-http");
+        try zig_http_build.addLibCommon(tests, target, "deps/zig-http");
         tests.linkLibC();
         runTests.dependOn(&tests.step);
     }
