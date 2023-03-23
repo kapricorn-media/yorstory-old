@@ -6,8 +6,11 @@ HIGH
 - gallery changes (layout + popup)
 - grid size3
 - sticker on top of "we are storytellers"
+- parallax scene with the overlaid map is cropped on the left
+- use history.pushState for navigation. single-page design, minimize reloading
 
 MEDIUM
+- size of scroll bar is not included in page width UI stuff (just pass it to wasm and use it)
 - lively details (react on hover, fade in as you scroll, etc)
 - flare layer, opacity sine wave 100% <-> 20% 
 - smarter should-redraw logic

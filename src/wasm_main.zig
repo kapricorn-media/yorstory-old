@@ -1154,8 +1154,7 @@ fn drawMobile(state: *State, deltaS: f32, scrollY: f32, screenSize: m.Vec2, rend
     }
 
     const crosshairTex = state.assets.getStaticTextureData(asset.Texture.MobileCrosshair);
-    const iconsTex = state.assets.getStaticTextureData(asset.Texture.MobileIcons);
-    if (crosshairTex.loaded() and iconsTex.loaded()) {
+    if (crosshairTex.loaded()) {
         // const offsetTest = if (state.anglesRef.z > anglesTarget.z) state.anglesRef.z - anglesTarget.z) / 90.0 * 100.0;
         const offsetTest = anglesTarget.z / 90.0 * 100.0;
         const crosshairOffset = gridSize * 0.25;
@@ -1163,12 +1162,18 @@ fn drawMobile(state: *State, deltaS: f32, scrollY: f32, screenSize: m.Vec2, rend
         const size = m.Vec2.init(screenSize.x + gridSize * 2.0 + crosshairOffset * 2.0, screenSize.y + gridSize * 2.0 + crosshairOffset * 2.0);
         drawCrosshairCorners(pos, size, DEPTH_UI_GENERIC, gridSize, crosshairTex, screenSize, m.Vec4.white, renderQueue);
 
+        const pos2 = m.Vec2.init(-(gridSize + crosshairOffset) + offsetTest, -(gridSize + crosshairOffset) + screenSize.y);
+        drawCrosshairCorners(pos2, size, DEPTH_UI_GENERIC, gridSize, crosshairTex, screenSize, m.Vec4.white, renderQueue);
+    }
+
+    const iconsTex = state.assets.getStaticTextureData(asset.Texture.MobileIcons);
+    if (iconsTex.loaded()) {
         const iconsSize = getTextureScaledSize(iconsTex.size, screenSize);
         const iconsPos = m.Vec2.init(screenSize.x - iconsSize.x - gridSize * 1.0, gridSize * 4.0);
         renderQueue.quadTex(iconsPos, iconsSize, DEPTH_UI_GENERIC, 0.0, iconsTex.id, m.Vec4.white);
     }
 
-    return @floatToInt(i32, screenSize.y);
+    return @floatToInt(i32, screenSize.y * 3);
 }
 
 export fn onAnimationFrame(memory: *wasm_app.Memory, width: c_int, height: c_int, scrollY: c_int, timestampMs: c_int) c_int
