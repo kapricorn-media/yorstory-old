@@ -1209,9 +1209,10 @@ fn drawMobile(state: *State, deltaS: f32, scrollY: f32, screenSize: m.Vec2, rend
     return @floatToInt(i32, y);
 }
 
-export fn onAnimationFrame(memory: *wasm_app.Memory, width: c_int, height: c_int, scrollY: c_int, timestampMs: c_int) c_int
+export fn onAnimationFrame(memory: *wasm_app.Memory, outerWidth: c_int, outerHeight: c_int, innerWidth: c_int, innerHeight: c_int, scrollY: c_int, timestampMs: c_int) c_int
 {
-    const screenSizeI = m.Vec2i.init(@intCast(i32, width), @intCast(i32, height));
+    _ = innerWidth; _ = innerHeight;
+    const screenSizeI = m.Vec2i.init(@intCast(i32, outerWidth), @intCast(i32, outerHeight));
     const screenSizeF = m.Vec2.initFromVec2i(screenSizeI);
     const scrollYF = @intToFloat(f32, scrollY);
 

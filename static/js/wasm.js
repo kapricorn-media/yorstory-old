@@ -3,6 +3,8 @@ let _ext = null;
 let _memoryPtr = null;
 let _canvas = null;
 
+let _lastOuterWidth = null;
+let _lastOuterHeight = null;
 let _currentHeight = null;
 let _loadTextureJobs = [];
 
@@ -450,12 +452,34 @@ function fillGlFunctions(env)
     };
 }
 
+function getViewSizes()
+{
+    return {
+        outer: {
+            width: _canvas.width,
+            height: _canvas.height,
+        },
+        inner: {
+            width: toRealPx(window.innerWidth),
+            height: toRealPx(window.innerHeight),
+        },
+    };
+}
+
 function updateCanvasSize()
 {
-    _canvas.style.width = px(window.innerWidth);
-    _canvas.style.height = px(window.innerHeight);
-    _canvas.width = toRealPx(window.innerWidth);
-    _canvas.height = toRealPx(window.innerHeight);
+    _lastOuterWidth = window.outerWidth;
+    _lastOuterHeight = window.outerHeight;
+
+    // Canvas should cover the entire window size to avoid blank spots on mobile address bar
+    // resizes, hence the use of "outer" instead of "inner".
+    const width = window.outerWidth;
+    const height = window.outerHeight;
+
+    _canvas.style.width = px(width);
+    _canvas.style.height = px(height);
+    _canvas.width = toRealPx(width);
+    _canvas.height = toRealPx(height);
     gl.viewport(0, 0, _canvas.width, _canvas.height);
     console.log(`canvas resize: ${_canvas.width} x ${_canvas.height}`);
 }
@@ -508,6 +532,12 @@ function wasmInit(wasmUri, memoryBytes)
     });
 
     addEventListener("resize", function() {
+        if (window.outerWidth === _lastOuterWidth && window.outerHeight === _lastOuterHeight) {
+            // Avoid resizing canvas if the actual window size hasn't changed.
+            // This is mainly to avoid excessive resizing when mobile address bar is hidden.
+            return;
+        }
+
         updateCanvasSize();
     });
 
@@ -527,7 +557,14 @@ function wasmInit(wasmUri, memoryBytes)
             doNextLoadTextureJob(); // TODO make fancier?
 
             const scrollY = toRealPx(window.scrollY);
-            const totalHeight = onAnimationFrame(_memoryPtr, _canvas.width, _canvas.height, scrollY, timestamp);
+            const viewSizes = getViewSizes();
+            const totalHeight = onAnimationFrame(
+                _memoryPtr,
+                viewSizes.outer.width, viewSizes.outer.height,
+                viewSizes.inner.width, viewSizes.inner.height,
+                scrollY,
+                timestamp
+            );
             const totalHeightDevice = toDevicePx(totalHeight);
             if (totalHeightDevice !== 0 && _currentHeight !== totalHeightDevice) {
                 _currentHeight = totalHeightDevice;
