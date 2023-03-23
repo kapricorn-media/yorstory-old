@@ -12,5 +12,5 @@ jobs:
   release:
     uses: kapricorn-media/github/.github/workflows/zig-release-package.yaml@main
     with:
-      zig-version: 0.10.0
+      zig-version: 0.10.1
       package-name: yorstory
