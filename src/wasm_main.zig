@@ -32,6 +32,8 @@ const DEPTH_LANDINGBACKGROUND = 0.7;
 const DEPTH_GRIDIMAGE = 0.6;
 const DEPTH_UI_BELOWALL = 1.0;
 
+const COLOR_YELLOW_HOME = m.Vec4.init(234.0 / 255.0, 1.0, 0.0, 1.0);
+
 fn isVerticalAspect(screenSize: m.Vec2) bool
 {
     const aspect = screenSize.x / screenSize.y;
@@ -425,11 +427,10 @@ fn drawCrosshairCorners(pos: m.Vec2, size: m.Vec2, depth: f32, gridSize: f32, de
 
 fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, renderQueue: *render.RenderQueue, allocator: std.mem.Allocator) i32
 {
-    const colorYellowHome = m.Vec4.init(234.0 / 255.0, 1.0, 0.0, 1.0);
     const colorUi = blk: {
         switch (state.pageData) {
             .Home => {
-                break :blk colorYellowHome;
+                break :blk COLOR_YELLOW_HOME;
             },
             .Entry => |entryData| {
                 const pf = portfolio.PORTFOLIO_LIST[entryData.portfolioIndex];
@@ -1090,8 +1091,7 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
 fn drawMobile(state: *State, deltaS: f32, scrollY: f32, screenSize: m.Vec2, renderQueue: *render.RenderQueue, allocator: std.mem.Allocator) i32
 {
     _ = deltaS;
-    _ = scrollY;
-    // _ = allocator;
+    _ = allocator;
 
     const aspect = screenSize.x / screenSize.y;
     const gridSize = getGridSize(screenSize);
@@ -1103,7 +1103,6 @@ fn drawMobile(state: *State, deltaS: f32, scrollY: f32, screenSize: m.Vec2, rend
     // TODO use something more linear
     state.anglesRef = m.lerp(state.anglesRef, anglesTarget, 0.01);
 
-    _ = allocator;
     // if (allFontsLoaded) {
     //     // const anglesRefText = std.fmt.allocPrint(allocator, "x={d:.2}\ny={d:.2}\nz={d:.2}", .{state.anglesRef.x, state.anglesRef.y, state.anglesRef.z}) catch "";
     //     // renderQueue.text2(anglesRefText, m.Vec2.init(50.0, 100.0), 0.0, asset.Font.Text, m.Vec4.one);
@@ -1186,18 +1185,21 @@ fn drawMobile(state: *State, deltaS: f32, scrollY: f32, screenSize: m.Vec2, rend
     const titleFontLoaded = state.assets.getStaticFontData(asset.Font.Title) != null;
     if (titleFontLoaded) {
         const wasText = "We are\nStorytellers.";
-        const wasPos = m.Vec2.init(gridSize * 1.0, y + gridSize * 8.0);
+        const wasPos = m.Vec2.init(
+            -(scrollY - screenSize.y) - gridSize * 6.0,
+            y + gridSize * 8.0
+        );
         // const wasRect = render.text2Rect(&state.assets, wasText, asset.Font.Title) orelse unreachable;
-        renderQueue.text2(wasText, wasPos, DEPTH_UI_GENERIC, asset.Font.Title, m.Vec4.white);
+        renderQueue.text2(wasText, wasPos, DEPTH_UI_GENERIC, asset.Font.Title, COLOR_YELLOW_HOME);
     }
 
     y += screenSize.y;
 
     const textFontLoaded = state.assets.getStaticFontData(asset.Font.Text) != null;
     if (textFontLoaded) {
-        const text = "TODO: Project Cards\nAlso, text should be yellow...";
+        const text = "TODO: Project Cards";
         const textPos = m.Vec2.init(gridSize * 1.0, y + gridSize * 8.0);
-        renderQueue.text2(text, textPos, DEPTH_UI_GENERIC, asset.Font.Text, m.Vec4.white);
+        renderQueue.text2(text, textPos, DEPTH_UI_GENERIC, asset.Font.Text, COLOR_YELLOW_HOME);
     }
 
     // TODO project cards
