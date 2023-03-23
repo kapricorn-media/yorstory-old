@@ -236,42 +236,42 @@ pub const State = struct {
         const helveticaMediumUrl = "/fonts/HelveticaNeueLTCom-Md.ttf";
         const helveticaLightUrl = "/fonts/HelveticaNeueLTCom-Lt.ttf";
 
+        const titleFontSize = gridSize * 4.0;
+        const titleKerning = -gridSize * 0.15;
+        const titleLineHeight = gridSize * 3.6;
+        self.assets.registerStaticFont(asset.Font.Title, helveticaBoldUrl, titleFontSize, 1.0, titleKerning, titleLineHeight) catch |err| {
+            std.log.err("registerStaticFont failed err={}", .{err});
+        };
+
+        const textFontSize = gridSize * 0.4;
+        const textKerning = 0;
+        const textLineHeight = textFontSize * 1.4;
+        self.assets.registerStaticFont(asset.Font.Text, helveticaMediumUrl, textFontSize, 1.0, textKerning, textLineHeight) catch |err| {
+            std.log.err("registerStaticFont failed err={}", .{err});
+        };
+
         if (!isVertical) {
             const categoryFontSize = gridSize * 0.6;
             const categoryKerning = 0;
             const categoryLineHeight = categoryFontSize;
-            self.assets.registerStaticFont(asset.Font.Category, helveticaBoldUrl, categoryFontSize, categoryKerning, categoryLineHeight) catch |err| {
-                std.log.err("registerStaticFont failed err={}", .{err});
-            };
-
-            const titleFontSize = gridSize * 4.0;
-            const titleKerning = -gridSize * 0.15;
-            const titleLineHeight = gridSize * 3.6;
-            self.assets.registerStaticFont(asset.Font.Title, helveticaBoldUrl, titleFontSize, titleKerning, titleLineHeight) catch |err| {
+            self.assets.registerStaticFont(asset.Font.Category, helveticaBoldUrl, categoryFontSize, 1.0, categoryKerning, categoryLineHeight) catch |err| {
                 std.log.err("registerStaticFont failed err={}", .{err});
             };
 
             const subtitleFontSize = gridSize * 1.25;
             const subtitleKerning = -gridSize * 0.05;
             const subtitleLineHeight = subtitleFontSize;
-            self.assets.registerStaticFont(asset.Font.Subtitle, helveticaLightUrl, subtitleFontSize, subtitleKerning, subtitleLineHeight) catch |err| {
+            self.assets.registerStaticFont(asset.Font.Subtitle, helveticaLightUrl, subtitleFontSize, 1.0, subtitleKerning, subtitleLineHeight) catch |err| {
                 std.log.err("registerStaticFont failed err={}", .{err});
             };
 
             const numberFontSize = gridSize * 1.8;
             const numberKerning = 0;
             const numberLineHeight = numberFontSize;
-            self.assets.registerStaticFont(asset.Font.Number, helveticaBoldUrl, numberFontSize, numberKerning, numberLineHeight) catch |err| {
+            self.assets.registerStaticFont(asset.Font.Number, helveticaBoldUrl, numberFontSize, 1.0, numberKerning, numberLineHeight) catch |err| {
                 std.log.err("registerStaticFont failed err={}", .{err});
             };
         }
-
-        const textFontSize = gridSize * 0.4;
-        const textKerning = 0;
-        const textLineHeight = textFontSize * 1.4;
-        self.assets.registerStaticFont(asset.Font.Text, helveticaMediumUrl, textFontSize, textKerning, textLineHeight) catch |err| {
-            std.log.err("registerStaticFont failed err={}", .{err});
-        };
     }
 
     pub fn deinit(self: Self) void
@@ -1104,7 +1104,6 @@ fn drawMobile(state: *State, deltaS: f32, scrollY: f32, screenSize: m.Vec2, rend
     state.anglesRef = m.lerp(state.anglesRef, anglesTarget, 0.01);
 
     _ = allocator;
-    // const allFontsLoaded = state.assets.getStaticFontData(asset.Font.Text) != null;
     // if (allFontsLoaded) {
     //     // const anglesRefText = std.fmt.allocPrint(allocator, "x={d:.2}\ny={d:.2}\nz={d:.2}", .{state.anglesRef.x, state.anglesRef.y, state.anglesRef.z}) catch "";
     //     // renderQueue.text2(anglesRefText, m.Vec2.init(50.0, 100.0), 0.0, asset.Font.Text, m.Vec4.one);
@@ -1173,7 +1172,39 @@ fn drawMobile(state: *State, deltaS: f32, scrollY: f32, screenSize: m.Vec2, rend
         renderQueue.quadTex(iconsPos, iconsSize, DEPTH_UI_GENERIC, 0.0, iconsTex.id, m.Vec4.white);
     }
 
-    return @floatToInt(i32, screenSize.y * 3);
+    var y = screenSize.y;
+
+    // draw moving gradient
+    const gradientColor = m.Vec4.init(86.0 / 255.0, 0.0, 214.0 / 255.0, 1.0);
+    const gradientPos = m.Vec2.init(0.0, y);
+    const gradientSize = m.Vec2.init(screenSize.x, screenSize.y);
+    renderQueue.quadGradient(
+        gradientPos, gradientSize, DEPTH_LANDINGBACKGROUND, 0.0,
+        gradientColor, gradientColor, m.Vec4.black, m.Vec4.black
+    );
+
+    const titleFontLoaded = state.assets.getStaticFontData(asset.Font.Title) != null;
+    if (titleFontLoaded) {
+        const wasText = "We are\nStorytellers.";
+        const wasPos = m.Vec2.init(gridSize * 1.0, y + gridSize * 8.0);
+        // const wasRect = render.text2Rect(&state.assets, wasText, asset.Font.Title) orelse unreachable;
+        renderQueue.text2(wasText, wasPos, DEPTH_UI_GENERIC, asset.Font.Title, m.Vec4.white);
+    }
+
+    y += screenSize.y;
+
+    const textFontLoaded = state.assets.getStaticFontData(asset.Font.Text) != null;
+    if (textFontLoaded) {
+        const text = "TODO: Project Cards\nAlso, text should be yellow...";
+        const textPos = m.Vec2.init(gridSize * 1.0, y + gridSize * 8.0);
+        renderQueue.text2(text, textPos, DEPTH_UI_GENERIC, asset.Font.Text, m.Vec4.white);
+    }
+
+    // TODO project cards
+
+    y += screenSize.y;
+
+    return @floatToInt(i32, y);
 }
 
 export fn onAnimationFrame(memory: *wasm_app.Memory, width: c_int, height: c_int, scrollY: c_int, timestampMs: c_int) c_int

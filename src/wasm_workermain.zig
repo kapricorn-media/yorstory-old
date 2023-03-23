@@ -13,9 +13,9 @@ const stb = @cImport({
 pub const log = wasm_core.log;
 usingnamespace wasm_core;
 
-fn loadFontDataInternal(atlasSize: c_int, fontDataLen: c_uint, fontSize: f32) !void
+fn loadFontDataInternal(atlasSize: c_int, fontDataLen: c_uint, fontSize: f32, scale: f32) !void
 {
-    std.log.info("loadFontData atlasSize={} fontSize={}", .{atlasSize, fontSize});
+    std.log.info("loadFontData atlasSize={} fontSize={} scale={}", .{atlasSize, fontSize, scale});
 
     var arenaAllocator = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arenaAllocator.deinit();
@@ -27,7 +27,7 @@ fn loadFontDataInternal(atlasSize: c_int, fontDataLen: c_uint, fontSize: f32) !v
     }
 
     var fontData = try allocator.create(wasm_asset.FontLoadData);
-    const pixelBytes = try fontData.load(@intCast(usize, atlasSize), fontDataBuf, fontSize, allocator);
+    const pixelBytes = try fontData.load(@intCast(usize, atlasSize), fontDataBuf, fontSize, scale, allocator);
 
     if (wasm_bindings.addReturnValueBuf(&pixelBytes[0], pixelBytes.len) != 1) {
         return error.AddReturnValue;
@@ -39,9 +39,9 @@ fn loadFontDataInternal(atlasSize: c_int, fontDataLen: c_uint, fontSize: f32) !v
 }
 
 // Returns 1 on success, 0 on failure
-export fn loadFontData(atlasSize: c_int, fontDataLen: c_uint, fontSize: f32) c_int
+export fn loadFontData(atlasSize: c_int, fontDataLen: c_uint, fontSize: f32, scale: f32) c_int
 {
-    loadFontDataInternal(atlasSize, fontDataLen, fontSize) catch |err| {
+    loadFontDataInternal(atlasSize, fontDataLen, fontSize, scale) catch |err| {
         std.log.err("loadFontData failed err={}", .{err});
         return 0;
     };

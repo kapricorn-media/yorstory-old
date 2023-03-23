@@ -6,6 +6,7 @@ attribute vec2 a_posPixels;
 attribute vec2 a_sizePixels;
 attribute vec2 a_uvOffset;
 
+uniform float u_atlasScale;
 uniform vec2 u_screenSize;
 uniform float u_depth;
 
@@ -20,7 +21,7 @@ vec2 posPixelsToNdc(vec2 pos, vec2 screenSize)
 
 void main()
 {
-    v_uv = a_pos * (a_sizePixels / ATLAS_SIZE) + a_uvOffset;
+    v_uv = a_pos * (a_sizePixels / (ATLAS_SIZE * u_atlasScale)) + a_uvOffset;
 
     vec2 pixelPos = a_pos * a_sizePixels + a_posPixels;
     gl_Position = vec4(posPixelsToNdc(pixelPos, u_screenSize), u_depth, 1.0);

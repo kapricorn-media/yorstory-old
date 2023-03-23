@@ -260,7 +260,7 @@ function loadTexture(textureId, imgUrlPtr, imgUrlLen, wrap, filter) {
     });
 }
 
-function loadFontDataJs(fontUrlPtr, fontUrlLen, fontSize, atlasSize)
+function loadFontDataJs(fontUrlPtr, fontUrlLen, fontSize, scale, atlasSize)
 {
     const fontUrl = readCharStr(fontUrlPtr, fontUrlLen);
 
@@ -288,7 +288,7 @@ function loadFontDataJs(fontUrlPtr, fontUrlLen, fontSize, atlasSize)
         }
 
         const worker = new Worker("/js/wasm_worker.js");
-        worker.postMessage(["/worker.wasm", "loadFontData", atlasSize, data, fontSize]);
+        worker.postMessage(["/worker.wasm", "loadFontData", atlasSize, data, fontSize, scale]);
         worker.onmessage = function(e) {
             worker.terminate();
 

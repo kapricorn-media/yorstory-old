@@ -44,13 +44,15 @@ pub const FontCharData = struct {
 
 pub const FontLoadData = struct {
     size: f32,
+    scale: f32,
     charData: [256]FontCharData,
 
     const Self = @This();
 
-    pub fn load(self: *Self, atlasSize: usize, fontFileData: []const u8, size: f32, allocator: std.mem.Allocator) ![]const u8
+    pub fn load(self: *Self, atlasSize: usize, fontFileData: []const u8, size: f32, scale: f32, allocator: std.mem.Allocator) ![]const u8
     {
         self.size = size;
+        self.scale = scale;
 
         const width = atlasSize;
         const height = atlasSize;
@@ -64,7 +66,7 @@ pub const FontLoadData = struct {
         stb.stbtt_PackSetOversampling(&context, oversampleN, oversampleN);
 
         var charData = try allocator.alloc(stb.stbtt_packedchar, self.charData.len);
-        if (stb.stbtt_PackFontRange(&context, &fontFileData[0], 0, size, 0, @intCast(c_int, charData.len), &charData[0]) != 1) {
+        if (stb.stbtt_PackFontRange(&context, &fontFileData[0], 0, size / scale, 0, @intCast(c_int, charData.len), &charData[0]) != 1) {
             return error.stbtt_PackFontRange;
         }
 
@@ -91,20 +93,22 @@ pub const FontData = struct {
     loaded: bool,
     textureId: c_uint,
     size: f32,
+    scale: f32,
     kerning: f32,
     lineHeight: f32,
     charData: [256]FontCharData,
 
     const Self = @This();
 
-    pub fn load(self: *Self, fontUrl: []const u8, size: f32, kerning: f32, lineHeight: f32) !void
+    pub fn load(self: *Self, fontUrl: []const u8, size: f32, scale: f32, kerning: f32, lineHeight: f32) !void
     {
         const atlasSize = 4096;
         if (self.loaded) {
             self.loaded = false;
         }
-        self.textureId = w.loadFontDataJs(&fontUrl[0], fontUrl.len, size, atlasSize);
+        self.textureId = w.loadFontDataJs(&fontUrl[0], fontUrl.len, size, scale, atlasSize);
         self.size = size;
+        self.scale = scale;
         self.kerning = kerning;
         self.lineHeight = lineHeight;
     }
@@ -314,9 +318,15 @@ pub fn Assets(comptime StaticTextureEnum: type, comptime maxDynamicTextures: usi
             }
         }
 
-        pub fn registerStaticFont(self: *Self, font: StaticFontEnum, fontUrl: []const u8, size: f32, kerning: f32, lineHeight: f32) !void
+        pub fn registerStaticFont(self: *Self, font: StaticFontEnum, fontUrl: []const u8, size: f32, scale: f32, kerning: f32, lineHeight: f32) !void
         {
-            try self.staticFonts[@enumToInt(font)].load(fontUrl, size, kerning, lineHeight);
+            // TODO auto-scale to fit in font atlas
+            const maxSize = 256.0;
+            var newScale = scale;
+            while ((size / newScale) >= maxSize) {
+                newScale *= 2.0;
+            }
+            try self.staticFonts[@enumToInt(font)].load(fontUrl, size, newScale, kerning, lineHeight);
         }
 
         pub fn getStaticFontData(self: *const Self, font: StaticFontEnum) ?*const FontData

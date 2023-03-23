@@ -434,6 +434,7 @@ const TextState = struct {
     sizePixelsAttrLoc: c_int,
     uvOffsetAttrLoc: c_int,
 
+    atlasScaleUniLoc: c_int,
     screenSizeUniLoc: c_int,
     depthUniLoc: c_int,
     samplerUniLoc: c_int,
@@ -482,6 +483,7 @@ const TextState = struct {
             .sizePixelsAttrLoc = try getAttributeLocation(programId, "a_sizePixels"),
             .uvOffsetAttrLoc = try getAttributeLocation(programId, "a_uvOffset"),
 
+            .atlasScaleUniLoc = try getUniformLocation(programId, "u_atlasScale"),
             .screenSizeUniLoc = try getUniformLocation(programId, "u_screenSize"),
             .depthUniLoc = try getUniformLocation(programId, "u_depth"),
             .samplerUniLoc = try getUniformLocation(programId, "u_sampler"),
@@ -794,8 +796,8 @@ pub const RenderQueue = struct
                     pos.x = e.baselineLeft.x;
                 } else {
                     const charData = fontData.charData[c];
-                    buffer[i] = m.Vec2.add(pos, charData.offset);
-                    pos.x += charData.advanceX + fontData.kerning; // TODO nah
+                    buffer[i] = m.Vec2.add(pos, m.multScalar(charData.offset, fontData.scale));
+                    pos.x += charData.advanceX * fontData.scale + fontData.kerning; // TODO nah
                 }
             }
             w.glEnableVertexAttribArray(@intCast(c_uint, renderState.textState.posPixelsAttrLoc));
@@ -809,7 +811,7 @@ pub const RenderQueue = struct
                     buffer[i] = m.Vec2.zero;
                 } else {
                     const charData = fontData.charData[c];
-                    buffer[i] = charData.size;
+                    buffer[i] = m.multScalar(charData.size, fontData.scale);
                 }
             }
             w.glEnableVertexAttribArray(@intCast(c_uint, renderState.textState.sizePixelsAttrLoc));
@@ -832,6 +834,7 @@ pub const RenderQueue = struct
             w.glVertexAttribPointer(@intCast(c_uint, renderState.textState.uvOffsetAttrLoc), 2, w.GL_f32, 0, 0, 0);
             w.vertexAttribDivisorANGLE(renderState.textState.uvOffsetAttrLoc, 1);
 
+            w.glUniform1fv(renderState.textState.atlasScaleUniLoc, fontData.scale);
             w.glUniform1fv(renderState.textState.depthUniLoc, e.depth);
             w.glUniform4fv(renderState.textState.colorUniLoc, e.color.x, e.color.y, e.color.z, e.color.w);
 
