@@ -43,7 +43,7 @@ fn isVerticalAspect(screenSize: m.Vec2) bool
 fn getGridSize(screenSize: m.Vec2) f32
 {
     if (isVerticalAspect(screenSize)) {
-        return std.math.round(80.0 / 1920.0 * screenSize.y);
+        return std.math.round(80.0 / 1080.0 * screenSize.x);
     } else {
         return std.math.round(gridRefSize / refSize.y * screenSize.y);
     }
@@ -238,16 +238,26 @@ pub const State = struct {
         const helveticaMediumUrl = "/fonts/HelveticaNeueLTCom-Md.ttf";
         const helveticaLightUrl = "/fonts/HelveticaNeueLTCom-Lt.ttf";
 
-        const titleFontSize = gridSize * 4.0;
-        const titleKerning = -gridSize * 0.15;
-        const titleLineHeight = gridSize * 3.6;
+        var titleFontSize = gridSize * 4.0;
+        const titleKerning = if (isVertical) -gridSize * 0.12 else -gridSize * 0.15;
+        var titleLineHeight = gridSize * 3.6;
+        if (isVertical) {
+            const titleMobileFactor = 0.56;
+            titleFontSize *= titleMobileFactor;
+            titleLineHeight *= titleMobileFactor;
+        }
         self.assets.registerStaticFont(asset.Font.Title, helveticaBoldUrl, titleFontSize, 1.0, titleKerning, titleLineHeight) catch |err| {
             std.log.err("registerStaticFont failed err={}", .{err});
         };
 
-        const textFontSize = gridSize * 0.4;
+        var textFontSize = gridSize * 0.4;
         const textKerning = 0;
-        const textLineHeight = textFontSize * 1.4;
+        var textLineHeight = textFontSize * 1.2;
+        if (isVertical) {
+            const textMobileFactor = 1.1;
+            textFontSize *= textMobileFactor;
+            textLineHeight *= textMobileFactor;
+        }
         self.assets.registerStaticFont(asset.Font.Text, helveticaMediumUrl, textFontSize, 1.0, textKerning, textLineHeight) catch |err| {
             std.log.err("registerStaticFont failed err={}", .{err});
         };
@@ -1091,6 +1101,7 @@ fn drawDesktop(state: *State, deltaMs: i32, scrollYF: f32, screenSizeF: m.Vec2, 
 fn drawMobile(state: *State, deltaS: f32, scrollY: f32, screenSize: m.Vec2, renderQueue: *render.RenderQueue, allocator: std.mem.Allocator) i32
 {
     _ = deltaS;
+    _ = scrollY;
     _ = allocator;
 
     const aspect = screenSize.x / screenSize.y;
@@ -1102,6 +1113,18 @@ fn drawMobile(state: *State, deltaS: f32, scrollY: f32, screenSize: m.Vec2, rend
     const anglesTarget = state.deviceState.angles;
     // TODO use something more linear
     state.anglesRef = m.lerp(state.anglesRef, anglesTarget, 0.01);
+
+    const fontsRequired = [_]asset.Font {
+        asset.Font.Title,
+        asset.Font.Text,
+    };
+    for (fontsRequired) |font| {
+        // TODO display loading screen?
+        // We can't draw/layout page until all fonts are ready.
+        if (state.assets.getStaticFontData(font) == null) {
+            return @floatToInt(i32, screenSize.y);
+        }
+    }
 
     // if (allFontsLoaded) {
     //     // const anglesRefText = std.fmt.allocPrint(allocator, "x={d:.2}\ny={d:.2}\nz={d:.2}", .{state.anglesRef.x, state.anglesRef.y, state.anglesRef.z}) catch "";
@@ -1117,6 +1140,8 @@ fn drawMobile(state: *State, deltaS: f32, scrollY: f32, screenSize: m.Vec2, rend
     //     const relativeFrontText = std.fmt.allocPrint(allocator, "relative front:\nx={d:.2}\ny={d:.2}\nz={d:.2}", .{relativeFront.x, relativeFront.y, relativeFront.z}) catch "";
     //     renderQueue.text2(relativeFrontText, m.Vec2.init(50.0, 600.0), 0.0, asset.Font.Text, m.Vec4.one);
     // }
+
+    // ==== FIRST FRAME: LANDING ====
 
     const backgroundTex = state.assets.getStaticTextureData(asset.Texture.MobileBackground);
     if (backgroundTex.loaded()) {
@@ -1173,38 +1198,77 @@ fn drawMobile(state: *State, deltaS: f32, scrollY: f32, screenSize: m.Vec2, rend
 
     var y = screenSize.y;
 
-    // draw moving gradient
+    // ==== SECOND FRAME: WE ARE STORYTELLERS ====
+
+    // slightly offset from the crosshair (aligned with the circle)
+    const sideMargin = gridSize * 1.0;
+
+    var yWas = y + gridSize * 8.0;
+    const wasText = "We are\nStorytellers";
+    const wasPos = m.Vec2.init(sideMargin, yWas);
+    const wasRect = render.text2Rect(&state.assets, wasText, asset.Font.Title) orelse unreachable;
+    renderQueue.text2(wasText, wasPos, DEPTH_UI_GENERIC, asset.Font.Title, COLOR_YELLOW_HOME);
+    std.log.info("{} | {}", .{wasRect, wasRect.size()});
+    yWas += wasRect.size().y;
+
+    // TODO what's happening here? why don't I need this extra spacing?
+    // yWas += gridSize * 2.0;
+    const text1 = "Yorstory is a creative development\nstudio specializing in sequential\nart.";
+    const text1Pos = m.Vec2.init(sideMargin, yWas);
+    renderQueue.text2(text1, text1Pos, DEPTH_UI_GENERIC, asset.Font.Text, COLOR_YELLOW_HOME);
+    const text1Rect = render.text2Rect(&state.assets, text1, asset.Font.Text) orelse unreachable;
+    yWas += text1Rect.size().y;
+
+    yWas += gridSize * 1.0;
+    const text2 = "We are storytellers with over\ntwenty years of experience in the\nTelevision, Film, and Video Game\nindustries.";
+    const text2Pos = m.Vec2.init(sideMargin, yWas);
+    renderQueue.text2(text2, text2Pos, DEPTH_UI_GENERIC, asset.Font.Text, COLOR_YELLOW_HOME);
+    const text2Rect = render.text2Rect(&state.assets, text2, asset.Font.Text) orelse unreachable;
+    yWas += text2Rect.size().y;
+
+    y += screenSize.y;
+
+    // ==== THIRD FRAME: PROJECTS ====
+
+    var yProjects = y + gridSize * 1.0;
+    for (portfolio.PORTFOLIO_LIST) |pf| {
+        const coverAspect = 1.74;
+        const coverPos = m.Vec2.init(sideMargin, yProjects);
+        const coverWidth = screenSize.x - sideMargin * 2.0;
+        const coverSize = m.Vec2.init(coverWidth, coverWidth / coverAspect);
+        yProjects += coverSize.y;
+        if (state.assets.getTextureData(.{.DynamicUrl = pf.cover})) |tex| {
+            if (tex.loaded()) {
+                const cornerRadius = 0;
+                renderQueue.quadTex(
+                    coverPos, coverSize, DEPTH_GRIDIMAGE, cornerRadius, tex.id, m.Vec4.white
+                );
+            }
+        } else {
+            _ = state.assets.register(.{ .DynamicUrl = pf.cover},
+                pf.cover, defaultTextureWrap, defaultTextureFilter, 9
+            ) catch |err| {
+                std.log.err("failed to register {s}, err {}", .{pf.cover, err});
+                return 0;
+            };
+        }
+
+        yProjects += gridSize * 1.0;
+        const coverTextPos = m.Vec2.init(sideMargin, yProjects);
+        renderQueue.text2(pf.title, coverTextPos, DEPTH_UI_GENERIC, asset.Font.Text, COLOR_YELLOW_HOME);
+        yProjects += gridSize * 1.5;
+    }
+
+    y = yProjects;
+
+    // draw background gradient
     const gradientColor = m.Vec4.init(86.0 / 255.0, 0.0, 214.0 / 255.0, 1.0);
-    const gradientPos = m.Vec2.init(0.0, y);
-    const gradientSize = m.Vec2.init(screenSize.x, screenSize.y);
+    const gradientPos = m.Vec2.init(0.0, screenSize.y);
+    const gradientSize = m.Vec2.init(screenSize.x, y - screenSize.y);
     renderQueue.quadGradient(
         gradientPos, gradientSize, DEPTH_LANDINGBACKGROUND, 0.0,
         gradientColor, gradientColor, m.Vec4.black, m.Vec4.black
     );
-
-    const titleFontLoaded = state.assets.getStaticFontData(asset.Font.Title) != null;
-    if (titleFontLoaded) {
-        const wasText = "We are\nStorytellers.";
-        const wasPos = m.Vec2.init(
-            -(scrollY - screenSize.y) - gridSize * 6.0,
-            y + gridSize * 8.0
-        );
-        // const wasRect = render.text2Rect(&state.assets, wasText, asset.Font.Title) orelse unreachable;
-        renderQueue.text2(wasText, wasPos, DEPTH_UI_GENERIC, asset.Font.Title, COLOR_YELLOW_HOME);
-    }
-
-    y += screenSize.y;
-
-    const textFontLoaded = state.assets.getStaticFontData(asset.Font.Text) != null;
-    if (textFontLoaded) {
-        const text = "TODO: Project Cards";
-        const textPos = m.Vec2.init(gridSize * 1.0, y + gridSize * 8.0);
-        renderQueue.text2(text, textPos, DEPTH_UI_GENERIC, asset.Font.Text, COLOR_YELLOW_HOME);
-    }
-
-    // TODO project cards
-
-    y += screenSize.y;
 
     return @floatToInt(i32, y);
 }
