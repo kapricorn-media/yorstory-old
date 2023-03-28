@@ -18,9 +18,7 @@ pub fn log(
 
 export fn stb_zig_malloc(size: usize, userData: ?*anyopaque) ?*anyopaque
 {
-    _ = userData;
-
-    var allocator = std.heap.page_allocator;
+    var allocator = @ptrCast(*std.mem.Allocator, @alignCast(@alignOf(*std.mem.Allocator), userData));
     const result = allocator.alloc(u8, size) catch |err| {
         std.log.err("stb_zig_malloc failed with err={} for size={}", .{err, size});
         return null;
@@ -31,7 +29,7 @@ export fn stb_zig_malloc(size: usize, userData: ?*anyopaque) ?*anyopaque
 export fn stb_zig_free(ptr: ?*anyopaque, userData: ?*anyopaque) void
 {
     _ = ptr; _ = userData;
-    // no size = no free. yolo!
+    // no free, yolo!
 }
 
 export fn stb_zig_assert(expression: c_int) void

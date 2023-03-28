@@ -1216,7 +1216,6 @@ fn drawMobile(state: *State, deltaS: f32, scrollY: f32, screenSize: m.Vec2, rend
     const wasPos = m.Vec2.init(sideMargin, yWas);
     const wasRect = render.text2Rect(&state.assets, wasText, asset.Font.Title) orelse unreachable;
     renderQueue.text2(wasText, wasPos, DEPTH_UI_GENERIC, asset.Font.Title, COLOR_YELLOW_HOME);
-    std.log.info("{} | {}", .{wasRect, wasRect.size()});
     yWas += wasRect.size().y;
 
     // TODO what's happening here? why don't I need this extra spacing?
