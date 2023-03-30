@@ -51,6 +51,10 @@ pub const FontLoadData = struct {
 
     pub fn load(self: *Self, atlasSize: usize, fontFileData: []const u8, size: f32, scale: f32, allocator: std.mem.Allocator) ![]const u8
     {
+        var tempArena = std.heap.ArenaAllocator.init(allocator);
+        defer tempArena.deinit();
+        const tempAllocator = tempArena.allocator();
+
         self.size = size;
         self.scale = scale;
 
@@ -59,13 +63,14 @@ pub const FontLoadData = struct {
         var pixelBytes = try allocator.alloc(u8, width * height);
         std.mem.set(u8, pixelBytes, 0);
         var context: stb.stbtt_pack_context = undefined;
-        if (stb.stbtt_PackBegin(&context, &pixelBytes[0], @intCast(c_int, width), @intCast(c_int, height), @intCast(c_int, width), 1, null) != 1) {
+        const constCasted = @intToPtr(*std.mem.Allocator, @ptrToInt(&tempAllocator)); // TODO hacky
+        if (stb.stbtt_PackBegin(&context, &pixelBytes[0], @intCast(c_int, width), @intCast(c_int, height), @intCast(c_int, width), 1, constCasted) != 1) {
             return error.stbtt_PackBegin;
         }
         const oversampleN = 1;
         stb.stbtt_PackSetOversampling(&context, oversampleN, oversampleN);
 
-        var charData = try allocator.alloc(stb.stbtt_packedchar, self.charData.len);
+        var charData = try tempAllocator.alloc(stb.stbtt_packedchar, self.charData.len);
         if (stb.stbtt_PackFontRange(&context, &fontFileData[0], 0, size / scale, 0, @intCast(c_int, charData.len), &charData[0]) != 1) {
             return error.stbtt_PackFontRange;
         }

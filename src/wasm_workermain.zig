@@ -18,7 +18,7 @@ fn loadFontDataInternal(atlasSize: c_int, fontDataLen: c_uint, fontSize: f32, sc
     std.log.info("loadFontData atlasSize={} fontSize={} scale={}", .{atlasSize, fontSize, scale});
 
     var arenaAllocator = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-    defer arenaAllocator.deinit();
+    // defer arenaAllocator.deinit();
     const allocator = arenaAllocator.allocator();
 
     var fontDataBuf = try allocator.alloc(u8, fontDataLen);

@@ -1,4 +1,5 @@
 const std = @import("std");
+const builtin = @import("builtin");
 
 const asset = @import("asset.zig");
 const input = @import("wasm_input.zig");
@@ -16,6 +17,13 @@ const ww = @import("wasm.zig");
 pub const log = wasm_core.log;
 pub usingnamespace wasm_app;
 usingnamespace wasm_core;
+
+pub const log_level: std.log.Level = switch (builtin.mode) {
+    .Debug => .debug,
+    .ReleaseSafe => .info,
+    .ReleaseFast => .info,
+    .ReleaseSmall => .info,
+};
 
 const defaultTextureWrap = w.GL_CLAMP_TO_EDGE;
 const defaultTextureFilter = w.GL_LINEAR;
