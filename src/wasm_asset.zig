@@ -70,7 +70,7 @@ pub const FontLoadData = struct {
         const oversampleN = 1;
         stb.stbtt_PackSetOversampling(&context, oversampleN, oversampleN);
 
-        var charData = try allocator.alloc(stb.stbtt_packedchar, self.charData.len);
+        var charData = try tempAllocator.alloc(stb.stbtt_packedchar, self.charData.len);
         if (stb.stbtt_PackFontRange(&context, &fontFileData[0], 0, size / scale, 0, @intCast(c_int, charData.len), &charData[0]) != 1) {
             return error.stbtt_PackFontRange;
         }
