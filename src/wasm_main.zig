@@ -20,8 +20,8 @@ usingnamespace wasm_core;
 const defaultTextureWrap = w.GL_CLAMP_TO_EDGE;
 const defaultTextureFilter = w.GL_LINEAR;
 
-const refSize = m.Vec2.init(3840, 2000);
-const gridRefSize = 74;
+const refSizeDesktop = m.Vec2.init(3840, 2000);
+const refSizeMobile = m.Vec2.init(1080, 1920);
 
 const DEPTH_UI_ABOVEALL = 0.0;
 const DEPTH_UI_OVER2 = 0.2;
@@ -42,10 +42,22 @@ fn isVerticalAspect(screenSize: m.Vec2) bool
 
 fn getGridSize(screenSize: m.Vec2) f32
 {
+    const gridRefSize = 80;
     if (isVerticalAspect(screenSize)) {
-        return std.math.round(80.0 / 1080.0 * screenSize.x);
+        return std.math.round(gridRefSize / refSizeMobile.x * screenSize.x);
     } else {
-        return std.math.round(gridRefSize / refSize.y * screenSize.y);
+        return std.math.round(gridRefSize / refSizeDesktop.y * screenSize.y);
+    }
+}
+
+fn fromRefFontSizePx(refFontSizePx: f32, screenSize: m.Vec2) f32
+{
+    if (isVerticalAspect(screenSize)) {
+        const magicFactor = 1.0;
+        return refFontSizePx / refSizeMobile.x * screenSize.x * magicFactor;
+    } else {
+        const magicFactor = 1.0;
+        return refFontSizePx / refSizeDesktop.y * screenSize.y * magicFactor;
     }
 }
 
@@ -238,26 +250,16 @@ pub const State = struct {
         const helveticaMediumUrl = "/fonts/HelveticaNeueLTCom-Md.ttf";
         const helveticaLightUrl = "/fonts/HelveticaNeueLTCom-Lt.ttf";
 
-        var titleFontSize = gridSize * 4.0;
+        const titleFontSize = if (isVertical) fromRefFontSizePx(180, screenSizeF) else gridSize * 4.0;
         const titleKerning = if (isVertical) -gridSize * 0.12 else -gridSize * 0.15;
-        var titleLineHeight = gridSize * 3.6;
-        if (isVertical) {
-            const titleMobileFactor = 0.56;
-            titleFontSize *= titleMobileFactor;
-            titleLineHeight *= titleMobileFactor;
-        }
+        const titleLineHeight = titleFontSize * 0.92;
         self.assets.registerStaticFont(asset.Font.Title, helveticaBoldUrl, titleFontSize, 1.0, titleKerning, titleLineHeight) catch |err| {
             std.log.err("registerStaticFont failed err={}", .{err});
         };
 
-        var textFontSize = gridSize * 0.4;
+        const textFontSize = if (isVertical) fromRefFontSizePx(38, screenSizeF) else gridSize * 0.4;
         const textKerning = 0;
-        var textLineHeight = textFontSize * 1.2;
-        if (isVertical) {
-            const textMobileFactor = 1.1;
-            textFontSize *= textMobileFactor;
-            textLineHeight *= textMobileFactor;
-        }
+        const textLineHeight = if (isVertical) fromRefFontSizePx(48, screenSizeF) else textFontSize * 1.2;
         self.assets.registerStaticFont(asset.Font.Text, helveticaMediumUrl, textFontSize, 1.0, textKerning, textLineHeight) catch |err| {
             std.log.err("registerStaticFont failed err={}", .{err});
         };
@@ -281,6 +283,13 @@ pub const State = struct {
             const numberKerning = 0;
             const numberLineHeight = numberFontSize;
             self.assets.registerStaticFont(asset.Font.Number, helveticaBoldUrl, numberFontSize, 1.0, numberKerning, numberLineHeight) catch |err| {
+                std.log.err("registerStaticFont failed err={}", .{err});
+            };
+        } else {
+            const subtitleFontSize = fromRefFontSizePx(18, screenSizeF);
+            const subtitleKerning = 0.0;
+            const subtitleLineHeight = fromRefFontSizePx(26, screenSizeF);
+            self.assets.registerStaticFont(asset.Font.Subtitle, helveticaMediumUrl, subtitleFontSize, 1.0, subtitleKerning, subtitleLineHeight) catch |err| {
                 std.log.err("registerStaticFont failed err={}", .{err});
             };
         }
@@ -358,7 +367,7 @@ fn drawImageGrid(images: []const GridImage, indexOffset: usize, itemsPerRow: usi
 fn getTextureScaledSize(size: m.Vec2i, screenSize: m.Vec2) m.Vec2
 {
     const sizeF = m.Vec2.initFromVec2i(size);
-    const scaleFactor = screenSize.y / refSize.y;
+    const scaleFactor = screenSize.y / refSizeDesktop.y;
     return m.Vec2.multScalar(sizeF, scaleFactor);
 }
 
@@ -1208,7 +1217,6 @@ fn drawMobile(state: *State, deltaS: f32, scrollY: f32, screenSize: m.Vec2, rend
     const wasPos = m.Vec2.init(sideMargin, yWas);
     const wasRect = render.text2Rect(&state.assets, wasText, asset.Font.Title) orelse unreachable;
     renderQueue.text2(wasText, wasPos, DEPTH_UI_GENERIC, asset.Font.Title, COLOR_YELLOW_HOME);
-    std.log.info("{} | {}", .{wasRect, wasRect.size()});
     yWas += wasRect.size().y;
 
     // TODO what's happening here? why don't I need this extra spacing?
