@@ -18,8 +18,9 @@ pub fn log(
 
 export fn stb_zig_malloc(size: usize, userData: ?*anyopaque) ?*anyopaque
 {
+    const alignment = 8; // does malloc always align to 4 or 8 bytes? I didn't know this...
     var allocator = @ptrCast(*std.mem.Allocator, @alignCast(@alignOf(*std.mem.Allocator), userData));
-    const result = allocator.alloc(u8, size) catch |err| {
+    const result = allocator.alignedAlloc(u8, alignment, size) catch |err| {
         std.log.err("stb_zig_malloc failed with err={} for size={}", .{err, size});
         return null;
     };
