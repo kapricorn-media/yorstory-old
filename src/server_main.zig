@@ -1,18 +1,22 @@
 const builtin = @import("builtin");
 const std = @import("std");
 
+const app = @import("zigkm-common-app");
+const bigdata = app.bigdata;
 const http = @import("http-common");
 const server = @import("http-server");
 
-const config = @import("config");
-
-const bigdata = @import("bigdata.zig");
-const m = @import("math.zig");
+// const bigdata = @import("bigdata.zig");
+// const m = @import("math.zig");
 const portfolio = @import("portfolio.zig");
+const server_util = @import("server_util.zig");
 
-const WASM_PATH = if (config.DEBUG) "zig-out/yorstory.wasm" else "yorstory.wasm";
-const WASM_PATH_WORKER = if (config.DEBUG) "zig-out/worker.wasm" else "worker.wasm";
+const DEBUG = builtin.mode == .Debug;
+const WASM_PATH = if (DEBUG) "zig-out/server/main.wasm" else "main.wasm";
+// const WASM_PATH_WORKER = if (DEBUG) "zig-out/server/worker.wasm" else "worker.wasm";
 const SERVER_IP = "0.0.0.0";
+
+pub usingnamespace @import("zigkm-common-stb").exports; // for stb linking
 
 pub const log_level: std.log.Level = switch (builtin.mode) {
     .Debug => .debug,
@@ -29,11 +33,9 @@ const ServerState = struct {
     bigdata: []const u8,
     map: std.StringHashMap([]const u8),
 
-    port: u16,
-
     const Self = @This();
 
-    pub fn init(allocator: std.mem.Allocator, port: u16, bigdataPath: []const u8) !Self
+    pub fn init(allocator: std.mem.Allocator, bigdataPath: []const u8) !Self
     {
         const cwd = std.fs.cwd();
         const bigdataFile = try cwd.openFile(bigdataPath, .{});
@@ -44,7 +46,6 @@ const ServerState = struct {
             .allocator = allocator,
             .bigdata = bigdataBytes,
             .map = std.StringHashMap([]const u8).init(allocator),
-            .port = port,
         };
         try bigdata.load(bigdataBytes, &self.map);
         return self;
@@ -99,15 +100,19 @@ fn serverCallback(
                 try server.writeContentLength(writer, data.len);
                 try server.writeEndHeader(writer);
                 try writer.writeAll(data);
-            } else if (std.mem.eql(u8, request.uri, "/yorstory.wasm")) {
+            } else if (std.mem.eql(u8, request.uri, "/main.wasm")) {
                 try server.writeFileResponse(writer, WASM_PATH, allocator);
-            } else if (std.mem.eql(u8, request.uri, "/worker.wasm")) {
-                try server.writeFileResponse(writer, WASM_PATH_WORKER, allocator);
             } else {
                 const uri = if (std.mem.eql(u8, request.uri, "/") or isPortfolioUri) "/wasm.html" else request.uri;
-                if (config.DEBUG) {
+                if (DEBUG) {
                     // For faster iteration
-                    try server.serveStatic(writer, uri, "static", allocator);
+                    // TODO this path can change
+                    server.serveStatic(writer, uri, "deps/zigkm-common/src/app/static", allocator) catch |err| switch (err) {
+                        error.FileNotFound => {
+                            try server.serveStatic(writer, uri, "static", allocator);
+                        },
+                        else => return err,
+                    };
                 } else {
                     const data = state.map.get(uri) orelse {
                         try server.writeCode(writer, ._404);
@@ -145,30 +150,9 @@ fn serverCallbackWrapper(
     };
 }
 
-fn httpRedirectCallback(_: void, request: server.Request, writer: server.Writer) !void
+pub fn main() !void
 {
-    // TODO we don't have an allocator... but it's ok, I guess
-    var buf: [2048]u8 = undefined;
-    const host = http.getHeader(request, "Host") orelse return error.NoHost;
-    const redirectUrl = try std.fmt.bufPrint(&buf, "https://{s}{s}", .{host, request.uriFull});
 
-    try server.writeRedirectResponse(writer, redirectUrl);
-}
-
-fn httpRedirectEntrypoint(allocator: std.mem.Allocator) !void
-{
-    var s = try server.Server(void).init(httpRedirectCallback, {}, null, allocator);
-    const port = 80;
-
-    std.log.info("Listening on {s}:{} (HTTP -> HTTPS redirect)", .{SERVER_IP, port});
-    s.listen(SERVER_IP, port) catch |err| {
-        std.log.err("server listen error {}", .{err});
-        return err;
-    };
-    s.stop();
-}
-
-pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer {
         if (gpa.deinit()) {
@@ -180,71 +164,14 @@ pub fn main() !void {
     const args = try std.process.argsAlloc(allocator);
     defer allocator.free(args);
     if (args.len < 3) {
-        std.log.err("Expected arguments: port datafile [<https-chain-path> <https-key-path>]", .{});
+        std.log.err("Expected arguments: datafile port [<https-chain-path> <https-key-path>]", .{});
         return error.BadArgs;
     }
 
-    const port = try std.fmt.parseUnsigned(u16, args[1], 10);
-    const HttpsArgs = struct {
-        chainPath: []const u8,
-        keyPath: []const u8,
-    };
-    var httpsArgs: ?HttpsArgs = null;
-    if (args.len > 3) {
-        if (args.len != 5) {
-            std.log.err("Expected arguments: port datafile [<https-chain-path> <https-key-path>]", .{});
-            return error.BadArgs;
-        }
-        httpsArgs = HttpsArgs {
-            .chainPath = args[3],
-            .keyPath = args[4],
-        };
-    }
-
-    const dataFile = args[2];
-    var state = try ServerState.init(allocator, port, dataFile);
+    const dataFile = args[1];
+    var state = try ServerState.init(allocator, dataFile);
     defer state.deinit();
 
-    var s: server.Server(*ServerState) = undefined;
-    var httpRedirectThread: ?std.Thread = undefined;
-    {
-        if (httpsArgs) |ha| {
-            const cwd = std.fs.cwd();
-            const chainFile = try cwd.openFile(ha.chainPath, .{});
-            defer chainFile.close();
-            const chainFileData = try chainFile.readToEndAlloc(allocator, 1024 * 1024 * 1024);
-            defer allocator.free(chainFileData);
-
-            const keyFile = try cwd.openFile(ha.keyPath, .{});
-            defer keyFile.close();
-            const keyFileData = try keyFile.readToEndAlloc(allocator, 1024 * 1024 * 1024);
-            defer allocator.free(keyFileData);
-
-            const httpsOptions = server.HttpsOptions {
-                .certChainFileData = chainFileData,
-                .privateKeyFileData = keyFileData,
-            };
-            s = try server.Server(*ServerState).init(
-                serverCallbackWrapper, &state, httpsOptions, allocator
-            );
-            httpRedirectThread = try std.Thread.spawn(.{}, httpRedirectEntrypoint, .{allocator});
-        } else {
-            s = try server.Server(*ServerState).init(
-                serverCallbackWrapper, &state, null, allocator
-            );
-            httpRedirectThread = null;
-        }
-    }
-    defer s.deinit();
-
-    std.log.info("Listening on {s}:{} (HTTPS {})", .{SERVER_IP, port, httpsArgs != null});
-    s.listen(SERVER_IP, port) catch |err| {
-        std.log.err("server listen error {}", .{err});
-        return err;
-    };
-    s.stop();
-
-    if (httpRedirectThread) |t| {
-        t.detach(); // TODO we don't really care for now
-    }
+    const serverArgs = args[2..];
+    try server_util.startFromCmdArgs(SERVER_IP, serverArgs, &state, serverCallbackWrapper, allocator);
 }

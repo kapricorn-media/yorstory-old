@@ -1,3 +1,11 @@
+pub const Font = enum {
+    Title,
+    Subtitle,
+    Text,
+    Number,
+    Category,
+};
+
 pub const Texture = enum {
     DecalTopLeft,
     LoadingGlyphs,
@@ -16,12 +24,4 @@ pub const Texture = enum {
     MobileYorstoryCompany,
 
     StickerMainHome,
-};
-
-pub const Font = enum {
-    Title,
-    Subtitle,
-    Text,
-    Number,
-    Category,
 };
