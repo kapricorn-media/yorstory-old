@@ -186,6 +186,33 @@ pub const PARALLAX_SETS = [_]ParallaxSet {
             ParallaxImage.init("images/parallax/chair/8-map.png", 1.2),
         },
     },
+    .{
+        .bgColor = .{
+            .Color = colorHexToVec4("#000000") catch unreachable,
+        },
+        .images = &[_]ParallaxImage{
+            ParallaxImage.init("/images/parallax/chair/1-bg.png", 0.01),
+            ParallaxImage.init("/images/parallax/chair/2-glow1.png", 0.0),
+            ParallaxImage.init("/images/parallax/chair/3-lamps.png", 0.1),
+            ParallaxImage.init("/images/parallax/chair/4-person-back.png", 0.3),
+            ParallaxImage.init("/images/parallax/chair/5-person-front.png", 0.8),
+            ParallaxImage.init("/images/parallax/chair/6-smoke.png", 0.8),
+            ParallaxImage.init("/images/parallax/chair/7-glow2.png", 0.0),
+            ParallaxImage.init("/images/parallax/chair/8-map.png", 1.2),
+        },
+    },
+    .{
+        .bgColor = .{
+            .Color = colorHexToVec4("#000000") catch unreachable,
+        },
+        .images = &[_]ParallaxImage{
+            ParallaxImage.init("/images/parallax/gow/1-bg.png", 0.0),
+            ParallaxImage.init("/images/parallax/gow/2-mg-guy.png", 0.1),
+            ParallaxImage.init("/images/parallax/gow/3-mg-lady.png", 0.2),
+            ParallaxImage.init("/images/parallax/gow/4-fg.png", 1.0),
+            ParallaxImage.init("/images/parallax/gow/5-lensflare.png", 0.0),
+        },
+    },
 };
 
 pub fn tryLoadAndGetParallaxSet(assets: anytype, index: usize, priority: u32, textureWrap: c_uint, textureFilter: c_uint) ?*const ParallaxSet

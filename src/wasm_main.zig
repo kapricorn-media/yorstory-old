@@ -1094,9 +1094,10 @@ fn drawDesktop(state: *App, deltaMs: u64, scrollYF: f32, screenSizeF: m.Vec2, re
                 contentMarginX,
                 contentHeaderPos.y - contentHeaderRect.min.y + gridSize * 3.2,
             );
+            const contentSubRect = render.text2Rect(&state.assets, pf.contentDescription, asset.Font.Text) orelse unreachable;
             renderQueue.text2(pf.contentDescription, contentSubPos, DEPTH_UI_GENERIC, asset.Font.Text, colorUi);
 
-            yMax = contentSubPos.y + gridSize * 4.0;
+            yMax = contentSubPos.y + contentSubRect.size().y + gridSize * 3.0;
 
             var galleryImages = std.ArrayList(GridImage).init(allocator);
 
@@ -1104,31 +1105,43 @@ fn drawDesktop(state: *App, deltaMs: u64, scrollYF: f32, screenSizeF: m.Vec2, re
             var yGallery = yMax;
             var indexOffset: usize = 0; // TODO eh...
             for (pf.subprojects) |sub, i| {
-                const numberSize = getTextureScaledSize(stickerCircle.size, screenSizeF);
-                const numberPos = m.Vec2.init(
-                    contentMarginX - gridSize * 1.4,
-                    yGallery - gridSize * 2.4,
-                );
-                // TODO number should be on top, but depth sorting is bad
-                if (stickerCircle.loaded()) {
-                    renderQueue.quadTex(
-                        numberPos, numberSize, DEPTH_UI_GENERIC + 0.02, 0, stickerCircle.id, colorRedSticker
+                if (sub.name.len > 0 or sub.description.len > 0) {
+                    const numberSize = getTextureScaledSize(stickerCircle.size, screenSizeF);
+                    const numberPos = m.Vec2.init(
+                        contentMarginX - gridSize * 1.4,
+                        yGallery - gridSize * 2.4,
                     );
+                    // TODO number should be on top, but depth sorting is bad
+                    if (stickerCircle.loaded()) {
+                        renderQueue.quadTex(
+                            numberPos, numberSize, DEPTH_UI_GENERIC + 0.02, 0, stickerCircle.id, colorRedSticker
+                        );
+                    }
+                    const numStr = std.fmt.allocPrint(allocator, "{}", .{i + 1}) catch unreachable;
+                    const numberTextPos = m.Vec2.init(
+                        numberPos.x + numberSize.x * 0.28,
+                        numberPos.y + numberSize.y * 0.75
+                    );
+                    renderQueue.text2(numStr, numberTextPos, DEPTH_UI_GENERIC + 0.01, asset.Font.Number, m.Vec4.black);
+
+// <<<<<<< HEAD
+//                 const subNameRect = app.render.text2Rect(&state.assets, sub.name, asset.Font.Subtitle) orelse unreachable;
+//                 renderQueue.text2(sub.name, m.Vec2.init(x, yGallery), DEPTH_UI_GENERIC, asset.Font.Subtitle, colorUi);
+//                 yGallery += -subNameRect.min.y + gridSize * 2.0;
+
+//                 const subDescriptionRect = app.render.text2Rect(&state.assets, sub.description, asset.Font.Text) orelse unreachable;
+//                 renderQueue.text2(sub.description, m.Vec2.init(x, yGallery), DEPTH_UI_GENERIC, asset.Font.Text, colorUi);
+//                 yGallery += -subDescriptionRect.min.y + gridSize * 2.0;
+// =======
+                    const subNameRect = render.text2Rect(&state.assets, sub.name, asset.Font.Subtitle) orelse unreachable;
+                    renderQueue.text2(sub.name, m.Vec2.init(x, yGallery), DEPTH_UI_GENERIC, asset.Font.Subtitle, colorUi);
+                    yGallery += -subNameRect.min.y + gridSize * 2.0;
+
+                    const subDescriptionRect = render.text2Rect(&state.assets, sub.description, asset.Font.Text) orelse unreachable;
+                    renderQueue.text2(sub.description, m.Vec2.init(x, yGallery), DEPTH_UI_GENERIC, asset.Font.Text, colorUi);
+                    yGallery += -subDescriptionRect.min.y + gridSize * 2.0;
                 }
-                const numStr = std.fmt.allocPrint(allocator, "{}", .{i + 1}) catch unreachable;
-                const numberTextPos = m.Vec2.init(
-                    numberPos.x + numberSize.x * 0.28,
-                    numberPos.y + numberSize.y * 0.75
-                );
-                renderQueue.text2(numStr, numberTextPos, DEPTH_UI_GENERIC + 0.01, asset.Font.Number, m.Vec4.black);
-
-                const subNameRect = app.render.text2Rect(&state.assets, sub.name, asset.Font.Subtitle) orelse unreachable;
-                renderQueue.text2(sub.name, m.Vec2.init(x, yGallery), DEPTH_UI_GENERIC, asset.Font.Subtitle, colorUi);
-                yGallery += -subNameRect.min.y + gridSize * 2.0;
-
-                const subDescriptionRect = app.render.text2Rect(&state.assets, sub.description, asset.Font.Text) orelse unreachable;
-                renderQueue.text2(sub.description, m.Vec2.init(x, yGallery), DEPTH_UI_GENERIC, asset.Font.Text, colorUi);
-                yGallery += -subDescriptionRect.min.y + gridSize * 2.0;
+// >>>>>>> 75f30b94a8b389768f908a4107e3e0a439fbf391
 
                 galleryImages.clearRetainingCapacity();
                 for (sub.images) |img| {
