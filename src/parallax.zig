@@ -192,14 +192,14 @@ pub const PARALLAX_SETS = [_]ParallaxSet {
             .Color = colorHexToVec4("#000000") catch unreachable,
         },
         .images = &[_]ParallaxImage{
-            ParallaxImage.init("/images/parallax/chair/1-bg.png", 0.01),
-            ParallaxImage.init("/images/parallax/chair/2-glow1.png", 0.0),
-            ParallaxImage.init("/images/parallax/chair/3-lamps.png", 0.1),
-            ParallaxImage.init("/images/parallax/chair/4-person-back.png", 0.3),
-            ParallaxImage.init("/images/parallax/chair/5-person-front.png", 0.8),
-            ParallaxImage.init("/images/parallax/chair/6-smoke.png", 0.8),
-            ParallaxImage.init("/images/parallax/chair/7-glow2.png", 0.0),
-            ParallaxImage.init("/images/parallax/chair/8-map.png", 1.2),
+            ParallaxImage.init("images/parallax/chair/1-bg.png", 0.01),
+            ParallaxImage.init("images/parallax/chair/2-glow1.png", 0.0),
+            ParallaxImage.init("images/parallax/chair/3-lamps.png", 0.1),
+            ParallaxImage.init("images/parallax/chair/4-person-back.png", 0.3),
+            ParallaxImage.init("images/parallax/chair/5-person-front.png", 0.8),
+            ParallaxImage.init("images/parallax/chair/6-smoke.png", 0.8),
+            ParallaxImage.init("images/parallax/chair/7-glow2.png", 0.0),
+            ParallaxImage.init("images/parallax/chair/8-map.png", 1.2),
         },
     },
     .{
@@ -207,11 +207,11 @@ pub const PARALLAX_SETS = [_]ParallaxSet {
             .Color = colorHexToVec4("#000000") catch unreachable,
         },
         .images = &[_]ParallaxImage{
-            ParallaxImage.init("/images/parallax/gow/1-bg.png", 0.0),
-            ParallaxImage.init("/images/parallax/gow/2-mg-guy.png", 0.1),
-            ParallaxImage.init("/images/parallax/gow/3-mg-lady.png", 0.2),
-            ParallaxImage.init("/images/parallax/gow/4-fg.png", 1.0),
-            ParallaxImage.init("/images/parallax/gow/5-lensflare.png", 0.0),
+            ParallaxImage.init("images/parallax/gow/1-bg.png", 0.0),
+            ParallaxImage.init("images/parallax/gow/2-mg-guy.png", 0.1),
+            ParallaxImage.init("images/parallax/gow/3-mg-lady.png", 0.2),
+            ParallaxImage.init("images/parallax/gow/4-fg.png", 1.0),
+            ParallaxImage.init("images/parallax/gow/5-lensflare.png", 0.0),
         },
     },
 };
@@ -224,44 +224,17 @@ pub fn tryLoadAndGetParallaxSet(assets: anytype, index: usize, priority: u32, te
 
     var loaded = true;
     for (PARALLAX_SETS[index].images) |parallaxImage| {
-        if (assets.getTextureLoadState(.{.dynamic = parallaxImage.url}) == .free) {
-            loaded = false;
-            _ = priority;
-            assets.loadTexture(.{.dynamic = parallaxImage.url}, &.{
+        const loadState = assets.getTextureLoadState(.{.dynamic = parallaxImage.url});
+        loaded = loaded and loadState == .loaded;
+        if (loadState == .free) {
+            assets.loadTexturePriority(.{.dynamic = parallaxImage.url}, &.{
                 .path = parallaxImage.url,
                 .filter = textureFilter,
                 .wrapMode = textureWrap,
-            }) catch |err| {
+            }, priority) catch |err| {
                 std.log.err("Failed to register {s}, err {}", .{parallaxImage.url, err});
             };
         }
-        // if (assets.getTextureData(.{.dynamic = parallaxImage.url}) == null) {
-        //     loaded = false;
-        //     if (state.assets.getTextureLoadState(.{.dynamic = pf.sticker}) == .free) {
-        //         state.assets.loadTexture(.{.dynamic = pf.sticker}, &.{
-        //             .path = pf.sticker,
-        //             .filter = defaultTextureFilter,
-        //             .wrapMode = defaultTextureWrap,
-        //         }) catch |err| {
-        //             std.log.err("Failed to register {s}, err {}", .{pf.sticker, err});
-        //         };
-        //     }
-        // }
-        // if (assets.getTextureData(.{.dynamic = parallaxImage.url})) |parallaxTexData| {
-        //     loaded = t
-        //     if (!parallaxTexData.loaded()) {
-        //         loaded = false;
-        //         break;
-        //     }
-        // } else {
-        //     loaded = false;
-        //     _ = assets.register(.{ .DynamicUrl = parallaxImage.url },
-        //         parallaxImage.url, textureWrap, textureFilter, priority
-        //     ) catch |err| {
-        //         std.log.err("register texture error {}", .{err});
-        //         break;
-        //     };
-        // }
     }
 
     return if (loaded) &PARALLAX_SETS[index] else null;

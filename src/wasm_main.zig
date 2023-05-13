@@ -9,21 +9,8 @@ pub usingnamespace app.exports;
 pub usingnamespace @import("zigkm-common-stb").exports; // for stb linking
 
 const asset = @import("asset.zig");
-// const input = @import("wasm_input.zig");
-// const m = @import("math.zig");
 const parallax = @import("parallax.zig");
 const portfolio = @import("portfolio.zig");
-// const render = @import("render.zig");
-// const w = @import("wasm_bindings.zig");
-// const wasm_app = @import("wasm_app.zig");
-// const wasm_asset = @import("wasm_asset.zig");
-// const wasm_core = @import("wasm_core.zig");
-// const ww = @import("wasm.zig");
-
-// Set up wasm export functions and logging.
-// pub const log = wasm_core.log;
-// pub usingnamespace wasm_app;
-// usingnamespace wasm_core;
 
 pub const log_level: std.log.Level = switch (builtin.mode) {
     .Debug => .debug,
@@ -37,8 +24,6 @@ const SIZE_TRANSIENT = 32 * 1024 * 1024;
 
 pub const MEMORY_FOOTPRINT = SIZE_PERMANENT + SIZE_TRANSIENT;
 
-// const defaultTextureWrap = w.GL_CLAMP_TO_EDGE;
-// const defaultTextureFilter = w.GL_LINEAR;
 const defaultTextureFilter = app.asset_data.TextureFilter.linear;
 const defaultTextureWrap = app.asset_data.TextureWrapMode.clampToEdge;
 
@@ -87,8 +72,8 @@ fn fromRefFontSizePx(refFontSizePx: f32, screenSize: m.Vec2) f32
 fn updateButton(topLeft: m.Vec2, size: m.Vec2, mouseState: app.input.MouseState, scrollY: f32, mouseHoverGlobal: *bool) bool
 {
     const mousePosF = m.Vec2.initFromVec2i(mouseState.pos);
-    const topLeftScroll = m.Vec2.init(topLeft.x, topLeft.y - scrollY);
-    const buttonRect = m.Rect.init(topLeftScroll, size);
+    const topLeftScroll = m.add(topLeft, m.Vec2.init(0, -scrollY));
+    const buttonRect = m.Rect.initOriginSize(topLeftScroll, size);
     if (m.isInsideRect(mousePosF, buttonRect)) {
         mouseHoverGlobal.* = true;
         for (mouseState.clickEvents[0..mouseState.numClickEvents]) |clickEvent| {
@@ -141,22 +126,15 @@ pub const App = struct {
     inputState: app.input.InputState,
     renderState: app.render.RenderState,
     assets: app.asset.AssetsWithIds(asset.Font, asset.Texture, 256),
-    // fbAllocator: std.heap.FixedBufferAllocator,
 
-    // renderState: render.RenderState,
     fbTexture: c_uint,
     fbDepthRenderbuffer: c_uint,
     fb: c_uint,
-
-    // assets: wasm_asset.Assets(asset.Texture, 256, asset.Font),
 
     pageData: PageData,
     screenSizePrev: m.Vec2usize,
     scrollYPrev: i32,
     timestampMsPrev: u64,
-    // mouseState: input.MouseState,
-    // keyboardState: input.KeyboardState,
-    // deviceState: input.DeviceState,
     activeParallaxSetIndex: usize,
     parallaxTX: f32,
     parallaxIdleTimeMs: u64,
@@ -176,7 +154,6 @@ pub const App = struct {
         }
     }
 
-    // pub fn load(self: *Self, buf: []u8, screenSize: m.Vec2usize) !void
     pub fn load(self: *Self, memory: []u8, screenSize: m.Vec2usize, scale: f32) !void
     {
         std.log.info("App load ({}x{}, {}) ({} MB)", .{screenSize.x, screenSize.y, scale, memory.len / 1024 / 1024});
@@ -222,95 +199,81 @@ pub const App = struct {
         //     "images/LUTs/identity.png", defaultTextureWrap, defaultTextureFilter, 2
         // );
 
-        try self.assets.loadTexture(.{.static = asset.Texture.StickerCircle}, &.{
+        try self.assets.loadTexturePriority(.{.static = .StickerCircle}, &.{
             .path = "images/sticker-circle.png",
             .filter = defaultTextureFilter,
             .wrapMode = defaultTextureWrap,
-            // 2
-        });
-        try self.assets.loadTexture(.{.static = asset.Texture.LoadingGlyphs}, &.{
+        }, 2);
+        try self.assets.loadTexturePriority(.{.static = .LoadingGlyphs}, &.{
             .path = "images/loading-glyphs.png",
             .filter = defaultTextureFilter,
             .wrapMode = defaultTextureWrap,
-            // 2
-        });
-        try self.assets.loadTexture(.{.static = asset.Texture.DecalTopLeft}, &.{
+        }, 2);
+        try self.assets.loadTexturePriority(.{.static = .DecalTopLeft}, &.{
             .path = "images/decal-topleft.png",
             .filter = defaultTextureFilter,
             .wrapMode = defaultTextureWrap,
-            // 2
-        });
+        }, 2);
 
-        try self.assets.loadTexture(.{.static = asset.Texture.StickerShiny}, &.{
+        try self.assets.loadTexturePriority(.{.static = .StickerShiny}, &.{
             .path = "images/sticker-shiny.png",
             .filter = defaultTextureFilter,
             .wrapMode = defaultTextureWrap,
-            // 5
-        });
+        }, 5);
 
         switch (self.pageData) {
             .Home => {
-                try self.assets.loadTexture(.{.static = .LogosAll}, &.{
+                try self.assets.loadTexturePriority(.{.static = .LogosAll}, &.{
                     .path = "images/logos-all.png",
                     .filter = defaultTextureFilter,
                     .wrapMode = defaultTextureWrap,
-                    // 8
-                });
-                try self.assets.loadTexture(.{.static = .ProjectSymbols}, &.{
+                }, 8);
+                try self.assets.loadTexturePriority(.{.static = .ProjectSymbols}, &.{
                     .path = "images/project-symbols.png",
                     .filter = defaultTextureFilter,
                     .wrapMode = defaultTextureWrap,
-                    // 8
-                });
-                try self.assets.loadTexture(.{.static = .StickerMainHome}, &.{
+                }, 8);
+                try self.assets.loadTexturePriority(.{.static = .StickerMainHome}, &.{
                     .path = "images/sticker-main.png",
                     .filter = defaultTextureFilter,
                     .wrapMode = defaultTextureWrap,
-                    // 5
-                });
-                try self.assets.loadTexture(.{.static = .SymbolEye}, &.{
+                }, 5);
+                try self.assets.loadTexturePriority(.{.static = .SymbolEye}, &.{
                     .path = "images/symbol-eye.png",
                     .filter = defaultTextureFilter,
                     .wrapMode = defaultTextureWrap,
-                    // 5
-                });
-                try self.assets.loadTexture(.{.static = .YorstoryCompany}, &.{
+                }, 5);
+                try self.assets.loadTexturePriority(.{.static = .YorstoryCompany}, &.{
                     .path = "images/a-yorstory-company.png",
                     .filter = defaultTextureFilter,
                     .wrapMode = defaultTextureWrap,
-                    // 5
-                });
+                }, 5);
 
-                try self.assets.loadTexture(.{.static = asset.Texture.MobileBackground}, &.{
+                try self.assets.loadTexturePriority(.{.static = .MobileBackground}, &.{
                     .path = "images/mobile/background.png",
                     .filter = defaultTextureFilter,
                     .wrapMode = defaultTextureWrap,
-                    // 5
-                });
-                try self.assets.loadTexture(.{.static = asset.Texture.MobileCrosshair}, &.{
+                }, 5);
+                try self.assets.loadTexturePriority(.{.static = .MobileCrosshair}, &.{
                     .path = "images/mobile/crosshair.png",
                     .filter = defaultTextureFilter,
                     .wrapMode = defaultTextureWrap,
-                    // 5
-                });
-                try self.assets.loadTexture(.{.static = asset.Texture.MobileIcons}, &.{
+                }, 5);
+                try self.assets.loadTexturePriority(.{.static = .MobileIcons}, &.{
                     .path = "images/mobile/icons.png",
                     .filter = defaultTextureFilter,
                     .wrapMode = defaultTextureWrap,
-                    // 5
-                });
-                try self.assets.loadTexture(.{.static = asset.Texture.MobileLogo}, &.{
+                }, 5);
+                try self.assets.loadTexturePriority(.{.static = .MobileLogo}, &.{
                     .path = "images/mobile/logo-and-stuff.png",
                     .filter = defaultTextureFilter,
                     .wrapMode = defaultTextureWrap,
-                    // 5
-                });
-                try self.assets.loadTexture(.{.static = asset.Texture.MobileYorstoryCompany}, &.{
+                }, 5);
+                try self.assets.loadTexturePriority(.{.static = .MobileYorstoryCompany}, &.{
                     .path = "images/mobile/a-yorstory-company.png",
                     .filter = defaultTextureFilter,
                     .wrapMode = defaultTextureWrap,
-                    // 5
-                });
+                }, 5);
             },
             .Entry => {
             },
@@ -335,9 +298,6 @@ pub const App = struct {
             .kerning = titleKerning,
             .lineHeight = titleLineHeight
         });
-        // self.assets.registerStaticFont(asset.Font.Title, helveticaBoldUrl, titleFontSize, 1.0, titleKerning, titleLineHeight) catch |err| {
-        //     std.log.err("registerStaticFont failed err={}", .{err});
-        // };
 
         const textFontSize = if (isVertical) fromRefFontSizePx(38, screenSizeF) else gridSize * 0.4;
         const textKerning = 0;
@@ -350,9 +310,6 @@ pub const App = struct {
             .kerning = textKerning,
             .lineHeight = textLineHeight,
         });
-        // self.assets.registerStaticFont(asset.Font.Text, helveticaMediumUrl, textFontSize, 1.0, textKerning, textLineHeight) catch |err| {
-        //     std.log.err("registerStaticFont failed err={}", .{err});
-        // };
 
         if (!isVertical) {
             const categoryFontSize = gridSize * 0.6;
@@ -366,9 +323,6 @@ pub const App = struct {
                 .kerning = categoryKerning,
                 .lineHeight = categoryLineHeight,
             });
-            // self.assets.registerStaticFont(asset.Font.Category, helveticaBoldUrl, categoryFontSize, 1.0, categoryKerning, categoryLineHeight) catch |err| {
-            //     std.log.err("registerStaticFont failed err={}", .{err});
-            // };
 
             const subtitleFontSize = gridSize * 1.25;
             const subtitleKerning = -gridSize * 0.05;
@@ -381,9 +335,6 @@ pub const App = struct {
                 .kerning = subtitleKerning,
                 .lineHeight = subtitleLineHeight,
             });
-            // self.assets.registerStaticFont(asset.Font.Subtitle, helveticaLightUrl, subtitleFontSize, 1.0, subtitleKerning, subtitleLineHeight) catch |err| {
-            //     std.log.err("registerStaticFont failed err={}", .{err});
-            // };
 
             const numberFontSize = gridSize * 1.8;
             const numberKerning = 0;
@@ -396,9 +347,6 @@ pub const App = struct {
                 .kerning = numberKerning,
                 .lineHeight = numberLineHeight,
             });
-            // self.assets.registerStaticFont(asset.Font.Number, helveticaBoldUrl, numberFontSize, 1.0, numberKerning, numberLineHeight) catch |err| {
-            //     std.log.err("registerStaticFont failed err={}", .{err});
-            // };
         } else {
             const subtitleFontSize = fromRefFontSizePx(18, screenSizeF);
             const subtitleKerning = 0.0;
@@ -411,9 +359,6 @@ pub const App = struct {
                 .kerning = subtitleKerning,
                 .lineHeight = subtitleLineHeight,
             });
-            // self.assets.registerStaticFont(asset.Font.Subtitle, helveticaMediumUrl, subtitleFontSize, 1.0, subtitleKerning, subtitleLineHeight) catch |err| {
-            //     std.log.err("registerStaticFont failed err={}", .{err});
-            // };
         }
     }
 
@@ -526,18 +471,7 @@ pub const App = struct {
         // state.assets.loadQueued(maxInflight);
 
         return yMax;
-        // return true;
     }
-
-    // pub fn deinit(self: Self) void
-    // {
-    //     self.gpa.deinit();
-    // }
-
-    // pub fn allocator(self: *Self) std.mem.Allocator
-    // {
-    //     return self.fbAllocator.allocator();
-    // }
 };
 
 const GridImage = struct {
@@ -562,30 +496,20 @@ fn drawImageGrid(images: []const GridImage, indexOffset: usize, itemsPerRow: usi
             topLeft.y + rowF * (itemSize.y + spacingY)
         );
         if (state.assets.getTextureData(.{.dynamic = img.uri})) |tex| {
-            // if (tex.loaded()) {
-                // const cornerRadius = spacing * 2;
-                const cornerRadius = 0;
-                renderQueue.texQuadColor(
-                    itemPos, itemSize, DEPTH_GRIDIMAGE, cornerRadius, tex, m.Vec4.white
-                );
-            // }
+            const cornerRadius = 0;
+            renderQueue.texQuadColor(
+                itemPos, itemSize, DEPTH_GRIDIMAGE, cornerRadius, tex, m.Vec4.white
+            );
         } else {
             if (state.assets.getTextureLoadState(.{.dynamic = img.uri}) == .free) {
-                state.assets.loadTexture(.{.dynamic = img.uri}, &.{
+                state.assets.loadTexturePriority(.{.dynamic = img.uri}, &.{
                     .path = img.uri,
                     .filter = defaultTextureFilter,
                     .wrapMode = defaultTextureWrap,
-                    // 9
-                }) catch |err| {
+                }, 9) catch |err| {
                     std.log.err("Failed to register {s}, err {}", .{img.uri, err});
                 };
             }
-            // _ = state.assets.register(.{ .dynamic = img.uri},
-            //     img.uri, defaultTextureWrap, defaultTextureFilter, 9
-            // ) catch |err| {
-            //     std.log.err("failed to register {s}, err {}", .{img.uri, err});
-            //     return 0;
-            // };
         }
 
         if (img.title) |title| {
@@ -721,6 +645,9 @@ fn drawDesktop(state: *App, deltaMs: u64, scrollYF: f32, screenSizeF: m.Vec2, re
     const crosshairMarginX = marginX + gridSize * 5;
     const contentMarginX = marginX + gridSize * 9;
 
+    // black background in landing
+    renderQueue.quad(m.Vec2.zero, screenSizeF, DEPTH_LANDINGBACKGROUND, 0, m.Vec4.black);
+
     const decalTopLeft = state.assets.getTextureData(.{.static = .DecalTopLeft});
     const stickerMain = blk: {
         switch (state.pageData) {
@@ -731,28 +658,15 @@ fn drawDesktop(state: *App, deltaMs: u64, scrollYF: f32, screenSizeF: m.Vec2, re
                     break :blk tex;
                 } else {
                     if (state.assets.getTextureLoadState(.{.dynamic = pf.sticker}) == .free) {
-                        state.assets.loadTexture(.{.dynamic = pf.sticker}, &.{
+                        state.assets.loadTexturePriority(.{.dynamic = pf.sticker}, &.{
                             .path = pf.sticker,
                             .filter = defaultTextureFilter,
                             .wrapMode = defaultTextureWrap,
-                        }) catch |err| {
+                        }, 5) catch |err| {
                             std.log.err("Failed to register {s}, err {}", .{pf.sticker, err});
                         };
                     }
                     break :blk null;
-                    // _ = state.assets.register(.{ .DynamicUrl = pf.sticker},
-                    //     pf.sticker, defaultTextureWrap, defaultTextureFilter, 5
-                    // ) catch |err| {
-                    //     std.log.err("failed to register {s}, err {}", .{pf.sticker, err});
-                    //     return 0;
-                    // };
-
-                    // if (state.assets.getTextureData(.{.DynamicUrl = pf.sticker})) |tex| {
-                    //     break :blk tex;
-                    // } else {
-                    //     std.log.err("no texture data after register for {s}", .{pf.sticker});
-                    //     return 0;
-                    // }
                 }
             },
         }
@@ -823,17 +737,17 @@ fn drawDesktop(state: *App, deltaMs: u64, scrollYF: f32, screenSizeF: m.Vec2, re
                     renderQueue.quadGradient(
                         landingImagePos, landingImageSize, DEPTH_LANDINGBACKGROUND, 0,
                         [4]m.Vec4 {
-                            gradient.colorTop,
-                            gradient.colorTop,
                             gradient.colorBottom,
-                            gradient.colorBottom
+                            gradient.colorBottom,
+                            gradient.colorTop,
+                            gradient.colorTop,
                         }
                     );
                 },
             }
 
             for (parallaxSet.images) |parallaxImage| {
-                const textureData = state.assets.getTextureData(.{.dynamic = parallaxImage.url}) orelse continue;
+                const textureData = state.assets.getTextureData(.{.dynamic = parallaxImage.url}) orelse unreachable;
 
                 const textureDataF = m.Vec2.initFromVec2usize(textureData.size);
                 const textureSize = m.Vec2.init(
@@ -969,23 +883,23 @@ fn drawDesktop(state: *App, deltaMs: u64, scrollYF: f32, screenSizeF: m.Vec2, re
         }
     }
 
-    {
-        // rounded black frame
-        const framePos = m.Vec2.init(marginX + gridSize * 1, gridSize * 1);
-        const frameSize = m.Vec2.init(
-            screenSizeF.x - marginX * 2 - gridSize * 2,
-            screenSizeF.y - gridSize * 3,
-        );
-        renderQueue.roundedFrame(.{
-            .bottomLeft = m.Vec2.zero,
-            .size = screenSizeF,
-            .depth = DEPTH_UI_OVER1,
-            .frameBottomLeft = framePos,
-            .frameSize = frameSize,
-            .cornerRadius = gridSize,
-            .color = m.Vec4.black
-        });
-    }
+    // {
+    //     // rounded black frame
+    //     const framePos = m.Vec2.init(marginX + gridSize * 1, gridSize * 1);
+    //     const frameSize = m.Vec2.init(
+    //         screenSizeF.x - marginX * 2 - gridSize * 2,
+    //         screenSizeF.y - gridSize * 3,
+    //     );
+    //     renderQueue.roundedFrame(.{
+    //         .bottomLeft = m.Vec2.zero,
+    //         .size = screenSizeF,
+    //         .depth = DEPTH_UI_OVER1,
+    //         .frameBottomLeft = framePos,
+    //         .frameSize = frameSize,
+    //         .cornerRadius = gridSize,
+    //         .color = m.Vec4.black
+    //     });
+    // }
 
     const section1Height = screenSizeF.y;
 
@@ -1002,7 +916,7 @@ fn drawDesktop(state: *App, deltaMs: u64, scrollYF: f32, screenSizeF: m.Vec2, re
 
     var section2Height: f32 = 0;
     if (state.pageData == .Home) {
-        section2Height = screenSizeF.y * 4.0;
+        section2Height = screenSizeF.y * 3.0;
         const secondFrameYScrolling = section1Height;
         const secondFrameYStill = blk: {
             if (scrollYF >= section1Height) {
@@ -1019,7 +933,7 @@ fn drawDesktop(state: *App, deltaMs: u64, scrollYF: f32, screenSizeF: m.Vec2, re
         // draw moving gradient
         const gradientColor = m.Vec4.init(86.0 / 255.0, 0.0, 214.0 / 255.0, 1.0);
         const gradientPos = m.Vec2.init(0.0, secondFrameYScrolling);
-        const gradientSize = m.Vec2.init(screenSizeF.x, section2Height - screenSizeF.y);
+        const gradientSize = m.Vec2.init(screenSizeF.x, section2Height);
         renderQueue.quadGradient(
             gradientPos, gradientSize, DEPTH_LANDINGBACKGROUND, 0.0,
             [4]m.Vec4 {m.Vec4.black, m.Vec4.black, gradientColor, gradientColor}
@@ -1104,7 +1018,7 @@ fn drawDesktop(state: *App, deltaMs: u64, scrollYF: f32, screenSizeF: m.Vec2, re
         }
 
         if (logosAll) |la| {
-            const logosPosYCheckpoint1 = section1Height + section2Height - screenSizeF.y * 2.0;
+            const logosPosYCheckpoint1 = section1Height + section2Height - screenSizeF.y;
             const logosPosYCheckpoint2 = section1Height + section2Height - screenSizeF.y;
             const logosPosBaseY = blk: {
                 if (scrollYF <= logosPosYCheckpoint1) {
@@ -1218,15 +1132,6 @@ fn drawDesktop(state: *App, deltaMs: u64, scrollYF: f32, screenSizeF: m.Vec2, re
                     );
                     renderQueue.text(numStr, numberTextPos, DEPTH_UI_GENERIC + 0.01, fontNumber, m.Vec4.black);
 
-// <<<<<<< HEAD
-//                 const subNameRect = app.render.text2Rect(&state.assets, sub.name, asset.Font.Subtitle) orelse unreachable;
-//                 renderQueue.text2(sub.name, m.Vec2.init(x, yGallery), DEPTH_UI_GENERIC, asset.Font.Subtitle, colorUi);
-//                 yGallery += -subNameRect.min.y + gridSize * 2.0;
-
-//                 const subDescriptionRect = app.render.text2Rect(&state.assets, sub.description, asset.Font.Text) orelse unreachable;
-//                 renderQueue.text2(sub.description, m.Vec2.init(x, yGallery), DEPTH_UI_GENERIC, asset.Font.Text, colorUi);
-//                 yGallery += -subDescriptionRect.min.y + gridSize * 2.0;
-// =======
                     const subNameRect = app.render.textRect(sub.name, fontSubtitle);
                     renderQueue.text(sub.name, m.Vec2.init(x, yGallery), DEPTH_UI_GENERIC, fontSubtitle, colorUi);
                     yGallery += -subNameRect.min.y + gridSize * 2.0;
@@ -1235,7 +1140,6 @@ fn drawDesktop(state: *App, deltaMs: u64, scrollYF: f32, screenSizeF: m.Vec2, re
                     renderQueue.text(sub.description, m.Vec2.init(x, yGallery), DEPTH_UI_GENERIC, fontText, colorUi);
                     yGallery += -subDescriptionRect.min.y + gridSize * 2.0;
                 }
-// >>>>>>> 75f30b94a8b389768f908a4107e3e0a439fbf391
 
                 galleryImages.clearRetainingCapacity();
                 for (sub.images) |img| {
@@ -1431,32 +1335,6 @@ fn drawMobile(state: *App, deltaS: f32, scrollY: f32, screenSize: m.Vec2, render
 
     const fontTitle = state.assets.getFontData(.Title) orelse return @floatToInt(i32, screenSize.y);
     const fontText = state.assets.getFontData(.Text) orelse return @floatToInt(i32, screenSize.y);
-    // const fontsRequired = [_]asset.Font {
-    //     asset.Font.Title,
-    //     asset.Font.Text,
-    // };
-    // for (fontsRequired) |font| {
-    //     // TODO display loading screen?
-    //     // We can't draw/layout page until all fonts are ready.
-    //     if (state.assets.getFontData(font) == null) {
-    //         return @floatToInt(i32, screenSize.y);
-    //     }
-    // }
-
-    // if (allFontsLoaded) {
-    //     // const anglesRefText = std.fmt.allocPrint(allocator, "x={d:.2}\ny={d:.2}\nz={d:.2}", .{state.anglesRef.x, state.anglesRef.y, state.anglesRef.z}) catch "";
-    //     // renderQueue.text2(anglesRefText, m.Vec2.init(50.0, 100.0), 0.0, asset.Font.Text, m.Vec4.one);
-
-    //     const anglesTargetText = std.fmt.allocPrint(allocator, "x={d:.2}\ny={d:.2}\nz={d:.2}", .{anglesTarget.x, anglesTarget.y, anglesTarget.z}) catch "";
-    //     renderQueue.text2(anglesTargetText, m.Vec2.init(50.0, 100.0), 0.0, asset.Font.Text, m.Vec4.one);
-
-    //     const relativeUp = m.Quat.rotate(quat, m.Vec3.unitY);
-    //     const relativeFront = m.Quat.rotate(quat, m.Vec3.unitZ);
-    //     const relativeUpText = std.fmt.allocPrint(allocator, "relative up:\nx={d:.2}\ny={d:.2}\nz={d:.2}", .{relativeUp.x, relativeUp.y, relativeUp.z}) catch "";
-    //     renderQueue.text2(relativeUpText, m.Vec2.init(50.0, 400.0), 0.0, asset.Font.Text, m.Vec4.one);
-    //     const relativeFrontText = std.fmt.allocPrint(allocator, "relative front:\nx={d:.2}\ny={d:.2}\nz={d:.2}", .{relativeFront.x, relativeFront.y, relativeFront.z}) catch "";
-    //     renderQueue.text2(relativeFrontText, m.Vec2.init(50.0, 600.0), 0.0, asset.Font.Text, m.Vec4.one);
-    // }
 
     // ==== FIRST FRAME: LANDING ====
 
@@ -1554,12 +1432,10 @@ fn drawMobile(state: *App, deltaS: f32, scrollY: f32, screenSize: m.Vec2, render
         const coverSize = m.Vec2.init(coverWidth, coverWidth / coverAspect);
         yProjects += coverSize.y;
         if (state.assets.getTextureData(.{.dynamic = pf.cover})) |tex| {
-            // if (tex.loaded()) {
-                const cornerRadius = 0;
-                renderQueue.texQuadColor(
-                    coverPos, coverSize, DEPTH_GRIDIMAGE, cornerRadius, tex, m.Vec4.white
-                );
-            // }
+            const cornerRadius = 0;
+            renderQueue.texQuadColor(
+                coverPos, coverSize, DEPTH_GRIDIMAGE, cornerRadius, tex, m.Vec4.white
+            );
         } else {
             if (state.assets.getTextureLoadState(.{.dynamic = pf.cover}) == .free) {
                 state.assets.loadTexture(.{.dynamic = pf.cover}, &.{
@@ -1570,12 +1446,6 @@ fn drawMobile(state: *App, deltaS: f32, scrollY: f32, screenSize: m.Vec2, render
                     std.log.err("Failed to register {s}, err {}", .{pf.cover, err});
                 };
             }
-            // _ = state.assets.register(.{ .dynamic = pf.cover},
-            //     pf.cover, defaultTextureWrap, defaultTextureFilter, 9
-            // ) catch |err| {
-            //     std.log.err("failed to register {s}, err {}", .{pf.cover, err});
-            //     return 0;
-            // };
         }
 
         yProjects += gridSize * 1.0;
@@ -1597,111 +1467,3 @@ fn drawMobile(state: *App, deltaS: f32, scrollY: f32, screenSize: m.Vec2, render
 
     return @floatToInt(i32, y);
 }
-
-// export fn onAnimationFrame(memory: *wasm_app.Memory, outerWidth: c_int, outerHeight: c_int, innerWidth: c_int, innerHeight: c_int, scrollY: c_int, timestampMs: c_int) c_int
-// {
-//     _ = innerWidth; _ = innerHeight;
-//     const screenSizeI = m.Vec2i.init(@intCast(i32, outerWidth), @intCast(i32, outerHeight));
-//     const screenSizeF = m.Vec2.initFromVec2i(screenSizeI);
-//     const scrollYF = @intToFloat(f32, scrollY);
-
-//     var state = memory.castPersistent(App);
-//     defer {
-//         state.timestampMsPrev = timestampMs;
-//         state.scrollYPrev = scrollY;
-//         state.screenSizePrev = screenSizeI;
-//         state.mouseState.clear();
-//         state.keyboardState.clear();
-//     }
-
-//     const keyCodeEscape = 27;
-//     const keyCodeArrowLeft = 37;
-//     const keyCodeArrowRight = 39;
-//     const keyCodeG = 71;
-
-//     if (state.pageData == .Entry and state.pageData.Entry.galleryImageIndex != null) {
-//         const imageCount = getImageCount(state.pageData.Entry);
-//         if (state.keyboardState.keyDown(keyCodeEscape)) {
-//             state.pageData.Entry.galleryImageIndex = null;
-//         } else if (state.keyboardState.keyDown(keyCodeArrowLeft)) {
-//             if (state.pageData.Entry.galleryImageIndex.? == 0) {
-//                 state.pageData.Entry.galleryImageIndex.? = imageCount - 1;
-//             } else {
-//                 state.pageData.Entry.galleryImageIndex.? -= 1;
-//             }
-//         } else if (state.keyboardState.keyDown(keyCodeArrowRight)) {
-//             state.pageData.Entry.galleryImageIndex.? += 1;
-//             if (state.pageData.Entry.galleryImageIndex.? >= imageCount) {
-//                 state.pageData.Entry.galleryImageIndex.? = 0;
-//             }
-//         }
-//     }
-//     if (state.keyboardState.keyDown(keyCodeG)) {
-//         state.debug = !state.debug;
-//     }
-
-//     const deltaMs = if (state.timestampMsPrev > 0) (timestampMs - state.timestampMsPrev) else 0;
-//     const deltaS = @intToFloat(f32, deltaMs) / 1000.0;
-
-//     var tempAllocatorObj = memory.getTransientAllocator();
-//     const tempAllocator = tempAllocatorObj.allocator();
-
-//     var renderQueue = app.render.RenderQueue.init(tempAllocator);
-
-//     const screenResize = !m.Vec2i.eql(state.screenSizePrev, screenSizeI);
-//     if (screenResize) {
-//         std.log.info("resetting screen framebuffer", .{});
-//         state.fbTexture = w.createTexture(screenSizeI.x, screenSizeI.y, defaultTextureWrap, w.GL_NEAREST);
-
-//         state.fb = w.glCreateFramebuffer();
-//         w.glBindFramebuffer(w.GL_FRAMEBUFFER, state.fb);
-//         w.glFramebufferTexture2D(w.GL_FRAMEBUFFER, w.GL_COLOR_ATTACHMENT0, w.GL_TEXTURE_2D, state.fbTexture, 0);
-
-//         state.fbDepthRenderbuffer = w.glCreateRenderbuffer();
-//         w.glBindRenderbuffer(w.GL_RENDERBUFFER, state.fbDepthRenderbuffer);
-//         w.glRenderbufferStorage(w.GL_RENDERBUFFER, w.GL_DEPTH_COMPONENT16, screenSizeI.x, screenSizeI.y);
-//         w.glFramebufferRenderbuffer(w.GL_FRAMEBUFFER, w.GL_DEPTH_ATTACHMENT, w.GL_RENDERBUFFER, state.fbDepthRenderbuffer);
-//     }
-
-//     if (state.scrollYPrev != scrollY) {
-//     }
-//     // TODO
-//     // } else {
-//     //     return 0;
-//     // }
-
-//     w.glBindFramebuffer(w.GL_FRAMEBUFFER, state.fb);
-
-//     w.glClear(w.GL_COLOR_BUFFER_BIT | w.GL_DEPTH_BUFFER_BIT);
-
-//     const isVertical = isVerticalAspect(screenSizeF);
-
-//     var yMax: i32 = 0;
-//     if (isVertical) {
-//         yMax = drawMobile(state, deltaS, scrollYF, screenSizeF, &renderQueue, tempAllocator);
-//     } else {
-//         yMax = drawDesktop(state, deltaMs, scrollYF, screenSizeF, &renderQueue, tempAllocator);
-//     }
-//     defer {
-//         state.yMaxPrev = yMax;
-//     }
-
-//     renderQueue.render(state.renderState, &state.assets, screenSizeF, scrollYF);
-//     if (!m.Vec2i.eql(state.screenSizePrev, screenSizeI) or yMax != state.yMaxPrev) {
-//         std.log.info("resize, clearing HTML elements", .{});
-//         w.clearAllEmbeds();
-//         renderQueue.renderHtml();
-//     }
-
-//     w.bindNullFramebuffer();
-//     w.glClear(w.GL_COLOR_BUFFER_BIT | w.GL_DEPTH_BUFFER_BIT);
-//     const lut1 = state.assets.getStaticTextureData(asset.Texture.Lut1);
-//     // if (lut1.loaded()) {
-//         state.renderState.postProcessState.draw(state.fbTexture, lut1.id, screenSizeF);
-//     // }
-
-//     const maxInflight = 8;
-//     state.assets.loadQueued(maxInflight);
-
-//     return yMax;
-// }
