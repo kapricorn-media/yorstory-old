@@ -143,7 +143,10 @@ fn serverCallbackWrapper(
 {
     serverCallback(state, request, writer) catch |err| {
         std.log.err("serverCallback failed, error {}", .{err});
-        const code = http.Code._500;
+        const code = switch (err) {
+            error.FileNotFound => http.Code._404,
+            else => http.Code._500,
+        };
         try server.writeCode(writer, code);
         try server.writeEndHeader(writer);
         return error.InternalServerError;

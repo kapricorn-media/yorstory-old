@@ -38,7 +38,7 @@
             "name": "yorstory",
             "working_dir": "$folder",
             "shell_cmd": "zig-0.10.1 build --prominent-compile-errors",
-            "file_regex": "^\\s*([^:]*):(\\d+):(\\d+): ([^\\n]+)",
+            "file_regex": "^\\s*.*yorstory\\/([^:]*):(\\d+):(\\d+): ([^\\n]+)",
             "variants": [
                 {
                     "name": "Build (release-fast)",

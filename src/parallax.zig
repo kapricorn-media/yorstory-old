@@ -1,5 +1,6 @@
 const std = @import("std");
 
+const app = @import("zigkm-common-app");
 const m = @import("zigkm-common-math");
 
 fn hexU8ToFloatNormalized(hexString: []const u8) !f32
@@ -215,7 +216,7 @@ pub const PARALLAX_SETS = [_]ParallaxSet {
     },
 };
 
-pub fn tryLoadAndGetParallaxSet(assets: anytype, index: usize, priority: u32, textureWrap: c_uint, textureFilter: c_uint) ?*const ParallaxSet
+pub fn tryLoadAndGetParallaxSet(assets: anytype, index: usize, priority: u32, textureWrap: app.asset_data.TextureWrapMode, textureFilter: app.asset_data.TextureFilter) ?*const ParallaxSet
 {
     if (index >= PARALLAX_SETS.len) {
         return null;
@@ -223,20 +224,44 @@ pub fn tryLoadAndGetParallaxSet(assets: anytype, index: usize, priority: u32, te
 
     var loaded = true;
     for (PARALLAX_SETS[index].images) |parallaxImage| {
-        if (assets.getTextureData(.{.DynamicUrl = parallaxImage.url})) |parallaxTexData| {
-            if (!parallaxTexData.loaded()) {
-                loaded = false;
-                break;
-            }
-        } else {
+        if (assets.getTextureLoadState(.{.dynamic = parallaxImage.url}) == .free) {
             loaded = false;
-            _ = assets.register(.{ .DynamicUrl = parallaxImage.url },
-                parallaxImage.url, textureWrap, textureFilter, priority
-            ) catch |err| {
-                std.log.err("register texture error {}", .{err});
-                break;
+            _ = priority;
+            assets.loadTexture(.{.dynamic = parallaxImage.url}, &.{
+                .path = parallaxImage.url,
+                .filter = textureFilter,
+                .wrapMode = textureWrap,
+            }) catch |err| {
+                std.log.err("Failed to register {s}, err {}", .{parallaxImage.url, err});
             };
         }
+        // if (assets.getTextureData(.{.dynamic = parallaxImage.url}) == null) {
+        //     loaded = false;
+        //     if (state.assets.getTextureLoadState(.{.dynamic = pf.sticker}) == .free) {
+        //         state.assets.loadTexture(.{.dynamic = pf.sticker}, &.{
+        //             .path = pf.sticker,
+        //             .filter = defaultTextureFilter,
+        //             .wrapMode = defaultTextureWrap,
+        //         }) catch |err| {
+        //             std.log.err("Failed to register {s}, err {}", .{pf.sticker, err});
+        //         };
+        //     }
+        // }
+        // if (assets.getTextureData(.{.dynamic = parallaxImage.url})) |parallaxTexData| {
+        //     loaded = t
+        //     if (!parallaxTexData.loaded()) {
+        //         loaded = false;
+        //         break;
+        //     }
+        // } else {
+        //     loaded = false;
+        //     _ = assets.register(.{ .DynamicUrl = parallaxImage.url },
+        //         parallaxImage.url, textureWrap, textureFilter, priority
+        //     ) catch |err| {
+        //         std.log.err("register texture error {}", .{err});
+        //         break;
+        //     };
+        // }
     }
 
     return if (loaded) &PARALLAX_SETS[index] else null;
