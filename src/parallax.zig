@@ -1,7 +1,7 @@
 const std = @import("std");
 
-const app = @import("zigkm-common-app");
-const m = @import("zigkm-common-math");
+const app = @import("zigkm-app");
+const m = @import("zigkm-math");
 
 fn hexU8ToFloatNormalized(hexString: []const u8) !f32
 {

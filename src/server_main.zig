@@ -1,10 +1,10 @@
 const builtin = @import("builtin");
 const std = @import("std");
 
-const app = @import("zigkm-common-app");
+const app = @import("zigkm-app");
 const bigdata = app.bigdata;
-const http = @import("http-common");
-const server = @import("http-server");
+const http = @import("zigkm-http-common");
+const server = @import("zigkm-http-server");
 
 // const bigdata = @import("bigdata.zig");
 // const m = @import("math.zig");
@@ -16,7 +16,7 @@ const WASM_PATH = if (DEBUG) "zig-out/server/main.wasm" else "main.wasm";
 // const WASM_PATH_WORKER = if (DEBUG) "zig-out/server/worker.wasm" else "worker.wasm";
 const SERVER_IP = "0.0.0.0";
 
-pub usingnamespace @import("zigkm-common-stb").exports; // for stb linking
+pub usingnamespace @import("zigkm-stb").exports; // for stb linking
 
 pub const log_level: std.log.Level = switch (builtin.mode) {
     .Debug => .debug,

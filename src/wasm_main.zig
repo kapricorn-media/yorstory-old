@@ -1,12 +1,12 @@
 const builtin = @import("builtin");
 const std = @import("std");
 
-const app = @import("zigkm-common-app");
-const m = @import("zigkm-common-math");
+const app = @import("zigkm-app");
+const m = @import("zigkm-math");
 const w = app.wasm_bindings;
 
 pub usingnamespace app.exports;
-pub usingnamespace @import("zigkm-common-stb").exports; // for stb linking
+pub usingnamespace @import("zigkm-stb").exports; // for stb linking
 
 const asset = @import("asset.zig");
 const parallax = @import("parallax.zig");

@@ -1,7 +1,7 @@
 const std = @import("std");
 
-const http = @import("http-common");
-const server = @import("http-server");
+const http = @import("zigkm-http-common");
+const server = @import("zigkm-http-server");
 
 fn httpRedirectCallback(_: void, request: server.Request, writer: server.Writer) !void
 {
