@@ -1340,21 +1340,21 @@ fn drawMobile(state: *App, deltaS: f32, scrollY: f32, screenSize: m.Vec2, render
     if (state.assets.getTextureData(.{.static = .MobileBackground})) |bgTex| {
         const bgTexSize = m.Vec2.initFromVec2usize(bgTex.size);
         const bgAspect = bgTexSize.x / bgTexSize.y;
-        _ = bgAspect;
-        _ = aspect;
-        const bgUvBottomLeft = m.Vec2.zero;
-        const bgUvSize = m.Vec2.one;
-        renderQueue.texQuadColorUvOffset(m.Vec2.zero, screenSize, DEPTH_LANDINGBACKGROUND, 0.0, bgUvBottomLeft, bgUvSize, bgTex, m.Vec4.white);
-        // const backgroundSize = if (backgroundAspect < aspect)
-        //     m.Vec2.init(screenSize.x, screenSize.x / backgroundAspect)
-        //     else
-        //     m.Vec2.init(screenSize.y / backgroundSizeF.y * backgroundSizeF.x, screenSize.y);
-        // std.log.info("{} vs {}: {}", .{backgroundAspect, aspect, backgroundSize});
-        // const backgroundPos = m.Vec2.init(
-        //     (screenSize.x - backgroundSize.x) / 2.0,
-        //     (screenSize.y - backgroundSize.y) / 2.0,
-        // );
-        // renderQueue.texQuadColor(backgroundPos, backgroundSize, DEPTH_LANDINGBACKGROUND, 0.0, backgroundTex, m.Vec4.white);
+        // _ = bgAspect;
+        // _ = aspect;
+        // const bgUvBottomLeft = m.Vec2.zero;
+        // const bgUvSize = m.Vec2.one;
+        // renderQueue.texQuadColorUvOffset(m.Vec2.zero, screenSize, DEPTH_LANDINGBACKGROUND, 0.0, bgUvBottomLeft, bgUvSize, bgTex, m.Vec4.white);
+        const backgroundSize = if (bgAspect < aspect)
+            m.Vec2.init(screenSize.x, screenSize.x / bgAspect)
+            else
+            m.Vec2.init(screenSize.y / bgTexSize.y * bgTexSize.x, screenSize.y);
+        std.log.info("{} vs {}: {}", .{bgAspect, aspect, backgroundSize});
+        const backgroundPos = m.Vec2.init(
+            (screenSize.x - backgroundSize.x) / 2.0,
+            (screenSize.y - backgroundSize.y) / 2.0,
+        );
+        renderQueue.texQuadColor(backgroundPos, backgroundSize, DEPTH_LANDINGBACKGROUND, 0.0, bgTex, m.Vec4.white);
     }
 
     if (state.assets.getTextureData(.{.static = .MobileYorstoryCompany})) |yorTex| {
