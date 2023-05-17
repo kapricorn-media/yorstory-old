@@ -1,6 +1,7 @@
 CRITICAL
 - parallax scene loading is slow (images are massive)
 - load yorstory.wasm immediately or ASAP
+- don't pause logos, just keep scrolling
 
 HIGH
 - gallery changes (layout + popup)
