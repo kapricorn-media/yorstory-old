@@ -14,10 +14,10 @@ fn stepPackage(self: *std.build.Step) !void
     std.log.info("Generating bigdata file archive...", .{});
 
     const genBigdataArgs = &[_][]const u8 {
-        "./zig-out/tools/gen_bigdata", "./static", "./zig-out/static.bigdata",
+        "./zig-out/tools/genbigdata", "./zig-out/server-temp/static", "./zig-out/server/static.bigdata",
     };
     if (zigkmBuild.utils.execCheckTermStdout(genBigdataArgs, allocator) == null) {
-        return error.aapt2CompileError;
+        return error.genbigdata;
     }
 }
 
@@ -57,9 +57,9 @@ pub fn build(b: *std.build.Builder) !void
     // TODO add tests! lol
     _ = runTests;
 
-    // const installDirTools = std.build.InstallDir {
-    //     .custom = "tools",
-    // };
+    const installDirTools = std.build.InstallDir {
+        .custom = "tools",
+    };
     // const genLut = b.addExecutable("gen_lut", "src/tools/gen_lut.zig");
     // genLut.setBuildMode(mode);
     // genLut.setTarget(target);
@@ -72,7 +72,28 @@ pub fn build(b: *std.build.Builder) !void
     // genLut.override_dest_dir = installDirTools;
     // genLut.install();
 
-    const package = b.step("package", "Package");
-    package.dependOn(b.getInstallStep());
-    package.makeFn = stepPackage;
+    const genbigdata = try zigkmBuild.addGenBigdataExe("deps/zigkm-common", b, mode, target);
+    genbigdata.override_dest_dir = installDirTools;
+    genbigdata.install();
+
+    const packageStep = b.step("package", "Package");
+    packageStep.dependOn(b.getInstallStep());
+    const installGenbigdataStep = b.addInstallArtifact(genbigdata);
+    packageStep.dependOn(&installGenbigdataStep.step);
+    packageStep.dependOn(&b.addInstallDirectory(.{
+        .source_dir = "deps/zigkm-common/src/app/static",
+        .install_dir = .{.custom = "server-temp/static"},
+        .install_subdir = "",
+    }).step);
+    packageStep.dependOn(&b.addInstallDirectory(.{
+        .source_dir = "static",
+        .install_dir = .{.custom = "server-temp/static"},
+        .install_subdir = "",
+    }).step);
+    packageStep.dependOn(&b.addInstallDirectory(.{
+        .source_dir = "scripts",
+        .install_dir = .{.custom = "server"},
+        .install_subdir = "scripts",
+    }).step);
+    packageStep.makeFn = stepPackage;
 }
