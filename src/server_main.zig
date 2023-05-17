@@ -6,14 +6,10 @@ const bigdata = app.bigdata;
 const http = @import("zigkm-http-common");
 const server = @import("zigkm-http-server");
 
-// const bigdata = @import("bigdata.zig");
-// const m = @import("math.zig");
 const portfolio = @import("portfolio.zig");
-const server_util = @import("server_util.zig");
 
 const DEBUG = builtin.mode == .Debug;
 const WASM_PATH = if (DEBUG) "zig-out/server/main.wasm" else "main.wasm";
-// const WASM_PATH_WORKER = if (DEBUG) "zig-out/server/worker.wasm" else "worker.wasm";
 const SERVER_IP = "0.0.0.0";
 
 pub usingnamespace @import("zigkm-stb").exports; // for stb linking
@@ -176,5 +172,5 @@ pub fn main() !void
     defer state.deinit();
 
     const serverArgs = args[2..];
-    try server_util.startFromCmdArgs(SERVER_IP, serverArgs, &state, serverCallbackWrapper, allocator);
+    try server.startFromCmdArgs(SERVER_IP, serverArgs, &state, serverCallbackWrapper, allocator);
 }

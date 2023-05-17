@@ -168,12 +168,14 @@ pub const App = struct {
         try self.renderState.load();
         try self.assets.load(permanentAllocator);
 
-        w.glClearColor(0.0, 0.0, 0.0, 0.0);
+        w.glClearColor(0.0, 0.0, 0.0, 1.0);
         w.glEnable(w.GL_DEPTH_TEST);
         w.glDepthFunc(w.GL_LEQUAL);
 
         w.glEnable(w.GL_BLEND);
-        w.glBlendFunc(w.GL_SRC_ALPHA, w.GL_ONE_MINUS_SRC_ALPHA);
+        w.glBlendFuncSeparate(
+            w.GL_SRC_ALPHA, w.GL_ONE_MINUS_SRC_ALPHA, w.GL_ONE, w.GL_ONE
+        );
 
         w.setCursorZ("auto");
 
@@ -467,8 +469,8 @@ pub const App = struct {
         //     state.renderState.postProcessState.draw(state.fbTexture, lut1.id, screenSizeF);
         // // }
 
-        // const maxInflight = 8;
-        // state.assets.loadQueued(maxInflight);
+        const maxInflight = 8;
+        state.assets.loadQueued(maxInflight);
 
         return yMax;
     }
@@ -645,9 +647,6 @@ fn drawDesktop(state: *App, deltaMs: u64, scrollYF: f32, screenSizeF: m.Vec2, re
     const crosshairMarginX = marginX + gridSize * 5;
     const contentMarginX = marginX + gridSize * 9;
 
-    // black background in landing
-    renderQueue.quad(m.Vec2.zero, screenSizeF, DEPTH_LANDINGBACKGROUND, 0, m.Vec4.black);
-
     const decalTopLeft = state.assets.getTextureData(.{.static = .DecalTopLeft});
     const stickerMain = blk: {
         switch (state.pageData) {
@@ -662,7 +661,7 @@ fn drawDesktop(state: *App, deltaMs: u64, scrollYF: f32, screenSizeF: m.Vec2, re
                             .path = pf.sticker,
                             .filter = defaultTextureFilter,
                             .wrapMode = defaultTextureWrap,
-                        }, 5) catch |err| {
+                        }, 9) catch |err| {
                             std.log.err("Failed to register {s}, err {}", .{pf.sticker, err});
                         };
                     }
@@ -883,23 +882,23 @@ fn drawDesktop(state: *App, deltaMs: u64, scrollYF: f32, screenSizeF: m.Vec2, re
         }
     }
 
-    // {
-    //     // rounded black frame
-    //     const framePos = m.Vec2.init(marginX + gridSize * 1, gridSize * 1);
-    //     const frameSize = m.Vec2.init(
-    //         screenSizeF.x - marginX * 2 - gridSize * 2,
-    //         screenSizeF.y - gridSize * 3,
-    //     );
-    //     renderQueue.roundedFrame(.{
-    //         .bottomLeft = m.Vec2.zero,
-    //         .size = screenSizeF,
-    //         .depth = DEPTH_UI_OVER1,
-    //         .frameBottomLeft = framePos,
-    //         .frameSize = frameSize,
-    //         .cornerRadius = gridSize,
-    //         .color = m.Vec4.black
-    //     });
-    // }
+    {
+        // rounded black frame
+        const framePos = m.Vec2.init(marginX + gridSize * 1, gridSize * 1);
+        const frameSize = m.Vec2.init(
+            screenSizeF.x - marginX * 2 - gridSize * 2,
+            screenSizeF.y - gridSize * 3,
+        );
+        renderQueue.roundedFrame(.{
+            .bottomLeft = m.Vec2.zero,
+            .size = screenSizeF,
+            .depth = DEPTH_UI_OVER1,
+            .frameBottomLeft = framePos,
+            .frameSize = frameSize,
+            .cornerRadius = gridSize,
+            .color = m.Vec4.black
+        });
+    }
 
     const section1Height = screenSizeF.y;
 
@@ -1058,7 +1057,7 @@ fn drawDesktop(state: *App, deltaMs: u64, scrollYF: f32, screenSizeF: m.Vec2, re
 
     // ==== THIRD FRAME ====
 
-    var yMax: f32 = section1Height + section2Height;
+    var yMax = section1Height + section2Height;
     const fontNumber = state.assets.getFontData(.Number) orelse return @floatToInt(i32, yMax);
 
     const CB = struct {
@@ -1438,11 +1437,11 @@ fn drawMobile(state: *App, deltaS: f32, scrollY: f32, screenSize: m.Vec2, render
             );
         } else {
             if (state.assets.getTextureLoadState(.{.dynamic = pf.cover}) == .free) {
-                state.assets.loadTexture(.{.dynamic = pf.cover}, &.{
+                state.assets.loadTexturePriority(.{.dynamic = pf.cover}, &.{
                     .path = pf.cover,
                     .filter = defaultTextureFilter,
                     .wrapMode = defaultTextureWrap,
-                }) catch |err| {
+                }, 5) catch |err| {
                     std.log.err("Failed to register {s}, err {}", .{pf.cover, err});
                 };
             }
