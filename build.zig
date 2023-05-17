@@ -54,21 +54,8 @@ pub fn build(b: *std.build.Builder) !void
     wasm.install();
 
     const runTests = b.step("test", "Run tests");
+    // TODO add tests! lol
     _ = runTests;
-    // const testSrcs = [_][]const u8 {
-    //     "src/bigdata.zig",
-    //     "src/math.zig",
-    // };
-    // for (testSrcs) |src| {
-    //     const tests = b.addTest(src);
-    //     tests.setBuildMode(mode);
-    //     tests.setTarget(target);
-    //     zigBearsslBuild.addLib(tests, target, "deps/zig-bearssl");
-    //     try zigHttpBuild.addLibClient(tests, target, "deps/zig-http");
-    //     try zigHttpBuild.addLibCommon(tests, target, "deps/zig-http");
-    //     tests.linkLibC();
-    //     runTests.dependOn(&tests.step);
-    // }
 
     // const installDirTools = std.build.InstallDir {
     //     .custom = "tools",
