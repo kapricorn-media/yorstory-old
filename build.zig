@@ -54,8 +54,11 @@ pub fn build(b: *std.build.Builder) !void
     wasm.install();
 
     const runTests = b.step("test", "Run tests");
-    // TODO add tests! lol
-    _ = runTests;
+    const testPortfolio = b.addTest("src/portfolio.zig");
+    testPortfolio.setBuildMode(mode);
+    testPortfolio.setTarget(target);
+    zigkmBuild.addPackages("deps/zigkm-common", &[_]zigkmBuild.Package {.math}, testPortfolio);
+    runTests.dependOn(&testPortfolio.step);
 
     const installDirTools = std.build.InstallDir {
         .custom = "tools",

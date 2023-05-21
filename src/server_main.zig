@@ -23,34 +23,80 @@ pub const log_level: std.log.Level = switch (builtin.mode) {
 
 const ServerCallbackError = server.Writer.Error || error {InternalServerError};
 
+fn initBigdata(
+    path: []const u8,
+    bytes: *[]const u8,
+    map: *std.StringHashMap([]const u8),
+    allocator: std.mem.Allocator) !void
+{
+    const cwd = std.fs.cwd();
+    const file = try cwd.openFile(path, .{});
+    defer file.close();
+    bytes.* = try file.readToEndAlloc(allocator, 1024 * 1024 * 1024);
+    map.* = std.StringHashMap([]const u8).init(allocator);
+    try bigdata.load(bytes.*, map);
+}
+
+fn deinitBigdata(bytes: *[]const u8, map: *std.StringHashMap([]const u8), allocator: std.mem.Allocator) void
+{
+    map.deinit();
+    allocator.free(bytes.*);
+}
+
+const DynamicData = struct {
+    bigdata: []const u8,
+    map: std.StringHashMap([]const u8),
+    portfolioJson: []const u8,
+    portfolio: portfolio.Portfolio,
+};
+
 const ServerState = struct {
     allocator: std.mem.Allocator,
 
-    bigdata: []const u8,
-    map: std.StringHashMap([]const u8),
+    bigdataStatic: []const u8,
+    mapStatic: std.StringHashMap([]const u8),
+    dynamic: DynamicData,
+    dynamicAlpha: DynamicData,
 
     const Self = @This();
 
-    pub fn init(allocator: std.mem.Allocator, bigdataPath: []const u8) !Self
+    pub fn init(
+        bigdataStaticPath: []const u8,
+        bigdataDynamicPath: []const u8,
+        portfolioJsonPath: []const u8,
+        allocator: std.mem.Allocator) !Self
     {
-        const cwd = std.fs.cwd();
-        const bigdataFile = try cwd.openFile(bigdataPath, .{});
-        defer bigdataFile.close();
-        const bigdataBytes = try bigdataFile.readToEndAlloc(allocator, 1024 * 1024 * 1024);
-
-        var self = Self {
+        var self: Self = .{
             .allocator = allocator,
-            .bigdata = bigdataBytes,
-            .map = std.StringHashMap([]const u8).init(allocator),
+            .bigdataStatic = undefined,
+            .mapStatic = undefined,
+            .dynamic = undefined,
+            .dynamicAlpha = undefined,
         };
-        try bigdata.load(bigdataBytes, &self.map);
+
+        const cwd = std.fs.cwd();
+        const porfolioJsonFile = try cwd.openFile(portfolioJsonPath, .{});
+        defer porfolioJsonFile.close();
+        self.dynamic.portfolioJson = try porfolioJsonFile.readToEndAlloc(allocator, 1024 * 1024 * 1024);
+        self.dynamic.portfolio = try portfolio.Portfolio.init(self.dynamic.portfolioJson, allocator);
+        self.dynamicAlpha.portfolioJson = try allocator.dupe(u8, self.dynamic.portfolioJson);
+        self.dynamicAlpha.portfolio = try portfolio.Portfolio.init(self.dynamicAlpha.portfolioJson, allocator);
+
+        try initBigdata(bigdataStaticPath, &self.bigdataStatic, &self.mapStatic, allocator);
+        try initBigdata(bigdataDynamicPath, &self.dynamic.bigdata, &self.dynamic.map, allocator);
+        try initBigdata(bigdataDynamicPath, &self.dynamicAlpha.bigdata, &self.dynamicAlpha.map, allocator);
         return self;
     }
 
     pub fn deinit(self: *Self) void
     {
-        self.allocator.free(self.bigdata);
-        self.map.deinit();
+        self.dynamic.portfolio.deinit(self.allocator);
+        self.allocator.free(self.dynamic.portfolioJson);
+        self.dynamicAlpha.portfolio.deinit(self.allocator);
+        self.allocator.free(self.dynamicAlpha.portfolioJson);
+        deinitBigdata(&self.bigdataStatic, &self.mapStatic, self.allocator);
+        deinitBigdata(&self.dynamic.bigdata, &self.dynamic.map, self.allocator);
+        deinitBigdata(&self.dynamicAlpha.bigdata, &self.dynamicAlpha.map, self.allocator);
     }
 };
 
@@ -60,15 +106,22 @@ fn serverCallback(
     writer: server.Writer) !void
 {
     const host = http.getHeader(request, "Host") orelse return error.NoHost;
-    _ = host;
+    const isAdmin = std.mem.startsWith(u8, host, "admin.");
+    const isAlpha = std.mem.startsWith(u8, host, "alpha.");
+    if (isAdmin) {
+        return error.AdminSiteNotImplemented;
+    }
+    const dynamicMap = if (isAlpha) &state.dynamicAlpha.map else &state.dynamic.map;
+    const portfolioJson = if (isAlpha) state.dynamicAlpha.portfolioJson else state.dynamic.portfolioJson;
+    const pf = if (isAlpha) state.dynamicAlpha.portfolio else state.dynamic.portfolio;
 
     const allocator = state.allocator;
 
     switch (request.method) {
         .Get => {
             var isPortfolioUri = false;
-            for (portfolio.PORTFOLIO_LIST) |pf| {
-                if (std.mem.eql(u8, request.uri, pf.uri)) {
+            for (pf.projects) |project| {
+                if (std.mem.eql(u8, request.uri, project.uri)) {
                     isPortfolioUri = true;
                 }
             }
@@ -87,7 +140,10 @@ fn serverCallback(
                     return;
                 }
 
-                const data = state.map.get(path.value) orelse {
+                const data = state.mapStatic.get(path.value) orelse blk: {
+                    if (dynamicMap.get(path.value)) |d| {
+                        break :blk d;
+                    }
                     try server.writeCode(writer, ._404);
                     try server.writeEndHeader(writer);
                     return;
@@ -98,6 +154,12 @@ fn serverCallback(
                 try writer.writeAll(data);
             } else if (std.mem.eql(u8, request.uri, "/main.wasm")) {
                 try server.writeFileResponse(writer, WASM_PATH, allocator);
+            } else if (std.mem.eql(u8, request.uri, "/portfolio")) {
+                try server.writeCode(writer, ._200);
+                try server.writeContentLength(writer, portfolioJson.len);
+                try server.writeContentType(writer, .ApplicationJson);
+                try server.writeEndHeader(writer);
+                try writer.writeAll(portfolioJson);
             } else {
                 const uri = if (std.mem.eql(u8, request.uri, "/") or isPortfolioUri) "/wasm.html" else request.uri;
                 if (DEBUG) {
@@ -110,7 +172,7 @@ fn serverCallback(
                         else => return err,
                     };
                 } else {
-                    const data = state.map.get(uri) orelse {
+                    const data = state.mapStatic.get(uri) orelse {
                         try server.writeCode(writer, ._404);
                         try server.writeEndHeader(writer);
                         return;
@@ -151,7 +213,6 @@ fn serverCallbackWrapper(
 
 pub fn main() !void
 {
-
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer {
         if (gpa.deinit()) {
@@ -162,15 +223,19 @@ pub fn main() !void
 
     const args = try std.process.argsAlloc(allocator);
     defer allocator.free(args);
-    if (args.len < 3) {
-        std.log.err("Expected arguments: datafile port [<https-chain-path> <https-key-path>]", .{});
+    if (args.len < 5) {
+        std.log.err("Expected arguments: <bigdata-static> <bigdata-dynamic> <portfolio-json> <port> [<https-chain-path> <https-key-path>]", .{});
         return error.BadArgs;
     }
 
-    const dataFile = args[1];
-    var state = try ServerState.init(allocator, dataFile);
+    const bigdataStaticPath = args[1];
+    const bigdataDynamicPath = args[2];
+    const portfolioJsonPath = args[3];
+    var state = try ServerState.init(
+        bigdataStaticPath, bigdataDynamicPath, portfolioJsonPath, allocator
+    );
     defer state.deinit();
 
-    const serverArgs = args[2..];
+    const serverArgs = args[4..];
     try server.startFromCmdArgs(SERVER_IP, serverArgs, &state, serverCallbackWrapper, allocator);
 }

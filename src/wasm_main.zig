@@ -91,6 +91,7 @@ fn updateButton(topLeft: m.Vec2, size: m.Vec2, mouseState: app.input.MouseState,
 const PageType = enum {
     Home,
     Entry,
+    Unknown,
 };
 
 const PageData = union(PageType) {
@@ -99,26 +100,31 @@ const PageData = union(PageType) {
         portfolioIndex: usize,
         galleryImageIndex: ?usize,
     },
+    Unknown: void,
 };
 
-fn uriToPageData(uri: []const u8) !PageData
+fn uriToPageData(uri: []const u8, pf: ?portfolio.Portfolio) PageData
 {
     if (std.mem.eql(u8, uri, "/")) {
         return PageData {
             .Home = {},
         };
     }
-    for (portfolio.PORTFOLIO_LIST) |pf, i| {
-        if (std.mem.eql(u8, uri, pf.uri)) {
-            return PageData {
-                .Entry = .{
-                    .portfolioIndex = i,
-                    .galleryImageIndex = null,
-                }
-            };
+    if (pf) |pfpf| {
+        for (pfpf.projects) |p, i| {
+            if (std.mem.eql(u8, uri, p.uri)) {
+                return PageData {
+                    .Entry = .{
+                        .portfolioIndex = i,
+                        .galleryImageIndex = null,
+                    }
+                };
+            }
         }
     }
-    return error.UnknownPage;
+    return PageData {
+        .Unknown = {},
+    };
 }
 
 pub const App = struct {
@@ -131,7 +137,9 @@ pub const App = struct {
     fbDepthRenderbuffer: c_uint,
     fb: c_uint,
 
+    portfolio: ?portfolio.Portfolio,
     pageData: PageData,
+    shouldUpdatePage: bool,
     screenSizePrev: m.Vec2usize,
     scrollYPrev: i32,
     timestampMsPrev: u64,
@@ -163,7 +171,6 @@ pub const App = struct {
         const permanentAllocator = self.memory.permanentAllocator();
         var tempBufferAllocator = self.memory.tempBufferAllocator();
         const tempAllocator = tempBufferAllocator.allocator();
-        _ = tempAllocator;
 
         try self.renderState.load();
         try self.assets.load(permanentAllocator);
@@ -183,10 +190,12 @@ pub const App = struct {
         self.fbDepthRenderbuffer = 0;
         self.fb = 0;
 
-        var uriBuf: [64]u8 = undefined;
-        const uriLen = w.getUriZ(&uriBuf);
-        const uri = uriBuf[0..uriLen];
-        self.pageData = try uriToPageData(uri);
+        w.httpGetZ("/portfolio"); // Load portfolio data ASAP
+
+        self.portfolio = null;
+        const uri = try w.getUriAlloc(tempAllocator);
+        self.pageData = uriToPageData(uri, self.portfolio);
+        self.shouldUpdatePage = false;
         self.screenSizePrev = m.Vec2usize.zero;
         self.scrollYPrev = -1;
         self.timestampMsPrev = 0;
@@ -197,93 +206,290 @@ pub const App = struct {
 
         self.debug = false;
 
+        try self.loadRelevantAssets(screenSize, tempAllocator);
+    }
+
+    pub fn updateAndRender(self: *Self, screenSize: m.Vec2usize, scrollY: i32, timestampMs: u64) i32
+    {
+        const screenSizeI = screenSize.toVec2i();
+        const screenSizeF = screenSize.toVec2();
+        const scrollYF = @intToFloat(f32, scrollY);
+        defer {
+            self.inputState.mouseState.clear();
+            self.inputState.keyboardState.clear();
+
+            self.timestampMsPrev = timestampMs;
+            self.scrollYPrev = scrollY;
+            self.screenSizePrev = screenSize;
+        }
+
+        const keyCodeEscape = 27;
+        const keyCodeArrowLeft = 37;
+        const keyCodeArrowRight = 39;
+        const keyCodeG = 71;
+
+        if (self.pageData == .Entry and self.pageData.Entry.galleryImageIndex != null and self.portfolio != null) {
+            const imageCount = getImageCount(self.portfolio.?, self.pageData.Entry);
+            if (self.inputState.keyboardState.keyDown(keyCodeEscape)) {
+                self.pageData.Entry.galleryImageIndex = null;
+            } else if (self.inputState.keyboardState.keyDown(keyCodeArrowLeft)) {
+                if (self.pageData.Entry.galleryImageIndex.? == 0) {
+                    self.pageData.Entry.galleryImageIndex.? = imageCount - 1;
+                } else {
+                    self.pageData.Entry.galleryImageIndex.? -= 1;
+                }
+            } else if (self.inputState.keyboardState.keyDown(keyCodeArrowRight)) {
+                self.pageData.Entry.galleryImageIndex.? += 1;
+                if (self.pageData.Entry.galleryImageIndex.? >= imageCount) {
+                    self.pageData.Entry.galleryImageIndex.? = 0;
+                }
+            }
+        }
+        if (self.inputState.keyboardState.keyDown(keyCodeG)) {
+            self.debug = !self.debug;
+        }
+
+        const deltaMs = if (self.timestampMsPrev > 0) (timestampMs - self.timestampMsPrev) else 0;
+        const deltaS = @intToFloat(f32, deltaMs) / 1000.0;
+
+        var tempBufferAllocator = self.memory.tempBufferAllocator();
+        const tempAllocator = tempBufferAllocator.allocator();
+
+        var renderQueue = tempAllocator.create(app.render.RenderQueue) catch {
+            std.log.warn("Failed to allocate RenderQueue", .{});
+            return -1;
+        };
+        renderQueue.load();
+
+        const screenResize = !m.eql(self.screenSizePrev, screenSize);
+        if (screenResize) {
+            std.log.info("resetting screen framebuffer", .{});
+            self.fbTexture = w.createTexture(screenSizeI.x, screenSizeI.y, w.GL_CLAMP_TO_EDGE, w.GL_NEAREST);
+
+            self.fb = w.glCreateFramebuffer();
+            w.glBindFramebuffer(w.GL_FRAMEBUFFER, self.fb);
+            w.glFramebufferTexture2D(w.GL_FRAMEBUFFER, w.GL_COLOR_ATTACHMENT0, w.GL_TEXTURE_2D, self.fbTexture, 0);
+
+            self.fbDepthRenderbuffer = w.glCreateRenderbuffer();
+            w.glBindRenderbuffer(w.GL_RENDERBUFFER, self.fbDepthRenderbuffer);
+            w.glRenderbufferStorage(w.GL_RENDERBUFFER, w.GL_DEPTH_COMPONENT16, screenSizeI.x, screenSizeI.y);
+            w.glFramebufferRenderbuffer(w.GL_FRAMEBUFFER, w.GL_DEPTH_ATTACHMENT, w.GL_RENDERBUFFER, self.fbDepthRenderbuffer);
+
+            self.loadRelevantAssets(screenSize, tempAllocator) catch |err| {
+                std.log.err("loadRelevantAssets error {}", .{err});
+            };
+        }
+
+        if (self.shouldUpdatePage or (self.pageData == .Unknown and self.portfolio != null)) {
+            self.updatePageData(tempAllocator);
+            self.loadRelevantAssets(screenSize, tempAllocator) catch |err| {
+                std.log.err("loadRelevantAssets error {}", .{err});
+            };
+            self.shouldUpdatePage = false;
+        }
+
+        if (self.scrollYPrev != scrollY) {
+        }
+        // TODO
+        // } else {
+        //     return 0;
+        // }
+
+        // w.glBindFramebuffer(w.GL_FRAMEBUFFER, self.fb);
+        w.bindNullFramebuffer();
+
+        w.glClear(w.GL_COLOR_BUFFER_BIT | w.GL_DEPTH_BUFFER_BIT);
+
+        const isVertical = isVerticalAspect(screenSizeF);
+
+        var yMax: i32 = 0;
+        if (isVertical) {
+            yMax = drawMobile(self, deltaS, scrollYF, screenSizeF, renderQueue, tempAllocator);
+        } else {
+            yMax = drawDesktop(self, deltaMs, scrollYF, screenSizeF, renderQueue, tempAllocator);
+        }
+        defer {
+            self.yMaxPrev = yMax;
+        }
+
+        renderQueue.render2(&self.renderState, screenSizeF, scrollYF, tempAllocator);
+        if (!m.eql(self.screenSizePrev, screenSize) or yMax != self.yMaxPrev) {
+            std.log.info("resize, clearing HTML elements", .{});
+            w.clearAllEmbeds();
+            // renderQueue.renderHtml();
+        }
+
+        // w.bindNullFramebuffer();
+        // w.glClear(w.GL_COLOR_BUFFER_BIT | w.GL_DEPTH_BUFFER_BIT);
+        // const lut1 = self.assets.getStaticTextureData(asset.Texture.Lut1);
+        // // if (lut1.loaded()) {
+        //     self.renderState.postProcessState.draw(self.fbTexture, lut1.id, screenSizeF);
+        // // }
+
+        const maxInflight = 8;
+        self.assets.loadQueued(maxInflight);
+
+        return yMax;
+    }
+
+    pub fn onPopState(self: *Self, screenSize: m.Vec2usize) void
+    {
+        var tempBufferAllocator = self.memory.tempBufferAllocator();
+        const tempAllocator = tempBufferAllocator.allocator();
+
+        self.updatePageData(tempAllocator);
+        self.loadRelevantAssets(screenSize, tempAllocator) catch |err| {
+            std.log.err("loadRelevantAssets error {}", .{err});
+        };
+    }
+
+    pub fn onHttpGet(self: *Self, uri: []const u8, data: ?[]const u8) void
+    {
+        if (std.mem.eql(u8, uri, "/portfolio")) {
+            const d = data orelse {
+                std.log.err("/portfolio request failed, no data", .{});
+                return;
+            };
+            const pf = portfolio.Portfolio.init(d, self.memory.permanentAllocator()) catch |err| {
+                std.log.err("Error {} while parsing /portfolio response", .{err});
+                std.log.err("Response:\n{s}", .{d});
+                return;
+            };
+            self.portfolio = pf;
+            std.log.info("Loaded portfolio ({} projects)", .{pf.projects.len});
+        }
+    }
+
+    fn updatePageData(self: *Self, allocator: std.mem.Allocator) void
+    {
+        const uri = w.getUriAlloc(allocator) catch {
+            std.log.err("getUriAlloc failed", .{});
+            return;
+        };
+        self.pageData = uriToPageData(uri, self.portfolio);
+    }
+
+    fn changePage(self: *Self, newUri: []const u8) void
+    {
+        w.pushStateZ(newUri);
+        w.setScrollY(0);
+        self.shouldUpdatePage = true;
+        self.assets.clearLoadQueue();
+    }
+
+    fn loadRelevantAssets(self: *Self, screenSize: m.Vec2usize, allocator: std.mem.Allocator) !void
+    {
+        const screenSizeF = screenSize.toVec2();
+        const isVertical = isVerticalAspect(screenSizeF);
+        const gridSize = getGridSize(screenSizeF);
+
         // _ = try self.assets.register(.{ .Static = asset.Texture.Lut1 },
         //     "images/LUTs/identity.png", defaultTextureWrap, defaultTextureFilter, 2
         // );
+        const FontLoadInfo = struct {
+            font: asset.Font,
+            path: []const u8,
+            atlasSize: usize,
+            size: f32,
+            scale: f32,
+            kerning: f32,
+            lineHeight: f32,
+        };
+        const TextureLoadInfo = struct {
+            texture: asset.Texture,
+            path: []const u8,
+            priority: u32,
+        };
 
-        try self.assets.loadTexturePriority(.{.static = .StickerCircle}, &.{
-            .path = "images/sticker-circle.png",
-            .filter = defaultTextureFilter,
-            .wrapMode = defaultTextureWrap,
-        }, 2);
-        try self.assets.loadTexturePriority(.{.static = .LoadingGlyphs}, &.{
-            .path = "images/loading-glyphs.png",
-            .filter = defaultTextureFilter,
-            .wrapMode = defaultTextureWrap,
-        }, 2);
-        try self.assets.loadTexturePriority(.{.static = .DecalTopLeft}, &.{
-            .path = "images/decal-topleft.png",
-            .filter = defaultTextureFilter,
-            .wrapMode = defaultTextureWrap,
-        }, 2);
+        var fontsToLoad = std.ArrayList(FontLoadInfo).init(allocator);
+        var texturesToLoad = std.ArrayList(TextureLoadInfo).init(allocator);
 
-        try self.assets.loadTexturePriority(.{.static = .StickerShiny}, &.{
-            .path = "images/sticker-shiny.png",
-            .filter = defaultTextureFilter,
-            .wrapMode = defaultTextureWrap,
-        }, 5);
+        try texturesToLoad.appendSlice(&[_]TextureLoadInfo {
+            .{
+                .texture = .StickerCircle,
+                .path = "images/sticker-circle.png",
+                .priority = 2,
+            },
+            .{
+                .texture = .LoadingGlyphs,
+                .path = "images/loading-glyphs.png",
+                .priority = 2,
+            },
+            .{
+                .texture = .DecalTopLeft,
+                .path = "images/decal-topleft.png",
+                .priority = 2,
+            },
+            .{
+                .texture = .StickerShiny,
+                .path = "images/sticker-shiny.png",
+                .priority = 5,
+            },
+        });
 
         switch (self.pageData) {
             .Home => {
-                try self.assets.loadTexturePriority(.{.static = .LogosAll}, &.{
-                    .path = "images/logos-all.png",
-                    .filter = defaultTextureFilter,
-                    .wrapMode = defaultTextureWrap,
-                }, 8);
-                try self.assets.loadTexturePriority(.{.static = .ProjectSymbols}, &.{
-                    .path = "images/project-symbols.png",
-                    .filter = defaultTextureFilter,
-                    .wrapMode = defaultTextureWrap,
-                }, 8);
-                try self.assets.loadTexturePriority(.{.static = .StickerMainHome}, &.{
-                    .path = "images/sticker-main.png",
-                    .filter = defaultTextureFilter,
-                    .wrapMode = defaultTextureWrap,
-                }, 5);
-                try self.assets.loadTexturePriority(.{.static = .SymbolEye}, &.{
-                    .path = "images/symbol-eye.png",
-                    .filter = defaultTextureFilter,
-                    .wrapMode = defaultTextureWrap,
-                }, 5);
-                try self.assets.loadTexturePriority(.{.static = .YorstoryCompany}, &.{
-                    .path = "images/a-yorstory-company.png",
-                    .filter = defaultTextureFilter,
-                    .wrapMode = defaultTextureWrap,
-                }, 5);
-
-                try self.assets.loadTexturePriority(.{.static = .MobileBackground}, &.{
-                    .path = "images/mobile/background.png",
-                    .filter = defaultTextureFilter,
-                    .wrapMode = defaultTextureWrap,
-                }, 5);
-                try self.assets.loadTexturePriority(.{.static = .MobileCrosshair}, &.{
-                    .path = "images/mobile/crosshair.png",
-                    .filter = defaultTextureFilter,
-                    .wrapMode = defaultTextureWrap,
-                }, 5);
-                try self.assets.loadTexturePriority(.{.static = .MobileIcons}, &.{
-                    .path = "images/mobile/icons.png",
-                    .filter = defaultTextureFilter,
-                    .wrapMode = defaultTextureWrap,
-                }, 5);
-                try self.assets.loadTexturePriority(.{.static = .MobileLogo}, &.{
-                    .path = "images/mobile/logo-and-stuff.png",
-                    .filter = defaultTextureFilter,
-                    .wrapMode = defaultTextureWrap,
-                }, 5);
-                try self.assets.loadTexturePriority(.{.static = .MobileYorstoryCompany}, &.{
-                    .path = "images/mobile/a-yorstory-company.png",
-                    .filter = defaultTextureFilter,
-                    .wrapMode = defaultTextureWrap,
-                }, 5);
+                if (!isVertical) {
+                    try texturesToLoad.appendSlice(&[_]TextureLoadInfo {
+                        .{
+                            .texture = .LogosAll,
+                            .path = "images/logos-all.png",
+                            .priority = 8,
+                        },
+                        .{
+                            .texture = .ProjectSymbols,
+                            .path = "images/project-symbols.png",
+                            .priority = 8,
+                        },
+                        .{
+                            .texture = .StickerMainHome,
+                            .path = "images/sticker-main.png",
+                            .priority = 5,
+                        },
+                        .{
+                            .texture = .SymbolEye,
+                            .path = "images/symbol-eye.png",
+                            .priority = 5,
+                        },
+                        .{
+                            .texture = .YorstoryCompany,
+                            .path = "images/a-yorstory-company.png",
+                            .priority = 5,
+                        },
+                    });
+                } else {
+                    try texturesToLoad.appendSlice(&[_]TextureLoadInfo {
+                        .{
+                            .texture = .MobileBackground,
+                            .path = "images/mobile/background.png",
+                            .priority = 5,
+                        },
+                        .{
+                            .texture = .MobileCrosshair,
+                            .path = "images/mobile/crosshair.png",
+                            .priority = 5,
+                        },
+                        .{
+                            .texture = .MobileIcons,
+                            .path = "images/mobile/icons.png",
+                            .priority = 5,
+                        },
+                        .{
+                            .texture = .MobileLogo,
+                            .path = "images/mobile/logo-and-stuff.png",
+                            .priority = 5,
+                        },
+                        .{
+                            .texture = .MobileYorstoryCompany,
+                            .path = "images/mobile/a-yorstory-company.png",
+                            .priority = 5,
+                        },
+                    });
+                }
             },
-            .Entry => {
-            },
+            .Entry => {},
+            .Unknown => {},
         }
-
-        const screenSizeF = m.Vec2.initFromVec2usize(screenSize);
-        const isVertical = isVerticalAspect(screenSizeF);
-        const gridSize = getGridSize(screenSizeF);
 
         const helveticaBoldUrl = "/fonts/HelveticaNeueLTCom-Bd.ttf";
         const helveticaMediumUrl = "/fonts/HelveticaNeueLTCom-Md.ttf";
@@ -292,7 +498,8 @@ pub const App = struct {
         const titleFontSize = if (isVertical) fromRefFontSizePx(180, screenSizeF) else gridSize * 4.0;
         const titleKerning = if (isVertical) -gridSize * 0.12 else -gridSize * 0.15;
         const titleLineHeight = titleFontSize * 0.92;
-        try self.assets.loadFont(.Title, &.{
+        try fontsToLoad.append(.{
+            .font = .Title,
             .path = helveticaBoldUrl,
             .atlasSize = 2048,
             .size = titleFontSize,
@@ -304,7 +511,8 @@ pub const App = struct {
         const textFontSize = if (isVertical) fromRefFontSizePx(38, screenSizeF) else gridSize * 0.4;
         const textKerning = 0;
         const textLineHeight = if (isVertical) fromRefFontSizePx(48, screenSizeF) else textFontSize * 1.2;
-        try self.assets.loadFont(.Text, &.{
+        try fontsToLoad.append(.{
+            .font = .Text,
             .path = helveticaMediumUrl,
             .atlasSize = 2048,
             .size = textFontSize,
@@ -317,7 +525,8 @@ pub const App = struct {
             const categoryFontSize = gridSize * 0.6;
             const categoryKerning = 0;
             const categoryLineHeight = categoryFontSize;
-            try self.assets.loadFont(.Category, &.{
+            try fontsToLoad.append(.{
+                .font = .Category,
                 .path = helveticaBoldUrl,
                 .atlasSize = 2048,
                 .size = categoryFontSize,
@@ -329,7 +538,8 @@ pub const App = struct {
             const subtitleFontSize = gridSize * 1.25;
             const subtitleKerning = -gridSize * 0.05;
             const subtitleLineHeight = subtitleFontSize;
-            try self.assets.loadFont(.Subtitle, &.{
+            try fontsToLoad.append(.{
+                .font = .Subtitle,
                 .path = helveticaLightUrl,
                 .atlasSize = 2048,
                 .size = subtitleFontSize,
@@ -341,7 +551,8 @@ pub const App = struct {
             const numberFontSize = gridSize * 1.8;
             const numberKerning = 0;
             const numberLineHeight = numberFontSize;
-            try self.assets.loadFont(.Number, &.{
+            try fontsToLoad.append(.{
+                .font = .Number,
                 .path = helveticaBoldUrl,
                 .atlasSize = 2048,
                 .size = numberFontSize,
@@ -353,7 +564,8 @@ pub const App = struct {
             const subtitleFontSize = fromRefFontSizePx(18, screenSizeF);
             const subtitleKerning = 0.0;
             const subtitleLineHeight = fromRefFontSizePx(26, screenSizeF);
-            try self.assets.loadFont(.Subtitle, &.{
+            try fontsToLoad.append(.{
+                .font = .Subtitle,
                 .path = helveticaMediumUrl,
                 .atlasSize = 2048,
                 .size = subtitleFontSize,
@@ -362,117 +574,28 @@ pub const App = struct {
                 .lineHeight = subtitleLineHeight,
             });
         }
-    }
 
-    pub fn updateAndRender(state: *Self, screenSize: m.Vec2usize, scrollY: i32, timestampMs: u64) i32
-    {
-        const screenSizeI = screenSize.toVec2i();
-        const screenSizeF = screenSize.toVec2();
-        const scrollYF = @intToFloat(f32, scrollY);
-        defer {
-            state.inputState.mouseState.clear();
-            state.inputState.keyboardState.clear();
-
-            state.timestampMsPrev = timestampMs;
-            state.scrollYPrev = scrollY;
-            state.screenSizePrev = screenSize;
-        }
-
-        const keyCodeEscape = 27;
-        const keyCodeArrowLeft = 37;
-        const keyCodeArrowRight = 39;
-        const keyCodeG = 71;
-
-        if (state.pageData == .Entry and state.pageData.Entry.galleryImageIndex != null) {
-            const imageCount = getImageCount(state.pageData.Entry);
-            if (state.inputState.keyboardState.keyDown(keyCodeEscape)) {
-                state.pageData.Entry.galleryImageIndex = null;
-            } else if (state.inputState.keyboardState.keyDown(keyCodeArrowLeft)) {
-                if (state.pageData.Entry.galleryImageIndex.? == 0) {
-                    state.pageData.Entry.galleryImageIndex.? = imageCount - 1;
-                } else {
-                    state.pageData.Entry.galleryImageIndex.? -= 1;
-                }
-            } else if (state.inputState.keyboardState.keyDown(keyCodeArrowRight)) {
-                state.pageData.Entry.galleryImageIndex.? += 1;
-                if (state.pageData.Entry.galleryImageIndex.? >= imageCount) {
-                    state.pageData.Entry.galleryImageIndex.? = 0;
-                }
+        for (fontsToLoad.items) |ftl| {
+            if (self.assets.getFontLoadState(ftl.font) == .free) {
+                try self.assets.loadFont(ftl.font, &.{
+                    .path = ftl.path,
+                    .atlasSize = ftl.atlasSize,
+                    .size = ftl.size,
+                    .scale = ftl.scale,
+                    .kerning = ftl.kerning,
+                    .lineHeight = ftl.lineHeight,
+                });
             }
         }
-        if (state.inputState.keyboardState.keyDown(keyCodeG)) {
-            state.debug = !state.debug;
+        for (texturesToLoad.items) |t| {
+            if (self.assets.getTextureLoadState(.{.static = t.texture}) == .free) {
+                try self.assets.loadTexturePriority(.{.static = t.texture}, &.{
+                    .path = t.path,
+                    .filter = defaultTextureFilter,
+                    .wrapMode = defaultTextureWrap,
+                }, t.priority);
+            }
         }
-
-        const deltaMs = if (state.timestampMsPrev > 0) (timestampMs - state.timestampMsPrev) else 0;
-        const deltaS = @intToFloat(f32, deltaMs) / 1000.0;
-
-        var tempBufferAllocator = state.memory.tempBufferAllocator();
-        const tempAllocator = tempBufferAllocator.allocator();
-
-        var renderQueue = tempAllocator.create(app.render.RenderQueue) catch {
-            std.log.warn("Failed to allocate RenderQueue", .{});
-            return -1;
-        };
-        renderQueue.load();
-
-        const screenResize = !m.eql(state.screenSizePrev, screenSize);
-        if (screenResize) {
-            std.log.info("resetting screen framebuffer", .{});
-            state.fbTexture = w.createTexture(screenSizeI.x, screenSizeI.y, w.GL_CLAMP_TO_EDGE, w.GL_NEAREST);
-
-            state.fb = w.glCreateFramebuffer();
-            w.glBindFramebuffer(w.GL_FRAMEBUFFER, state.fb);
-            w.glFramebufferTexture2D(w.GL_FRAMEBUFFER, w.GL_COLOR_ATTACHMENT0, w.GL_TEXTURE_2D, state.fbTexture, 0);
-
-            state.fbDepthRenderbuffer = w.glCreateRenderbuffer();
-            w.glBindRenderbuffer(w.GL_RENDERBUFFER, state.fbDepthRenderbuffer);
-            w.glRenderbufferStorage(w.GL_RENDERBUFFER, w.GL_DEPTH_COMPONENT16, screenSizeI.x, screenSizeI.y);
-            w.glFramebufferRenderbuffer(w.GL_FRAMEBUFFER, w.GL_DEPTH_ATTACHMENT, w.GL_RENDERBUFFER, state.fbDepthRenderbuffer);
-        }
-
-        if (state.scrollYPrev != scrollY) {
-        }
-        // TODO
-        // } else {
-        //     return 0;
-        // }
-
-        // w.glBindFramebuffer(w.GL_FRAMEBUFFER, state.fb);
-        w.bindNullFramebuffer();
-
-        w.glClear(w.GL_COLOR_BUFFER_BIT | w.GL_DEPTH_BUFFER_BIT);
-
-        const isVertical = isVerticalAspect(screenSizeF);
-
-        var yMax: i32 = 0;
-        if (isVertical) {
-            yMax = drawMobile(state, deltaS, scrollYF, screenSizeF, renderQueue, tempAllocator);
-        } else {
-            yMax = drawDesktop(state, deltaMs, scrollYF, screenSizeF, renderQueue, tempAllocator);
-        }
-        defer {
-            state.yMaxPrev = yMax;
-        }
-
-        renderQueue.render2(&state.renderState, screenSizeF, scrollYF, tempAllocator);
-        if (!m.eql(state.screenSizePrev, screenSize) or yMax != state.yMaxPrev) {
-            std.log.info("resize, clearing HTML elements", .{});
-            w.clearAllEmbeds();
-            // renderQueue.renderHtml();
-        }
-
-        // w.bindNullFramebuffer();
-        // w.glClear(w.GL_COLOR_BUFFER_BIT | w.GL_DEPTH_BUFFER_BIT);
-        // const lut1 = state.assets.getStaticTextureData(asset.Texture.Lut1);
-        // // if (lut1.loaded()) {
-        //     state.renderState.postProcessState.draw(state.fbTexture, lut1.id, screenSizeF);
-        // // }
-
-        const maxInflight = 8;
-        state.assets.loadQueued(maxInflight);
-
-        return yMax;
     }
 };
 
@@ -482,7 +605,7 @@ const GridImage = struct {
     goToUri: ?[]const u8,
 };
 
-fn drawImageGrid(images: []const GridImage, indexOffset: usize, itemsPerRow: usize, topLeft: m.Vec2, width: f32, spacing: f32, fontData: *const app.asset_data.FontData, fontColor: m.Vec4, state: *App, scrollY: f32, mouseHoverGlobal: *bool, renderQueue: *app.render.RenderQueue, callback: *const fn(*App, GridImage, usize) void) f32
+fn drawImageGrid(images: []const GridImage, indexOffset: usize, itemsPerRow: usize, topLeft: m.Vec2, width: f32, spacing: f32, texPriority: u32, fontData: *const app.asset_data.FontData, fontColor: m.Vec4, state: *App, scrollY: f32, mouseHoverGlobal: *bool, renderQueue: *app.render.RenderQueue, callback: *const fn(*App, GridImage, usize) void) f32
 {
     const itemAspect = 1.74;
     const itemWidth = (width - spacing * (@intToFloat(f32, itemsPerRow) - 1)) / @intToFloat(f32, itemsPerRow);
@@ -508,7 +631,7 @@ fn drawImageGrid(images: []const GridImage, indexOffset: usize, itemsPerRow: usi
                     .path = img.uri,
                     .filter = defaultTextureFilter,
                     .wrapMode = defaultTextureWrap,
-                }, 9) catch |err| {
+                }, texPriority) catch |err| {
                     std.log.err("Failed to register {s}, err {}", .{img.uri, err});
                 };
             }
@@ -541,24 +664,24 @@ fn getTextureScaledSize(size: m.Vec2usize, screenSize: m.Vec2) m.Vec2
     return m.multScalar(sizeF, scaleFactor);
 }
 
-fn getImageCount(entryData: anytype) usize
+fn getImageCount(pf: portfolio.Portfolio, entryData: anytype) usize
 {
-    const pf = portfolio.PORTFOLIO_LIST[entryData.portfolioIndex];
+    const project = pf.projects[entryData.portfolioIndex];
     var i: usize = 0;
-    for (pf.subprojects) |sub| {
-        for (sub.images) |_| {
+    for (project.sections) |section| {
+        for (section.images) |_| {
             i += 1;
         }
     }
     return i;
 }
 
-fn getImageUrlFromIndex(entryData: anytype, index: usize) ?[]const u8
+fn getImageUrlFromIndex(pf: portfolio.Portfolio, entryData: anytype, index: usize) ?[]const u8
 {
-    const pf = portfolio.PORTFOLIO_LIST[entryData.portfolioIndex];
+    const project = pf.projects[entryData.portfolioIndex];
     var i: usize = 0;
-    for (pf.subprojects) |sub| {
-        for (sub.images) |img| {
+    for (project.sections) |section| {
+        for (section.images) |img| {
             if (i == index) {
                 return img;
             }
@@ -622,8 +745,14 @@ fn drawDesktop(state: *App, deltaMs: u64, scrollYF: f32, screenSizeF: m.Vec2, re
                 break :blk COLOR_YELLOW_HOME;
             },
             .Entry => |entryData| {
-                const pf = portfolio.PORTFOLIO_LIST[entryData.portfolioIndex];
-                break :blk pf.colorUi;
+                if (state.portfolio) |pf| {
+                    break :blk pf.projects[entryData.portfolioIndex].colorUi;
+                } else {
+                    break :blk m.Vec4.white;
+                }
+            },
+            .Unknown => {
+                break :blk m.Vec4.white;
             },
         }
     };
@@ -650,21 +779,25 @@ fn drawDesktop(state: *App, deltaMs: u64, scrollYF: f32, screenSizeF: m.Vec2, re
     const decalTopLeft = state.assets.getTextureData(.{.static = .DecalTopLeft});
     const stickerMain = blk: {
         switch (state.pageData) {
-            .Home => break :blk state.assets.getTextureData(.{.static = .StickerMainHome}),
+            .Home, .Unknown => break :blk state.assets.getTextureData(.{.static = .StickerMainHome}),
             .Entry => |entryData| {
-                const pf = portfolio.PORTFOLIO_LIST[entryData.portfolioIndex];
-                if (state.assets.getTextureData(.{.dynamic = pf.sticker})) |tex| {
-                    break :blk tex;
-                } else {
-                    if (state.assets.getTextureLoadState(.{.dynamic = pf.sticker}) == .free) {
-                        state.assets.loadTexturePriority(.{.dynamic = pf.sticker}, &.{
-                            .path = pf.sticker,
-                            .filter = defaultTextureFilter,
-                            .wrapMode = defaultTextureWrap,
-                        }, 9) catch |err| {
-                            std.log.err("Failed to register {s}, err {}", .{pf.sticker, err});
-                        };
+                if (state.portfolio) |pf| {
+                    const project = pf.projects[entryData.portfolioIndex];
+                    if (state.assets.getTextureData(.{.dynamic = project.sticker})) |tex| {
+                        break :blk tex;
+                    } else {
+                        if (state.assets.getTextureLoadState(.{.dynamic = project.sticker}) == .free) {
+                            state.assets.loadTexturePriority(.{.dynamic = project.sticker}, &.{
+                                .path = project.sticker,
+                                .filter = defaultTextureFilter,
+                                .wrapMode = defaultTextureWrap,
+                            }, 9) catch |err| {
+                                std.log.err("Failed to register {s}, err {}", .{project.sticker, err});
+                            };
+                        }
+                        break :blk null;
                     }
+                } else {
                     break :blk null;
                 }
             },
@@ -684,10 +817,10 @@ fn drawDesktop(state: *App, deltaMs: u64, scrollYF: f32, screenSizeF: m.Vec2, re
     if (allLandingAssetsLoaded) {
         const parallaxIndex = blk: {
             switch (state.pageData) {
-                .Home => break :blk state.activeParallaxSetIndex,
+                .Home, .Unknown => break :blk state.activeParallaxSetIndex,
                 .Entry => |entryData| {
-                    const pf = portfolio.PORTFOLIO_LIST[entryData.portfolioIndex];
-                    break :blk pf.parallaxIndex;
+                    const project = state.portfolio.?.projects[entryData.portfolioIndex];
+                    break :blk project.parallaxIndex;
                 },
             }
         };
@@ -808,7 +941,7 @@ fn drawDesktop(state: *App, deltaMs: u64, scrollYF: f32, screenSizeF: m.Vec2, re
         };
         var x = contentMarginX;
         for (categories) |c| {
-            const categoryRect = app.render.textRect(c.name, fontCategory);
+            const categoryRect = app.render.textRect(c.name, fontCategory, null);
             const categorySize = categoryRect.size();
             const categoryPos = m.Vec2.init(x, gridSize * 5.5);
             renderQueue.text(c.name, categoryPos, DEPTH_UI_GENERIC, fontCategory, colorUi);
@@ -817,7 +950,7 @@ fn drawDesktop(state: *App, deltaMs: u64, scrollYF: f32, screenSizeF: m.Vec2, re
             const categoryButtonPos = m.Vec2.init(categoryPos.x - categorySize.x * 0.1, categoryPos.y - categorySize.y);
             if (c.uri) |uri| {
                 if (updateButton(categoryButtonPos, categoryButtonSize, state.inputState.mouseState, scrollYF, &mouseHoverGlobal)) {
-                    w.setUriZ(uri);
+                    state.changePage(uri);
                 }
             }
 
@@ -832,10 +965,10 @@ fn drawDesktop(state: *App, deltaMs: u64, scrollYF: f32, screenSizeF: m.Vec2, re
         );
         const colorSticker = blk: {
             switch (state.pageData) {
-                .Home => break :blk colorUi,
+                .Home, .Unknown => break :blk colorUi,
                 .Entry => |entryData| {
-                    const pf = portfolio.PORTFOLIO_LIST[entryData.portfolioIndex];
-                    break :blk pf.colorSticker;
+                    const project = state.portfolio.?.projects[entryData.portfolioIndex];
+                    break :blk project.colorSticker;
                 },
             }
         };
@@ -974,19 +1107,20 @@ fn drawDesktop(state: *App, deltaMs: u64, scrollYF: f32, screenSizeF: m.Vec2, re
             wasPosBaseY + gridSize * 10.8
         );
         const wasText = "We are\nStorytellers.";
-        const wasRect = app.render.textRect(wasText, fontTitle);
+        const wasRect = app.render.textRect(wasText, fontTitle, null);
         renderQueue.text(wasText, wasPos, DEPTH_UI_GENERIC, fontTitle, colorUi);
 
         const wasTextPos1 = m.Vec2.init(
             contentMarginX - gridSize * 0.3,
             wasPos.y - wasRect.min.y + gridSize * 3.2,
         );
-        renderQueue.text("Yorstory is a creative development studio specializing in sequential art. We\nare storytellers with over 20 years of experience in the Television, Film, and\nVideo Game industries.", wasTextPos1, DEPTH_UI_GENERIC, fontText, colorUi);
+        const wasTextWidth = screenSizeF.x / 2.0 - wasTextPos1.x - gridSize;
+        renderQueue.textWithMaxWidth("Yorstory is a creative development studio specializing in sequential art. We are storytellers with over 20 years of experience in the Television, Film, and Video Game industries.", wasTextPos1, DEPTH_UI_GENERIC, wasTextWidth, fontText, colorUi);
         const wasTextPos2 = m.Vec2.init(
             screenSizeF.x / 2.0,
             wasTextPos1.y,
         );
-        renderQueue.text("Our diverse experience has given us an unparalleled understanding of\nmultiple mediums, giving us the tools to create a cohesive, story-centric vision\nalong with the visuals needed to create a shared understanding between\nmultiple departments and disciplines.", wasTextPos2, DEPTH_UI_GENERIC, fontText, colorUi);
+        renderQueue.textWithMaxWidth("Our diverse experience has given us an unparalleled understanding of multiple mediums, giving us the tools to create a cohesive, story-centric vision along with the visuals needed to create a shared understanding between multiple departments and disciplines.", wasTextPos2, DEPTH_UI_GENERIC, wasTextWidth, fontText, colorUi);
 
         if (symbolEye) |se| {
             const eyeSize = getTextureScaledSize(sCircle.size, screenSizeF);
@@ -1059,14 +1193,15 @@ fn drawDesktop(state: *App, deltaMs: u64, scrollYF: f32, screenSizeF: m.Vec2, re
 
     var yMax = section1Height + section2Height;
     const fontNumber = state.assets.getFontData(.Number) orelse return @floatToInt(i32, yMax);
+    const pf = state.portfolio orelse return @floatToInt(i32, yMax);
 
     const CB = struct {
         fn home(theState: *App, image: GridImage, index: usize) void
         {
-            _ = theState; _ = index;
+            _ = index;
 
             if (image.goToUri) |uri| {
-                w.setUriZ(uri);
+                theState.changePage(uri);
             }
         }
 
@@ -1086,35 +1221,34 @@ fn drawDesktop(state: *App, deltaMs: u64, scrollYF: f32, screenSizeF: m.Vec2, re
 
     const contentSubWidth = screenSizeF.x - contentMarginX * 2;
     switch (state.pageData) {
-        .Home => {
-        },
+        .Home, .Unknown => {},
         .Entry => |entryData| {
             // content section
-            const pf = portfolio.PORTFOLIO_LIST[entryData.portfolioIndex];
+            const project = pf.projects[entryData.portfolioIndex];
 
             const contentHeaderPos = m.Vec2.init(
                 contentMarginX,
                 yMax + gridSize * 4.0,
             );
-            const contentHeaderRect = app.render.textRect(pf.contentHeader, fontTitle);
-            renderQueue.text(pf.contentHeader, contentHeaderPos, DEPTH_UI_GENERIC, fontTitle, colorUi);
+            const contentHeaderRect = app.render.textRect(project.contentHeader, fontTitle, null);
+            renderQueue.text(project.contentHeader, contentHeaderPos, DEPTH_UI_GENERIC, fontTitle, colorUi);
 
             const contentSubPos = m.Vec2.init(
                 contentMarginX,
                 contentHeaderPos.y - contentHeaderRect.min.y + gridSize * 3.2,
             );
-            const contentSubRect = app.render.textRect(pf.contentDescription, fontText);
-            renderQueue.text(pf.contentDescription, contentSubPos, DEPTH_UI_GENERIC, fontText, colorUi);
+            const contentSubPosWidth = screenSizeF.x - contentMarginX * 2;
+            const contentSubRect = app.render.textRect(project.contentDescription, fontText, contentSubPosWidth);
+            renderQueue.textWithMaxWidth(project.contentDescription, contentSubPos, DEPTH_UI_GENERIC, contentSubPosWidth, fontText, colorUi);
 
             yMax = contentSubPos.y + contentSubRect.size().y + gridSize * 3.0;
 
             var galleryImages = std.ArrayList(GridImage).init(allocator);
 
-            const x = contentMarginX;
             var yGallery = yMax;
             var indexOffset: usize = 0; // TODO eh...
-            for (pf.subprojects) |sub, i| {
-                if (sub.name.len > 0 or sub.description.len > 0) {
+            for (project.sections) |section, i| {
+                if (section.name.len > 0 or section.description.len > 0) {
                     const numberSize = getTextureScaledSize(sCircle.size, screenSizeF);
                     const numberPos = m.Vec2.init(
                         contentMarginX - gridSize * 1.4,
@@ -1131,17 +1265,25 @@ fn drawDesktop(state: *App, deltaMs: u64, scrollYF: f32, screenSizeF: m.Vec2, re
                     );
                     renderQueue.text(numStr, numberTextPos, DEPTH_UI_GENERIC + 0.01, fontNumber, m.Vec4.black);
 
-                    const subNameRect = app.render.textRect(sub.name, fontSubtitle);
-                    renderQueue.text(sub.name, m.Vec2.init(x, yGallery), DEPTH_UI_GENERIC, fontSubtitle, colorUi);
+                    const subNameRect = app.render.textRect(section.name, fontSubtitle, null);
+                    renderQueue.text(section.name, m.Vec2.init(contentMarginX, yGallery), DEPTH_UI_GENERIC, fontSubtitle, colorUi);
                     yGallery += -subNameRect.min.y + gridSize * 2.0;
 
-                    const subDescriptionRect = app.render.textRect(sub.description, fontText);
-                    renderQueue.text(sub.description, m.Vec2.init(x, yGallery), DEPTH_UI_GENERIC, fontText, colorUi);
+                    const subDescriptionWidth = screenSizeF.x - contentMarginX * 2;
+                    const subDescriptionRect = app.render.textRect(section.description, fontText, subDescriptionWidth);
+                    renderQueue.textWithMaxWidth(
+                        section.description,
+                        m.Vec2.init(contentMarginX, yGallery),
+                        DEPTH_UI_GENERIC,
+                        subDescriptionWidth,
+                        fontText,
+                        colorUi
+                    );
                     yGallery += -subDescriptionRect.min.y + gridSize * 2.0;
                 }
 
                 galleryImages.clearRetainingCapacity();
-                for (sub.images) |img| {
+                for (section.images) |img| {
                     galleryImages.append(GridImage {
                         .uri = img,
                         .title = null,
@@ -1152,11 +1294,11 @@ fn drawDesktop(state: *App, deltaMs: u64, scrollYF: f32, screenSizeF: m.Vec2, re
                 }
 
                 const itemsPerRow = 6;
-                const topLeft = m.Vec2.init(x, yGallery);
+                const topLeft = m.Vec2.init(contentMarginX, yGallery);
                 const spacing = gridSize * 0.25;
-                yGallery += drawImageGrid(galleryImages.items, indexOffset, itemsPerRow, topLeft, contentSubWidth, spacing, fontText, colorUi, state, scrollYF, &mouseHoverGlobal, renderQueue, CB.entry);
+                yGallery += drawImageGrid(galleryImages.items, indexOffset, itemsPerRow, topLeft, contentSubWidth, spacing, 9, fontText, colorUi, state, scrollYF, &mouseHoverGlobal, renderQueue, CB.entry);
                 yGallery += gridSize * 4.0;
-                indexOffset += sub.images.len;
+                indexOffset += section.images.len;
             }
 
             yMax = yGallery + gridSize * 1;
@@ -1177,7 +1319,7 @@ fn drawDesktop(state: *App, deltaMs: u64, scrollYF: f32, screenSizeF: m.Vec2, re
                 const pos = m.Vec2.init(0.0, scrollYF);
                 renderQueue.quad(pos, screenSizeF, DEPTH_UI_OVER2, 0, m.Vec4.init(0.0, 0.0, 0.0, 1.0));
 
-                if (getImageUrlFromIndex(entryData, ind)) |imageUrl| {
+                if (getImageUrlFromIndex(pf, entryData, ind)) |imageUrl| {
                     if (state.assets.getTextureData(.{.dynamic = imageUrl})) |imageTex| {
                         const imageRefSizeF = m.Vec2.initFromVec2usize(imageTex.size);
                         const targetHeight = screenSizeF.y - gridSize * 4.0;
@@ -1227,15 +1369,18 @@ fn drawDesktop(state: *App, deltaMs: u64, scrollYF: f32, screenSizeF: m.Vec2, re
     renderQueue.text(projectsText, contentHeaderPos, DEPTH_UI_GENERIC, fontTitle, colorUi);
 
     var images = std.ArrayList(GridImage).init(allocator);
-    for (portfolio.PORTFOLIO_LIST) |pf, i| {
+    for (pf.projects) |project, i| {
         if (state.pageData == .Entry and state.pageData.Entry.portfolioIndex == i) {
             continue;
         }
 
+        const imageTitle = std.fmt.allocPrint(
+            allocator, "{s}        {s}", .{project.name, project.company}
+        ) catch continue;
         images.append(GridImage {
-            .uri = pf.cover,
-            .title = pf.title,
-            .goToUri = pf.uri,
+            .uri = project.cover,
+            .title = imageTitle,
+            .goToUri = project.uri,
         }) catch |err| {
             std.log.err("image append failed {}", .{err});
         };
@@ -1253,7 +1398,7 @@ fn drawDesktop(state: *App, deltaMs: u64, scrollYF: f32, screenSizeF: m.Vec2, re
         section3Start + gridSize * 14.0,
     );
     const spacing = gridSize * 0.25;
-    const projectGridY = drawImageGrid(images.items, 0, itemsPerRow, gridTopLeft, contentSubWidth, spacing, fontText, colorUi, state, scrollYF, &mouseHoverGlobal, renderQueue, CB.home);
+    const projectGridY = drawImageGrid(images.items, 0, itemsPerRow, gridTopLeft, contentSubWidth, spacing, 8, fontText, colorUi, state, scrollYF, &mouseHoverGlobal, renderQueue, CB.home);
 
     const section3Height = gridTopLeft.y - section3Start + projectGridY + gridSize * 8.0;
 
@@ -1400,7 +1545,7 @@ fn drawMobile(state: *App, deltaS: f32, scrollY: f32, screenSize: m.Vec2, render
     var yWas = y + gridSize * 8.0;
     const wasText = "We are\nStorytellers";
     const wasPos = m.Vec2.init(sideMargin, yWas);
-    const wasRect = app.render.textRect(wasText, fontTitle);
+    const wasRect = app.render.textRect(wasText, fontTitle, null);
     renderQueue.text(wasText, wasPos, DEPTH_UI_GENERIC, fontTitle, COLOR_YELLOW_HOME);
     yWas += wasRect.size().y;
 
@@ -1409,47 +1554,49 @@ fn drawMobile(state: *App, deltaS: f32, scrollY: f32, screenSize: m.Vec2, render
     const text1 = "Yorstory is a creative development\nstudio specializing in sequential\nart.";
     const text1Pos = m.Vec2.init(sideMargin, yWas);
     renderQueue.text(text1, text1Pos, DEPTH_UI_GENERIC, fontText, COLOR_YELLOW_HOME);
-    const text1Rect = app.render.textRect(text1, fontText);
+    const text1Rect = app.render.textRect(text1, fontText, null);
     yWas += text1Rect.size().y;
 
     yWas += gridSize * 1.0;
     const text2 = "We are storytellers with over\ntwenty years of experience in the\nTelevision, Film, and Video Game\nindustries.";
     const text2Pos = m.Vec2.init(sideMargin, yWas);
     renderQueue.text(text2, text2Pos, DEPTH_UI_GENERIC, fontText, COLOR_YELLOW_HOME);
-    const text2Rect = app.render.textRect(text2, fontText);
+    const text2Rect = app.render.textRect(text2, fontText, null);
     yWas += text2Rect.size().y;
 
     y += screenSize.y;
 
     // ==== THIRD FRAME: PROJECTS ====
 
+    const pf = state.portfolio orelse return @floatToInt(i32, y);
+
     var yProjects = y + gridSize * 1.0;
-    for (portfolio.PORTFOLIO_LIST) |pf| {
+    for (pf.projects) |project| {
         const coverAspect = 1.74;
         const coverPos = m.Vec2.init(sideMargin, yProjects);
         const coverWidth = screenSize.x - sideMargin * 2.0;
         const coverSize = m.Vec2.init(coverWidth, coverWidth / coverAspect);
         yProjects += coverSize.y;
-        if (state.assets.getTextureData(.{.dynamic = pf.cover})) |tex| {
+        if (state.assets.getTextureData(.{.dynamic = project.cover})) |tex| {
             const cornerRadius = 0;
             renderQueue.texQuadColor(
                 coverPos, coverSize, DEPTH_GRIDIMAGE, cornerRadius, tex, m.Vec4.white
             );
         } else {
-            if (state.assets.getTextureLoadState(.{.dynamic = pf.cover}) == .free) {
-                state.assets.loadTexturePriority(.{.dynamic = pf.cover}, &.{
-                    .path = pf.cover,
+            if (state.assets.getTextureLoadState(.{.dynamic = project.cover}) == .free) {
+                state.assets.loadTexturePriority(.{.dynamic = project.cover}, &.{
+                    .path = project.cover,
                     .filter = defaultTextureFilter,
                     .wrapMode = defaultTextureWrap,
                 }, 5) catch |err| {
-                    std.log.err("Failed to register {s}, err {}", .{pf.cover, err});
+                    std.log.err("Failed to register {s}, err {}", .{project.cover, err});
                 };
             }
         }
 
         yProjects += gridSize * 1.0;
         const coverTextPos = m.Vec2.init(sideMargin, yProjects);
-        renderQueue.text(pf.title, coverTextPos, DEPTH_UI_GENERIC, fontText, COLOR_YELLOW_HOME);
+        renderQueue.text(project.name, coverTextPos, DEPTH_UI_GENERIC, fontText, COLOR_YELLOW_HOME);
         yProjects += gridSize * 1.5;
     }
 
