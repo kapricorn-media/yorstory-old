@@ -214,6 +214,18 @@ pub const PARALLAX_SETS = [_]ParallaxSet {
             ParallaxImage.init("images/parallax/gow/5-lensflare.png", 0.0),
         },
     },
+    .{
+        .bgColor = .{
+            .Color = colorHexToVec4("#111111") catch unreachable,
+        },
+        .images = &[_]ParallaxImage{
+            ParallaxImage.init("images/parallax/matahari/1-bg.png", 0.0),
+            ParallaxImage.init("images/parallax/matahari/2-bg-ladies.png", 0.1),
+            ParallaxImage.init("images/parallax/matahari/3-mg-buddha.png", 0.4),
+            ParallaxImage.init("images/parallax/matahari/4-matahari.png", 0.6),
+            ParallaxImage.init("images/parallax/matahari/5-fg.png", 1.2),
+        },
+    },
 };
 
 pub fn tryLoadAndGetParallaxSet(assets: anytype, index: usize, priority: u32, textureWrap: app.asset_data.TextureWrapMode, textureFilter: app.asset_data.TextureFilter) ?*const ParallaxSet

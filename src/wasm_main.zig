@@ -427,70 +427,6 @@ pub const App = struct {
             },
         });
 
-        switch (self.pageData) {
-            .Home => {
-                if (!isVertical) {
-                    try texturesToLoad.appendSlice(&[_]TextureLoadInfo {
-                        .{
-                            .texture = .LogosAll,
-                            .path = "images/logos-all.png",
-                            .priority = 8,
-                        },
-                        .{
-                            .texture = .ProjectSymbols,
-                            .path = "images/project-symbols.png",
-                            .priority = 8,
-                        },
-                        .{
-                            .texture = .StickerMainHome,
-                            .path = "images/sticker-main.png",
-                            .priority = 5,
-                        },
-                        .{
-                            .texture = .SymbolEye,
-                            .path = "images/symbol-eye.png",
-                            .priority = 5,
-                        },
-                        .{
-                            .texture = .YorstoryCompany,
-                            .path = "images/a-yorstory-company.png",
-                            .priority = 5,
-                        },
-                    });
-                } else {
-                    try texturesToLoad.appendSlice(&[_]TextureLoadInfo {
-                        .{
-                            .texture = .MobileBackground,
-                            .path = "images/mobile/background.png",
-                            .priority = 5,
-                        },
-                        .{
-                            .texture = .MobileCrosshair,
-                            .path = "images/mobile/crosshair.png",
-                            .priority = 5,
-                        },
-                        .{
-                            .texture = .MobileIcons,
-                            .path = "images/mobile/icons.png",
-                            .priority = 5,
-                        },
-                        .{
-                            .texture = .MobileLogo,
-                            .path = "images/mobile/logo-and-stuff.png",
-                            .priority = 5,
-                        },
-                        .{
-                            .texture = .MobileYorstoryCompany,
-                            .path = "images/mobile/a-yorstory-company.png",
-                            .priority = 5,
-                        },
-                    });
-                }
-            },
-            .Entry => {},
-            .Unknown => {},
-        }
-
         const helveticaBoldUrl = "/fonts/HelveticaNeueLTCom-Bd.ttf";
         const helveticaMediumUrl = "/fonts/HelveticaNeueLTCom-Md.ttf";
         const helveticaLightUrl = "/fonts/HelveticaNeueLTCom-Lt.ttf";
@@ -561,6 +497,34 @@ pub const App = struct {
                 .lineHeight = numberLineHeight,
             });
         } else {
+            try texturesToLoad.appendSlice(&[_]TextureLoadInfo {
+                .{
+                    .texture = .MobileBackground,
+                    .path = "images/mobile/background.png",
+                    .priority = 5,
+                },
+                .{
+                    .texture = .MobileCrosshair,
+                    .path = "images/mobile/crosshair.png",
+                    .priority = 5,
+                },
+                .{
+                    .texture = .MobileIcons,
+                    .path = "images/mobile/icons.png",
+                    .priority = 5,
+                },
+                .{
+                    .texture = .MobileLogo,
+                    .path = "images/mobile/logo-and-stuff.png",
+                    .priority = 5,
+                },
+                .{
+                    .texture = .MobileYorstoryCompany,
+                    .path = "images/mobile/a-yorstory-company.png",
+                    .priority = 5,
+                },
+            });
+
             const subtitleFontSize = fromRefFontSizePx(18, screenSizeF);
             const subtitleKerning = 0.0;
             const subtitleLineHeight = fromRefFontSizePx(26, screenSizeF);
@@ -573,6 +537,42 @@ pub const App = struct {
                 .kerning = subtitleKerning,
                 .lineHeight = subtitleLineHeight,
             });
+        }
+
+        switch (self.pageData) {
+            .Home => {
+                if (!isVertical) {
+                    try texturesToLoad.appendSlice(&[_]TextureLoadInfo {
+                        .{
+                            .texture = .LogosAll,
+                            .path = "images/logos-all.png",
+                            .priority = 8,
+                        },
+                        .{
+                            .texture = .ProjectSymbols,
+                            .path = "images/project-symbols.png",
+                            .priority = 8,
+                        },
+                        .{
+                            .texture = .StickerMainHome,
+                            .path = "images/sticker-main.png",
+                            .priority = 5,
+                        },
+                        .{
+                            .texture = .SymbolEye,
+                            .path = "images/symbol-eye.png",
+                            .priority = 5,
+                        },
+                        .{
+                            .texture = .YorstoryCompany,
+                            .path = "images/a-yorstory-company.png",
+                            .priority = 5,
+                        },
+                    });
+                }
+            },
+            .Entry => {},
+            .Unknown => {},
         }
 
         for (fontsToLoad.items) |ftl| {
