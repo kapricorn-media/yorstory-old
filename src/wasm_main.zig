@@ -40,6 +40,7 @@ const DEPTH_GRIDIMAGE = 0.6;
 const DEPTH_UI_BELOWALL = 1.0;
 
 const COLOR_YELLOW_HOME = m.Vec4.init(234.0 / 255.0, 1.0, 0.0, 1.0);
+const COLOR_RED_STICKER = m.Vec4.init(234.0 / 255.0, 65.0 / 255.0, 0.0, 1.0);
 
 fn isVerticalAspect(screenSize: m.Vec2) bool
 {
@@ -69,7 +70,7 @@ fn fromRefFontSizePx(refFontSizePx: f32, screenSize: m.Vec2) f32
 }
 
 // return true when pressed
-fn updateButton(topLeft: m.Vec2, size: m.Vec2, mouseState: app.input.MouseState, scrollY: f32, mouseHoverGlobal: *bool) bool
+fn updateButton(topLeft: m.Vec2, size: m.Vec2, mouseState: *const app.input.MouseState, scrollY: f32, mouseHoverGlobal: *bool) bool
 {
     const mousePosF = m.Vec2.initFromVec2i(mouseState.pos);
     const topLeftScroll = m.add(topLeft, m.Vec2.init(0, -scrollY));
@@ -457,6 +458,19 @@ pub const App = struct {
             .lineHeight = textLineHeight,
         });
 
+        const numberFontSize = gridSize * 1.8;
+        const numberKerning = 0;
+        const numberLineHeight = numberFontSize;
+        try fontsToLoad.append(.{
+            .font = .Number,
+            .path = helveticaBoldUrl,
+            .atlasSize = 2048,
+            .size = numberFontSize,
+            .scale = 1.0,
+            .kerning = numberKerning,
+            .lineHeight = numberLineHeight,
+        });
+
         if (!isVertical) {
             const categoryFontSize = gridSize * 0.6;
             const categoryKerning = 0;
@@ -482,19 +496,6 @@ pub const App = struct {
                 .scale = 1.0,
                 .kerning = subtitleKerning,
                 .lineHeight = subtitleLineHeight,
-            });
-
-            const numberFontSize = gridSize * 1.8;
-            const numberKerning = 0;
-            const numberLineHeight = numberFontSize;
-            try fontsToLoad.append(.{
-                .font = .Number,
-                .path = helveticaBoldUrl,
-                .atlasSize = 2048,
-                .size = numberFontSize,
-                .scale = 1.0,
-                .kerning = numberKerning,
-                .lineHeight = numberLineHeight,
             });
         } else {
             try texturesToLoad.appendSlice(&[_]TextureLoadInfo {
@@ -647,7 +648,7 @@ fn drawImageGrid(images: []const GridImage, indexOffset: usize, itemsPerRow: usi
             yMax = std.math.max(yMax, textPos.y);
         }
 
-        if (updateButton(itemPos, itemSize, state.inputState.mouseState, scrollY, mouseHoverGlobal)) {
+        if (updateButton(itemPos, itemSize, &state.inputState.mouseState, scrollY, mouseHoverGlobal)) {
             callback(state, img, indexOffset + i);
         }
 
@@ -756,7 +757,6 @@ fn drawDesktop(state: *App, deltaMs: u64, scrollYF: f32, screenSizeF: m.Vec2, re
             },
         }
     };
-    const colorRedSticker = m.Vec4.init(234.0 / 255.0, 65.0 / 255.0, 0.0, 1.0);
     const parallaxMotionMax = screenSizeF.x / 8.0;
 
     const mousePosF = m.Vec2.initFromVec2i(state.inputState.mouseState.pos);
@@ -949,7 +949,7 @@ fn drawDesktop(state: *App, deltaMs: u64, scrollYF: f32, screenSizeF: m.Vec2, re
             const categoryButtonSize = m.Vec2.init(categorySize.x * 1.2, categorySize.y * 2.0);
             const categoryButtonPos = m.Vec2.init(categoryPos.x - categorySize.x * 0.1, categoryPos.y - categorySize.y);
             if (c.uri) |uri| {
-                if (updateButton(categoryButtonPos, categoryButtonSize, state.inputState.mouseState, scrollYF, &mouseHoverGlobal)) {
+                if (updateButton(categoryButtonPos, categoryButtonSize, &state.inputState.mouseState, scrollYF, &mouseHoverGlobal)) {
                     state.changePage(uri);
                 }
             }
@@ -1191,10 +1191,6 @@ fn drawDesktop(state: *App, deltaMs: u64, scrollYF: f32, screenSizeF: m.Vec2, re
 
     // ==== THIRD FRAME ====
 
-    var yMax = section1Height + section2Height;
-    const fontNumber = state.assets.getFontData(.Number) orelse return @floatToInt(i32, yMax);
-    const pf = state.portfolio orelse return @floatToInt(i32, yMax);
-
     const CB = struct {
         fn home(theState: *App, image: GridImage, index: usize) void
         {
@@ -1218,6 +1214,10 @@ fn drawDesktop(state: *App, deltaMs: u64, scrollYF: f32, screenSizeF: m.Vec2, re
             }
         }
     };
+
+    var yMax = section1Height + section2Height;
+    const fontNumber = state.assets.getFontData(.Number) orelse return @floatToInt(i32, yMax);
+    const pf = state.portfolio orelse return @floatToInt(i32, yMax);
 
     const contentSubWidth = screenSizeF.x - contentMarginX * 2;
     switch (state.pageData) {
@@ -1256,7 +1256,7 @@ fn drawDesktop(state: *App, deltaMs: u64, scrollYF: f32, screenSizeF: m.Vec2, re
                     );
                     // TODO number should be on top, but depth sorting is bad
                     renderQueue.texQuadColor(
-                        numberPos, numberSize, DEPTH_UI_GENERIC + 0.02, 0, sCircle, colorRedSticker
+                        numberPos, numberSize, DEPTH_UI_GENERIC + 0.02, 0, sCircle, COLOR_RED_STICKER
                     );
                     const numStr = std.fmt.allocPrint(allocator, "{}", .{i + 1}) catch unreachable;
                     const numberTextPos = m.Vec2.init(
@@ -1465,8 +1465,24 @@ fn drawDesktop(state: *App, deltaMs: u64, scrollYF: f32, screenSizeF: m.Vec2, re
 fn drawMobile(state: *App, deltaS: f32, scrollY: f32, screenSize: m.Vec2, renderQueue: *app.render.RenderQueue, allocator: std.mem.Allocator) i32
 {
     _ = deltaS;
-    _ = scrollY;
-    _ = allocator;
+
+    const colorUi = blk: {
+        switch (state.pageData) {
+            .Home => {
+                break :blk COLOR_YELLOW_HOME;
+            },
+            .Entry => |entryData| {
+                if (state.portfolio) |pf| {
+                    break :blk pf.projects[entryData.portfolioIndex].colorUi;
+                } else {
+                    break :blk m.Vec4.white;
+                }
+            },
+            .Unknown => {
+                break :blk m.Vec4.white;
+            },
+        }
+    };
 
     const aspect = screenSize.x / screenSize.y;
     const gridSize = getGridSize(screenSize);
@@ -1479,6 +1495,8 @@ fn drawMobile(state: *App, deltaS: f32, scrollY: f32, screenSize: m.Vec2, render
 
     const fontTitle = state.assets.getFontData(.Title) orelse return @floatToInt(i32, screenSize.y);
     const fontText = state.assets.getFontData(.Text) orelse return @floatToInt(i32, screenSize.y);
+
+    var mouseHoverGlobal = false;
 
     // ==== FIRST FRAME: LANDING ====
 
@@ -1539,39 +1557,210 @@ fn drawMobile(state: *App, deltaS: f32, scrollY: f32, screenSize: m.Vec2, render
 
     // ==== SECOND FRAME: WE ARE STORYTELLERS ====
 
+    if (state.pageData == .Unknown) {
+        return @floatToInt(i32, y);
+    }
+
     // slightly offset from the crosshair (aligned with the circle)
     const sideMargin = gridSize * 1.0;
+    const contentWidth = screenSize.x - sideMargin * 2;
 
     var yWas = y + gridSize * 8.0;
-    const wasText = "We are\nStorytellers";
+    const wasText = blk: {
+        switch (state.pageData) {
+            .Home => break :blk "We are\nStorytellers",
+            .Entry => |entryData| {
+                const project = state.portfolio.?.projects[entryData.portfolioIndex];
+                break :blk project.name;
+            },
+            .Unknown => unreachable,
+        }
+    };
     const wasPos = m.Vec2.init(sideMargin, yWas);
     const wasRect = app.render.textRect(wasText, fontTitle, null);
-    renderQueue.text(wasText, wasPos, DEPTH_UI_GENERIC, fontTitle, COLOR_YELLOW_HOME);
+    renderQueue.text(wasText, wasPos, DEPTH_UI_GENERIC, fontTitle, colorUi);
     yWas += wasRect.size().y;
 
-    // TODO what's happening here? why don't I need this extra spacing?
-    // yWas += gridSize * 2.0;
-    const text1 = "Yorstory is a creative development\nstudio specializing in sequential\nart.";
-    const text1Pos = m.Vec2.init(sideMargin, yWas);
-    renderQueue.text(text1, text1Pos, DEPTH_UI_GENERIC, fontText, COLOR_YELLOW_HOME);
-    const text1Rect = app.render.textRect(text1, fontText, null);
-    yWas += text1Rect.size().y;
+    switch (state.pageData) {
+        .Home => {
+            // TODO what's happening here? why don't I need this extra spacing?
+            // yWas += gridSize * 2.0;
+            const text1 = "Yorstory is a creative development\nstudio specializing in sequential\nart.";
+            const text1Pos = m.Vec2.init(sideMargin, yWas);
+            renderQueue.text(text1, text1Pos, DEPTH_UI_GENERIC, fontText, colorUi);
+            const text1Rect = app.render.textRect(text1, fontText, null);
+            yWas += text1Rect.size().y;
 
-    yWas += gridSize * 1.0;
-    const text2 = "We are storytellers with over\ntwenty years of experience in the\nTelevision, Film, and Video Game\nindustries.";
-    const text2Pos = m.Vec2.init(sideMargin, yWas);
-    renderQueue.text(text2, text2Pos, DEPTH_UI_GENERIC, fontText, COLOR_YELLOW_HOME);
-    const text2Rect = app.render.textRect(text2, fontText, null);
-    yWas += text2Rect.size().y;
+            yWas += gridSize * 1.0;
+            const text2 = "We are storytellers with over\ntwenty years of experience in the\nTelevision, Film, and Video Game\nindustries.";
+            const text2Pos = m.Vec2.init(sideMargin, yWas);
+            renderQueue.text(text2, text2Pos, DEPTH_UI_GENERIC, fontText, colorUi);
+            const text2Rect = app.render.textRect(text2, fontText, null);
+            yWas += text2Rect.size().y;
+        },
+        .Entry => |entryData| {
+            const project = state.portfolio.?.projects[entryData.portfolioIndex];
+
+            const text1Pos = m.Vec2.init(sideMargin, yWas);
+            renderQueue.textWithMaxWidth(project.contentDescription, text1Pos, DEPTH_UI_GENERIC, contentWidth, fontText, colorUi);
+            const text1Rect = app.render.textRect(project.contentDescription, fontText, contentWidth);
+            yWas += text1Rect.size().y;
+        },
+        .Unknown => unreachable,
+    }
 
     y += screenSize.y;
 
-    // ==== THIRD FRAME: PROJECTS ====
+    // ==== THIRD FRAME: GALLERY (ENTRY ONLY) ====
+
+    const CB = struct {
+        fn entry(theState: *App, image: GridImage, index: usize) void
+        {
+            _ = theState;
+            _ = image;
+            _ = index;
+        }
+    };
 
     const pf = state.portfolio orelse return @floatToInt(i32, y);
 
+    var y3 = y;
+    switch (state.pageData) {
+        .Home => {},
+        .Unknown => unreachable,
+        .Entry => |entryData| {
+            const project = pf.projects[entryData.portfolioIndex];
+            const fontNumber = state.assets.getFontData(.Number) orelse return @floatToInt(i32, y3);
+            const fontSubtitle = state.assets.getFontData(.Subtitle) orelse return @floatToInt(i32, y3);
+            const sCircle = state.assets.getTextureData(.{.static = .StickerCircle}) orelse return @floatToInt(i32, y3);
+
+            y3 += gridSize * 2.0;
+
+            var galleryImages = std.ArrayList(GridImage).init(allocator);
+
+            var yGallery = y3;
+            var indexOffset: usize = 0; // TODO eh...
+            for (project.sections) |section, i| {
+                if (section.name.len > 0 or section.description.len > 0) {
+                    const numberSize = getTextureScaledSize(sCircle.size, screenSize);
+                    const numberPos = m.Vec2.init(
+                        sideMargin - gridSize * 1.4,
+                        yGallery - gridSize * 2.4,
+                    );
+                    // TODO number should be on top, but depth sorting is bad
+                    renderQueue.texQuadColor(
+                        numberPos, numberSize, DEPTH_UI_GENERIC + 0.02, 0, sCircle, COLOR_RED_STICKER
+                    );
+                    const numStr = std.fmt.allocPrint(allocator, "{}", .{i + 1}) catch unreachable;
+                    const numberTextPos = m.Vec2.init(
+                        numberPos.x + numberSize.x * 0.28,
+                        numberPos.y + numberSize.y * 0.75
+                    );
+                    renderQueue.text(numStr, numberTextPos, DEPTH_UI_GENERIC + 0.01, fontNumber, m.Vec4.black);
+
+                    const subNameRect = app.render.textRect(section.name, fontSubtitle, null);
+                    renderQueue.text(section.name, m.Vec2.init(sideMargin, yGallery), DEPTH_UI_GENERIC, fontSubtitle, colorUi);
+                    yGallery += -subNameRect.min.y + gridSize * 2.0;
+
+                    const subDescriptionWidth = screenSize.x - sideMargin * 2;
+                    const subDescriptionRect = app.render.textRect(section.description, fontText, subDescriptionWidth);
+                    renderQueue.textWithMaxWidth(
+                        section.description,
+                        m.Vec2.init(sideMargin, yGallery),
+                        DEPTH_UI_GENERIC,
+                        subDescriptionWidth,
+                        fontText,
+                        colorUi
+                    );
+                    yGallery += -subDescriptionRect.min.y + gridSize * 2.0;
+                }
+
+                galleryImages.clearRetainingCapacity();
+                for (section.images) |img| {
+                    galleryImages.append(GridImage {
+                        .uri = img,
+                        .title = null,
+                        .goToUri = null,
+                    }) catch |err| {
+                        std.log.err("image append failed {}", .{err});
+                    };
+                }
+
+                const itemsPerRow = 1;
+                const topLeft = m.Vec2.init(sideMargin, yGallery);
+                const spacing = gridSize * 0.25;
+                yGallery += drawImageGrid(galleryImages.items, indexOffset, itemsPerRow, topLeft, contentWidth, spacing, 9, fontText, colorUi, state, scrollY, &mouseHoverGlobal, renderQueue, CB.entry);
+                yGallery += gridSize * 4.0;
+                indexOffset += section.images.len;
+            }
+
+            y3 = yGallery + gridSize * 1;
+
+            // TODO
+            // video embed
+            // if (pf.youtubeId) |youtubeId| {
+            //     const embedWidth = screenSizeF.x - contentMarginX * 2;
+            //     const embedSize = m.Vec2.init(embedWidth, embedWidth / 2.0);
+            //     const embedPos = m.Vec2.init(contentMarginX, yMax);
+            //     renderQueue.embedYoutube(embedPos, embedSize, youtubeId);
+            //     yMax += embedSize.y + gridSize * 4;
+            // }
+
+            y3 += gridSize * 1;
+
+            if (entryData.galleryImageIndex) |ind| {
+                const pos = m.Vec2.init(0.0, scrollY);
+                renderQueue.quad(pos, screenSize, DEPTH_UI_OVER2, 0, m.Vec4.init(0.0, 0.0, 0.0, 1.0));
+
+                if (getImageUrlFromIndex(pf, entryData, ind)) |imageUrl| {
+                    if (state.assets.getTextureData(.{.dynamic = imageUrl})) |imageTex| {
+                        const imageRefSizeF = m.Vec2.initFromVec2usize(imageTex.size);
+                        const targetHeight = screenSize.y - gridSize * 4.0;
+                        const imageSize = m.Vec2.init(
+                            targetHeight / imageRefSizeF.y * imageRefSizeF.x,
+                            targetHeight
+                        );
+                        const imagePos = m.Vec2.init(
+                            (screenSize.x - imageSize.x) / 2.0,
+                            scrollY + gridSize * 2.0
+                        );
+                        // const imagePos = m.Vec2.add(pos, m.Vec2.init(gridSize, gridSize));
+                        renderQueue.texQuad(imagePos, imageSize, DEPTH_UI_OVER2 - 0.01, 0, imageTex);
+
+                        const clickEvents = state.inputState.mouseState.clickEvents[0..state.inputState.mouseState.numClickEvents];
+                        for (clickEvents) |e| {
+                            if (e.clickType == .Left and e.down) {
+                                const posF = m.Vec2.initFromVec2i(e.pos);
+                                if (posF.x < (screenSize.x - imageSize.x) / 2.0
+                                    or posF.x > (screenSize.x + imageSize.x) / 2.0
+                                    or posF.y < (gridSize * 2.0)
+                                    or posF.y > (screenSize.y - gridSize * 2.0)) {
+                                    state.pageData.Entry.galleryImageIndex = null;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+    }
+
+    y = y3;
+
+    // ==== FOURTH FRAME: PROJECTS ====
+
+    if (state.pageData == .Entry) {
+        y += gridSize;
+        renderQueue.text("Other\nProjects", m.Vec2.init(sideMargin, y), DEPTH_UI_GENERIC, fontTitle, colorUi);
+        y += fontTitle.lineHeight + gridSize;
+    }
+
     var yProjects = y + gridSize * 1.0;
-    for (pf.projects) |project| {
+    for (pf.projects) |project, i| {
+        if (state.pageData == .Entry and state.pageData.Entry.portfolioIndex == i) {
+            continue;
+        }
+
         const coverAspect = 1.74;
         const coverPos = m.Vec2.init(sideMargin, yProjects);
         const coverWidth = screenSize.x - sideMargin * 2.0;
@@ -1593,6 +1782,9 @@ fn drawMobile(state: *App, deltaS: f32, scrollY: f32, screenSize: m.Vec2, render
                 };
             }
         }
+        if (updateButton(coverPos, coverSize, &state.inputState.mouseState, scrollY, &mouseHoverGlobal)) {
+            state.changePage(project.uri);
+        }
 
         yProjects += gridSize * 1.0;
         const coverTextPos = m.Vec2.init(sideMargin, yProjects);
@@ -1610,6 +1802,13 @@ fn drawMobile(state: *App, deltaS: f32, scrollY: f32, screenSize: m.Vec2, render
         gradientPos, gradientSize, DEPTH_LANDINGBACKGROUND, 0.0,
         [4]m.Vec4 {m.Vec4.black, m.Vec4.black, gradientColor, gradientColor}
     );
+
+    // TODO don't do all the time
+    if (mouseHoverGlobal) {
+        w.setCursorZ("pointer");
+    } else {
+        w.setCursorZ("auto");
+    }
 
     return @floatToInt(i32, y);
 }
