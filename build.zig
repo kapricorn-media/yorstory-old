@@ -35,7 +35,7 @@ pub fn build(b: *std.build.Builder) !void
     testing.setTarget(target);
     zigkmBuild.addPackages(
         "deps/zigkm-common",
-        &[_]zigkmBuild.Package {.app, .google},
+        &[_]zigkmBuild.Package {.app, .google, .zigimg},
         testing
     );
     testing.linkLibC();

@@ -4,6 +4,7 @@ const google = @import("zigkm-google");
 
 const app = @import("zigkm-app");
 const bigdata = app.bigdata;
+const zigimg = @import("zigimg");
 
 const CHUNK_SIZE = 512 * 1024;
 
@@ -65,7 +66,22 @@ pub const Data = struct {
                 if (!l.visible) {
                     continue;
                 }
-                _ = i;
+
+                const layerPixelData = try psdFile.layers[i].getPixelData(null, tempAllocator);
+                const chunkSize = bigdata.calculateChunkSize(slice.size, CHUNK_SIZE_MAX);
+                const chunked = try pixelDataToPngChunkedFormat(layerPixelData, slice, chunkSize, allocator);
+                const outputDir = entry.path[0..entry.path.len - 4];
+                const uri = try std.fmt.allocPrint(allocator, "/{s}/{s}.png", .{outputDir, l.name});
+                try entries.append(Entry {
+                    .uri = uri,
+                    .data = chunked,
+                });
+                std.log.info("wrote chunked layer as {s} ({}K)", .{uri, chunked.len / 1024});
+
+                const png = @import("png.zig");
+                const testPath = try std.fmt.allocPrint(tempAllocator, "{s}.png", .{l.name});
+                try png.writePngFile(testPath, layerPixelData, slice);
+
                 // const dashInd = std.mem.indexOfScalar(u8, l.name, '-') orelse continue;
                 // const pre = l.name[0..dashInd];
                 // var allNumbers = true;
