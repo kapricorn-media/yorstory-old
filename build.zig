@@ -30,16 +30,16 @@ pub fn build(b: *std.build.Builder) !void
         .custom = "server",
     };
 
-    const testing = b.addExecutable("testing", "src/testing.zig");
-    testing.setBuildMode(mode);
-    testing.setTarget(target);
-    zigkmBuild.addPackages(
-        "deps/zigkm-common",
-        &[_]zigkmBuild.Package {.app, .google, .zigimg},
-        testing
-    );
-    testing.linkLibC();
-    testing.install();
+    // const testing = b.addExecutable("testing", "src/testing.zig");
+    // testing.setBuildMode(mode);
+    // testing.setTarget(target);
+    // zigkmBuild.addPackages(
+    //     "deps/zigkm-common",
+    //     &[_]zigkmBuild.Package {.app, .google, .zigimg},
+    //     testing
+    // );
+    // testing.linkLibC();
+    // testing.install();
 
     const server = b.addExecutable("yorstory", "src/server_main.zig");
     server.setBuildMode(mode);

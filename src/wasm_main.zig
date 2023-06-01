@@ -99,7 +99,7 @@ const PageData = union(PageType) {
     Home: void,
     Entry: struct {
         portfolioIndex: usize,
-        galleryImageIndex: ?usize,
+        galleryIndex: ?usize,
     },
     Unknown: void,
 };
@@ -117,7 +117,7 @@ fn uriToPageData(uri: []const u8, pf: ?portfolio.Portfolio) PageData
                 return PageData {
                     .Entry = .{
                         .portfolioIndex = i,
-                        .galleryImageIndex = null,
+                        .galleryIndex = null,
                     }
                 };
             }
@@ -229,20 +229,20 @@ pub const App = struct {
         const keyCodeArrowRight = 39;
         const keyCodeG = 71;
 
-        if (self.pageData == .Entry and self.pageData.Entry.galleryImageIndex != null and self.portfolio != null) {
-            const imageCount = getImageCount(self.portfolio.?, self.pageData.Entry);
+        if (self.pageData == .Entry and self.pageData.Entry.galleryIndex != null and self.portfolio != null) {
+            const indexCount = getGalleryIndexCount(self.portfolio.?.projects[self.pageData.Entry.portfolioIndex]);
             if (self.inputState.keyboardState.keyDown(keyCodeEscape)) {
-                self.pageData.Entry.galleryImageIndex = null;
+                self.pageData.Entry.galleryIndex = null;
             } else if (self.inputState.keyboardState.keyDown(keyCodeArrowLeft)) {
-                if (self.pageData.Entry.galleryImageIndex.? == 0) {
-                    self.pageData.Entry.galleryImageIndex.? = imageCount - 1;
+                if (self.pageData.Entry.galleryIndex.? == 0) {
+                    self.pageData.Entry.galleryIndex.? = indexCount - 1;
                 } else {
-                    self.pageData.Entry.galleryImageIndex.? -= 1;
+                    self.pageData.Entry.galleryIndex.? -= 1;
                 }
             } else if (self.inputState.keyboardState.keyDown(keyCodeArrowRight)) {
-                self.pageData.Entry.galleryImageIndex.? += 1;
-                if (self.pageData.Entry.galleryImageIndex.? >= imageCount) {
-                    self.pageData.Entry.galleryImageIndex.? = 0;
+                self.pageData.Entry.galleryIndex.? += 1;
+                if (self.pageData.Entry.galleryIndex.? >= indexCount) {
+                    self.pageData.Entry.galleryIndex.? = 0;
                 }
             }
         }
@@ -438,7 +438,7 @@ pub const App = struct {
         try fontsToLoad.append(.{
             .font = .Title,
             .path = helveticaBoldUrl,
-            .atlasSize = 2048,
+            .atlasSize = 4096,
             .size = titleFontSize,
             .scale = 1.0,
             .kerning = titleKerning,
@@ -606,7 +606,7 @@ const GridImage = struct {
     goToUri: ?[]const u8,
 };
 
-fn drawImageGrid(images: []const GridImage, indexOffset: usize, itemsPerRow: usize, topLeft: m.Vec2, width: f32, spacing: f32, texPriority: u32, fontData: *const app.asset_data.FontData, fontColor: m.Vec4, state: *App, scrollY: f32, mouseHoverGlobal: *bool, renderQueue: *app.render.RenderQueue, callback: *const fn(*App, GridImage, usize) void) f32
+fn drawImageGrid(images: []const GridImage, indexOffset: usize, itemsPerRow: usize, topLeft: m.Vec2, width: f32, spacing: f32, depthTex: f32, texPriority: u32, fontData: *const app.asset_data.FontData, fontColor: m.Vec4, state: *App, scrollY: f32, mouseHoverGlobal: *bool, renderQueue: *app.render.RenderQueue, callback: *const fn(*App, GridImage, usize) void) f32
 {
     const itemAspect = 1.74;
     const itemWidth = (width - spacing * (@intToFloat(f32, itemsPerRow) - 1)) / @intToFloat(f32, itemsPerRow);
@@ -624,7 +624,7 @@ fn drawImageGrid(images: []const GridImage, indexOffset: usize, itemsPerRow: usi
         if (state.assets.getTextureData(.{.dynamic = img.uri})) |tex| {
             const cornerRadius = 0;
             renderQueue.texQuadColor(
-                itemPos, itemSize, DEPTH_GRIDIMAGE, cornerRadius, tex, m.Vec4.white
+                itemPos, itemSize, depthTex, cornerRadius, tex, m.Vec4.white
             );
         } else {
             if (state.assets.getTextureLoadState(.{.dynamic = img.uri}) == .free) {
@@ -665,6 +665,8 @@ fn getTextureScaledSize(size: m.Vec2usize, screenSize: m.Vec2) m.Vec2
     return m.multScalar(sizeF, scaleFactor);
 }
 
+const IMAGES_PER_ZOOM = 6;
+
 fn getImageCount(pf: portfolio.Portfolio, entryData: anytype) usize
 {
     const project = pf.projects[entryData.portfolioIndex];
@@ -675,6 +677,34 @@ fn getImageCount(pf: portfolio.Portfolio, entryData: anytype) usize
         }
     }
     return i;
+}
+
+fn getGalleryIndexCount(project: portfolio.Project) usize
+{
+    var i: usize = 0;
+    for (project.sections) |section| {
+        if (section.images.len > 0) {
+            i += ((section.images.len - 1) / IMAGES_PER_ZOOM) + 1;
+        }
+    }
+    return i;
+}
+
+fn imageIndexToGalleryIndex(index: usize, project: portfolio.Project) usize
+{
+    var i: usize = 0;
+    var galleryIndex: usize = 0;
+    for (project.sections) |section| {
+        i += section.images.len;
+        if (i >= index) {
+            // const off = (i - index) / IMAGES_PER_ZOOM;
+            return galleryIndex;
+        }
+        if (section.images.len > 0) {
+            galleryIndex += ((section.images.len - 1) / IMAGES_PER_ZOOM) + 1;
+        }
+    }
+    return galleryIndex;
 }
 
 fn getImageUrlFromIndex(pf: portfolio.Portfolio, entryData: anytype, index: usize) ?[]const u8
@@ -1209,8 +1239,9 @@ fn drawDesktop(state: *App, deltaMs: u64, scrollYF: f32, screenSizeF: m.Vec2, re
                 std.log.err("entry callback, but not an Entry page", .{});
                 return;
             }
-            if (theState.pageData.Entry.galleryImageIndex == null) {
-                theState.pageData.Entry.galleryImageIndex = index;
+            if (theState.pageData.Entry.galleryIndex == null) {
+                const p = theState.portfolio.?.projects[theState.pageData.Entry.portfolioIndex];
+                theState.pageData.Entry.galleryIndex = imageIndexToGalleryIndex(index, p);
             }
         }
     };
@@ -1296,7 +1327,7 @@ fn drawDesktop(state: *App, deltaMs: u64, scrollYF: f32, screenSizeF: m.Vec2, re
                 const itemsPerRow = 6;
                 const topLeft = m.Vec2.init(contentMarginX, yGallery);
                 const spacing = gridSize * 0.25;
-                yGallery += drawImageGrid(galleryImages.items, indexOffset, itemsPerRow, topLeft, contentSubWidth, spacing, 9, fontText, colorUi, state, scrollYF, &mouseHoverGlobal, renderQueue, CB.entry);
+                yGallery += drawImageGrid(galleryImages.items, indexOffset, itemsPerRow, topLeft, contentSubWidth, spacing, DEPTH_GRIDIMAGE, 9, fontText, colorUi, state, scrollYF, &mouseHoverGlobal, renderQueue, CB.entry);
                 yGallery += gridSize * 4.0;
                 indexOffset += section.images.len;
             }
@@ -1315,39 +1346,40 @@ fn drawDesktop(state: *App, deltaMs: u64, scrollYF: f32, screenSizeF: m.Vec2, re
 
             yMax += gridSize * 1;
 
-            if (entryData.galleryImageIndex) |ind| {
+            if (entryData.galleryIndex) |galleryIndex| {
                 const pos = m.Vec2.init(0.0, scrollYF);
                 renderQueue.quad(pos, screenSizeF, DEPTH_UI_OVER2, 0, m.Vec4.init(0.0, 0.0, 0.0, 1.0));
 
-                if (getImageUrlFromIndex(pf, entryData, ind)) |imageUrl| {
-                    if (state.assets.getTextureData(.{.dynamic = imageUrl})) |imageTex| {
-                        const imageRefSizeF = m.Vec2.initFromVec2usize(imageTex.size);
-                        const targetHeight = screenSizeF.y - gridSize * 4.0;
-                        const imageSize = m.Vec2.init(
-                            targetHeight / imageRefSizeF.y * imageRefSizeF.x,
-                            targetHeight
-                        );
-                        const imagePos = m.Vec2.init(
-                            (screenSizeF.x - imageSize.x) / 2.0,
-                            scrollYF + gridSize * 2.0
-                        );
-                        // const imagePos = m.Vec2.add(pos, m.Vec2.init(gridSize, gridSize));
-                        renderQueue.texQuad(imagePos, imageSize, DEPTH_UI_OVER2 - 0.01, 0, imageTex);
-
-                        const clickEvents = state.inputState.mouseState.clickEvents[0..state.inputState.mouseState.numClickEvents];
-                        for (clickEvents) |e| {
-                            if (e.clickType == .Left and e.down) {
-                                const posF = m.Vec2.initFromVec2i(e.pos);
-                                if (posF.x < (screenSizeF.x - imageSize.x) / 2.0
-                                    or posF.x > (screenSizeF.x + imageSize.x) / 2.0
-                                    or posF.y < (gridSize * 2.0)
-                                    or posF.y > (screenSizeF.y - gridSize * 2.0)) {
-                                    state.pageData.Entry.galleryImageIndex = null;
-                                }
+                galleryImages.clearRetainingCapacity();
+                var i: usize = 0;
+                for (project.sections) |section| {
+                    if (section.images.len > 0) {
+                        i += ((section.images.len - 1) / IMAGES_PER_ZOOM) + 1;
+                    }
+                    if (i >= galleryIndex) {
+                        var count: usize = 0;
+                        for (section.images) |img| {
+                            if (count >= IMAGES_PER_ZOOM) {
+                                break;
                             }
+                            count += 1;
+
+                            galleryImages.append(GridImage {
+                                .uri = img,
+                                .title = null,
+                                .goToUri = null,
+                            }) catch unreachable;
                         }
+                        break;
                     }
                 }
+                const spacing = gridSize * 0.25;
+                const aspect = 1.74; // TODO Copied from imagegrid
+                const perRow: usize = IMAGES_PER_ZOOM / 2;
+                const height = screenSizeF.x / @intToFloat(f32, perRow) / aspect * 2;
+                const yOffset = (screenSizeF.y - height) / 2;
+                const pospos = m.Vec2.init(0.0, scrollYF + yOffset);
+                _ = drawImageGrid(galleryImages.items, 0, perRow, pospos, screenSizeF.x, spacing, DEPTH_UI_OVER2 - 0.01, 9, fontText, colorUi, state, scrollYF, &mouseHoverGlobal, renderQueue, CB.entry);
             }
         },
     }
@@ -1398,7 +1430,7 @@ fn drawDesktop(state: *App, deltaMs: u64, scrollYF: f32, screenSizeF: m.Vec2, re
         section3Start + gridSize * 14.0,
     );
     const spacing = gridSize * 0.25;
-    const projectGridY = drawImageGrid(images.items, 0, itemsPerRow, gridTopLeft, contentSubWidth, spacing, 8, fontText, colorUi, state, scrollYF, &mouseHoverGlobal, renderQueue, CB.home);
+    const projectGridY = drawImageGrid(images.items, 0, itemsPerRow, gridTopLeft, contentSubWidth, spacing, DEPTH_GRIDIMAGE, 8, fontText, colorUi, state, scrollYF, &mouseHoverGlobal, renderQueue, CB.home);
 
     const section3Height = gridTopLeft.y - section3Start + projectGridY + gridSize * 8.0;
 
@@ -1689,7 +1721,7 @@ fn drawMobile(state: *App, deltaS: f32, scrollY: f32, screenSize: m.Vec2, render
                 const itemsPerRow = 1;
                 const topLeft = m.Vec2.init(sideMargin, yGallery);
                 const spacing = gridSize * 0.25;
-                yGallery += drawImageGrid(galleryImages.items, indexOffset, itemsPerRow, topLeft, contentWidth, spacing, 9, fontText, colorUi, state, scrollY, &mouseHoverGlobal, renderQueue, CB.entry);
+                yGallery += drawImageGrid(galleryImages.items, indexOffset, itemsPerRow, topLeft, contentWidth, spacing, DEPTH_GRIDIMAGE, 9, fontText, colorUi, state, scrollY, &mouseHoverGlobal, renderQueue, CB.entry);
                 yGallery += gridSize * 4.0;
                 indexOffset += section.images.len;
             }
@@ -1707,41 +1739,6 @@ fn drawMobile(state: *App, deltaS: f32, scrollY: f32, screenSize: m.Vec2, render
             // }
 
             y3 += gridSize * 1;
-
-            if (entryData.galleryImageIndex) |ind| {
-                const pos = m.Vec2.init(0.0, scrollY);
-                renderQueue.quad(pos, screenSize, DEPTH_UI_OVER2, 0, m.Vec4.init(0.0, 0.0, 0.0, 1.0));
-
-                if (getImageUrlFromIndex(pf, entryData, ind)) |imageUrl| {
-                    if (state.assets.getTextureData(.{.dynamic = imageUrl})) |imageTex| {
-                        const imageRefSizeF = m.Vec2.initFromVec2usize(imageTex.size);
-                        const targetHeight = screenSize.y - gridSize * 4.0;
-                        const imageSize = m.Vec2.init(
-                            targetHeight / imageRefSizeF.y * imageRefSizeF.x,
-                            targetHeight
-                        );
-                        const imagePos = m.Vec2.init(
-                            (screenSize.x - imageSize.x) / 2.0,
-                            scrollY + gridSize * 2.0
-                        );
-                        // const imagePos = m.Vec2.add(pos, m.Vec2.init(gridSize, gridSize));
-                        renderQueue.texQuad(imagePos, imageSize, DEPTH_UI_OVER2 - 0.01, 0, imageTex);
-
-                        const clickEvents = state.inputState.mouseState.clickEvents[0..state.inputState.mouseState.numClickEvents];
-                        for (clickEvents) |e| {
-                            if (e.clickType == .Left and e.down) {
-                                const posF = m.Vec2.initFromVec2i(e.pos);
-                                if (posF.x < (screenSize.x - imageSize.x) / 2.0
-                                    or posF.x > (screenSize.x + imageSize.x) / 2.0
-                                    or posF.y < (gridSize * 2.0)
-                                    or posF.y > (screenSize.y - gridSize * 2.0)) {
-                                    state.pageData.Entry.galleryImageIndex = null;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
         },
     }
 
