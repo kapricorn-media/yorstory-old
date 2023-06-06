@@ -30,16 +30,16 @@ pub fn build(b: *std.build.Builder) !void
         .custom = "server",
     };
 
-    // const testing = b.addExecutable("testing", "src/testing.zig");
-    // testing.setBuildMode(mode);
-    // testing.setTarget(target);
-    // zigkmBuild.addPackages(
-    //     "deps/zigkm-common",
-    //     &[_]zigkmBuild.Package {.app, .google, .zigimg},
-    //     testing
-    // );
-    // testing.linkLibC();
-    // testing.install();
+    const testing = b.addExecutable("testing", "src/testing.zig");
+    testing.setBuildMode(mode);
+    testing.setTarget(target);
+    zigkmBuild.addPackages(
+        "deps/zigkm-common",
+        &[_]zigkmBuild.Package {.app, .google, .zigimg},
+        testing
+    );
+    testing.linkLibC();
+    testing.install();
 
     const server = b.addExecutable("yorstory", "src/server_main.zig");
     server.setBuildMode(mode);
@@ -64,12 +64,24 @@ pub fn build(b: *std.build.Builder) !void
     wasm.override_dest_dir = installDirServer;
     wasm.install();
 
+    const testSrcs = [_][]const u8 {
+        "src/portfolio.zig",
+        "src/testing.zig",
+    };
     const runTests = b.step("test", "Run tests");
-    const testPortfolio = b.addTest("src/portfolio.zig");
-    testPortfolio.setBuildMode(mode);
-    testPortfolio.setTarget(target);
-    zigkmBuild.addPackages("deps/zigkm-common", &[_]zigkmBuild.Package {.math}, testPortfolio);
-    runTests.dependOn(&testPortfolio.step);
+    for (testSrcs) |testSrc| {
+        const t = b.addTest(testSrc);
+        t.setBuildMode(mode);
+        t.setTarget(target);
+        zigkmBuild.addPackages("deps/zigkm-common", &[_]zigkmBuild.Package {.app, .google, .math, .zigimg}, t);
+        t.linkLibC();
+        runTests.dependOn(&t.step);
+    }
+    // const testPortfolio = b.addTest("src/portfolio.zig");
+    // testPortfolio.setBuildMode(mode);
+    // testPortfolio.setTarget(target);
+    // zigkmBuild.addPackages("deps/zigkm-common", &[_]zigkmBuild.Package {.math}, testPortfolio);
+    // runTests.dependOn(&testPortfolio.step);
 
     const installDirTools = std.build.InstallDir {
         .custom = "tools",
@@ -86,14 +98,16 @@ pub fn build(b: *std.build.Builder) !void
     // genLut.override_dest_dir = installDirTools;
     // genLut.install();
 
-    const genbigdata = try zigkmBuild.addGenBigdataExe("deps/zigkm-common", b, mode, target);
-    genbigdata.override_dest_dir = installDirTools;
-    genbigdata.install();
+    // TODO reenable
+    _ = installDirTools;
+    // const genbigdata = try zigkmBuild.addGenBigdataExe("deps/zigkm-common", b, mode, target);
+    // genbigdata.override_dest_dir = installDirTools;
+    // genbigdata.install();
 
     const packageStep = b.step("package", "Package");
     packageStep.dependOn(b.getInstallStep());
-    const installGenbigdataStep = b.addInstallArtifact(genbigdata);
-    packageStep.dependOn(&installGenbigdataStep.step);
+    // const installGenbigdataStep = b.addInstallArtifact(genbigdata);
+    // packageStep.dependOn(&installGenbigdataStep.step);
     packageStep.dependOn(&b.addInstallDirectory(.{
         .source_dir = "deps/zigkm-common/src/app/static",
         .install_dir = .{.custom = "server-temp/static"},
