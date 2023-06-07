@@ -2,6 +2,7 @@ const builtin = @import("builtin");
 const std = @import("std");
 
 const google = @import("zigkm-google");
+const m = @import("zigkm-math");
 
 const app = @import("zigkm-app");
 const bigdata = app.bigdata;
@@ -21,6 +22,35 @@ fn readIntBigEndian(comptime T: type, data: []const u8) !T
     var stream = std.io.fixedBufferStream(data);
     var reader = stream.reader();
     return reader.readIntBig(T);
+}
+
+fn trim(image: zigimg.Image, slice: m.Rect2usize) m.Rect2usize
+{
+    std.debug.assert(image.pixels == .rgba32); // need alpha channel for current trim
+    std.debug.assert(slice.min.x <= image.width and slice.min.y <= image.height);
+    std.debug.assert(slice.max.x <= image.width and slice.max.y <= image.height);
+
+    const sliceSize = slice.size();
+    var max = slice.min;
+    var min = slice.max;
+    var y: usize = 0;
+    while (y < sliceSize.y) : (y += 1) {
+        var x: usize = 0;
+        while (x < sliceSize.x) : (x += 1) {
+            const pixelCoord = m.add(slice.min, m.Vec2usize.init(x, y));
+            const pixelInd = pixelCoord.y * image.width + pixelCoord.x;
+            const pixel = image.pixels.rgba32[pixelInd];
+            if (pixel.a != 0) {
+                max = m.max(max, pixelCoord);
+                min = m.min(min, pixelCoord);
+            }
+        }
+    }
+
+    if (min.x > max.x and min.y > max.y) {
+        return m.Rect2usize.zero;
+    }
+    return m.Rect2usize.init(m.add(slice.min, min), m.add(m.add(slice.min, max), m.Vec2usize.one));
 }
 
 fn deserializeMapValue(comptime T: type, data: []const u8, value: *T) !usize
@@ -322,10 +352,12 @@ pub const Data = struct {
         var md5 = std.crypto.hash.Md5.init(.{});
         md5.update(data);
         md5.final(&sourceEntry.md5Checksum);
+        sourceEntry.children.len = 0;
         // Important to clear all children for serialization logic
         for (sourceEntry.children.buffer) |*e| {
             e.len = 0;
         }
+        const pathDupe = try selfAllocator.dupe(u8, path);
 
         if (std.mem.endsWith(u8, path, ".psd")) {
             var psdFile: app.psd.PsdFile = undefined;
@@ -334,84 +366,25 @@ pub const Data = struct {
                 if (!l.visible) {
                     continue;
                 }
+                if (m.eql(l.size, m.Vec2usize.zero)) {
+                    continue;
+                }
 
-                _ = i;
-                // const layerPixelData = try psdFile.layers[i].getPixelData(null, tempAllocator);
-                // std.log.info("Loaded layer {s}, {}x{}", .{l.name, layerPixelData.width, layerPixelData.height});
-                // const chunkSize = bigdata.calculateChunkSize(slice.size, CHUNK_SIZE_MAX);
-                // const chunked = try pixelDataToPngChunkedFormat(layerPixelData, slice, chunkSize, allocator);
-                // const outputDir = entry.path[0..entry.path.len - 4];
-                // const uri = try std.fmt.allocPrint(allocator, "/{s}/{s}.png", .{outputDir, l.name});
-                // try entries.append(Entry {
-                //     .uri = uri,
-                //     .data = chunked,
-                // });
-                // std.log.info("wrote chunked layer as {s} ({}K)", .{uri, chunked.len / 1024});
+                const layerPath = try std.fmt.allocPrint(selfAllocator, "{s}/{s}.layer", .{path, l.name});
+                sourceEntry.children.buffer[sourceEntry.children.len] = layerPath;
+                sourceEntry.children.len += 1;
 
-                // const png = @import("png.zig");
-                // const testPath = try std.fmt.allocPrint(tempAllocator, "{s}.png", .{l.name});
-                // try png.writePngFile(testPath, layerPixelData, slice);
+                const layerPixelData = try psdFile.layers[i].getPixelDataCanvasSize(null, psdFile.canvasSize, tempAllocator);
+                const sliceTrim = trim(layerPixelData, m.Rect2usize.init(m.Vec2usize.zero, m.Vec2usize.init(layerPixelData.width, layerPixelData.height)));
+                const chunkSize = bigdata.calculateChunkSize(sliceTrim.size(), CHUNK_SIZE);
+                const chunked = try bigdata.imageToPngChunkedFormat(layerPixelData, sliceTrim, chunkSize, tempAllocator);
 
-                // const dashInd = std.mem.indexOfScalar(u8, l.name, '-') orelse continue;
-                // const pre = l.name[0..dashInd];
-                // var allNumbers = true;
-                // for (pre) |c| {
-                //     if (!('0' <= c and c <= '9')) {
-                //         allNumbers = false;
-                //         break;
-                //     }
-                // }
-                // if (!allNumbers) continue;
-
-                // const safeAspect = 3;
-                // const sizeX = @floatToInt(usize, @intToFloat(f32, psdFile.canvasSize.y) * safeAspect);
-                // const parallaxSize = m.Vec2usize.init(sizeX, psdFile.canvasSize.y);
-                // const topLeft = m.Vec2i.init(@divTrunc((@intCast(i32, psdFile.canvasSize.x) - @intCast(i32, sizeX)), 2), 0);
-                // const layerPixelData = image.PixelData {
-                //     .size = parallaxSize,
-                //     .channels = 4,
-                //     .data = try tempAllocator.alloc(u8, parallaxSize.x * parallaxSize.y * 4),
-                // };
-                // std.mem.set(u8, layerPixelData.data, 0);
-                // const sliceDst = image.PixelDataSlice {
-                //     .topLeft = m.Vec2usize.zero,
-                //     .size = parallaxSize,
-                // };
-                // _ = try psdFile.layers[i].getPixelDataRectBuf(null, topLeft, layerPixelData, sliceDst);
-
-                // const sliceAll = image.PixelDataSlice {
-                //     .topLeft = m.Vec2usize.zero,
-                //     .size = layerPixelData.size,
-                // };
-                // const sliceTrim = image.trim(layerPixelData, sliceAll);
-                // const slice = blk: {
-                //     const offsetLeftX = sliceTrim.topLeft.x - sliceAll.topLeft.x;
-                //     const offsetRightX = (sliceAll.topLeft.x + sliceAll.size.x) - (sliceTrim.topLeft.x + sliceTrim.size.x);
-                //     const offsetMin = std.math.min(offsetLeftX, offsetRightX);
-                //     break :blk image.PixelDataSlice {
-                //         .topLeft = m.Vec2usize.init(sliceAll.topLeft.x + offsetMin, sliceAll.topLeft.y),
-                //         .size = m.Vec2usize.init(sliceAll.size.x - offsetMin * 2, sliceAll.size.y),
-                //     };
-                // };
-                // const chunkSize = calculateChunkSize(slice.size, CHUNK_SIZE_MAX);
-                // const chunked = try pixelDataToPngChunkedFormat(layerPixelData, slice, chunkSize, allocator);
-                // const outputDir = entry.path[0..entry.path.len - 4];
-                // const uri = try std.fmt.allocPrint(allocator, "/{s}/{s}.png", .{outputDir, l.name});
-                // try entries.append(Entry {
-                //     .uri = uri,
-                //     .data = chunked,
-                // });
-                // std.log.info("wrote chunked layer as {s} ({}K)", .{uri, chunked.len / 1024});
-
-                // const png = @import("png.zig");
-                // const testPath = try std.fmt.allocPrint(tempAllocator, "{s}.png", .{l.name});
-                // try png.writePngFile(testPath, layerPixelData, slice);
+                try self.map.put(layerPath, try selfAllocator.dupe(u8, chunked));
+                std.log.info("Inserted {s}\n    {}x{} (trim {})", .{layerPath, layerPixelData.width, layerPixelData.height, sliceTrim});
             }
         } else {
-            const pathDupe = try selfAllocator.dupe(u8, path);
             sourceEntry.children.len = 1;
             sourceEntry.children.set(0, pathDupe);
-            try self.sourceMap.put(pathDupe, sourceEntry);
 
             if (std.mem.endsWith(u8, path, ".png")) {
                 const chunked = try bigdata.pngToChunkedFormat(data, CHUNK_SIZE, tempAllocator);
@@ -421,6 +394,8 @@ pub const Data = struct {
                 try self.map.put(pathDupe, try selfAllocator.dupe(u8, data));
             }
         }
+
+        try self.sourceMap.put(pathDupe, sourceEntry);
     }
 };
 
