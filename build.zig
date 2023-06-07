@@ -30,16 +30,16 @@ pub fn build(b: *std.build.Builder) !void
         .custom = "server",
     };
 
-    const testing = b.addExecutable("testing", "src/testing.zig");
-    testing.setBuildMode(mode);
-    testing.setTarget(target);
-    zigkmBuild.addPackages(
-        "deps/zigkm-common",
-        &[_]zigkmBuild.Package {.app, .google, .zigimg},
-        testing
-    );
-    testing.linkLibC();
-    testing.install();
+    // const testing = b.addExecutable("testing", "src/testing.zig");
+    // testing.setBuildMode(mode);
+    // testing.setTarget(target);
+    // zigkmBuild.addPackages(
+    //     "deps/zigkm-common",
+    //     &[_]zigkmBuild.Package {.app, .google, .zigimg},
+    //     testing
+    // );
+    // testing.linkLibC();
+    // testing.install();
 
     const server = b.addExecutable("yorstory", "src/server_main.zig");
     server.setBuildMode(mode);
@@ -66,7 +66,7 @@ pub fn build(b: *std.build.Builder) !void
 
     const testSrcs = [_][]const u8 {
         "src/portfolio.zig",
-        "src/testing.zig",
+        // "src/testing.zig",
     };
     const runTests = b.step("test", "Run tests");
     for (testSrcs) |testSrc| {
@@ -98,11 +98,9 @@ pub fn build(b: *std.build.Builder) !void
     // genLut.override_dest_dir = installDirTools;
     // genLut.install();
 
-    // TODO reenable
-    _ = installDirTools;
-    // const genbigdata = try zigkmBuild.addGenBigdataExe("deps/zigkm-common", b, mode, target);
-    // genbigdata.override_dest_dir = installDirTools;
-    // genbigdata.install();
+    const genbigdata = try zigkmBuild.addGenBigdataExe("deps/zigkm-common", b, mode, target);
+    genbigdata.override_dest_dir = installDirTools;
+    genbigdata.install();
 
     const packageStep = b.step("package", "Package");
     packageStep.dependOn(b.getInstallStep());

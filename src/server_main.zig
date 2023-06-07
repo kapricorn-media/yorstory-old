@@ -23,29 +23,8 @@ pub const log_level: std.log.Level = switch (builtin.mode) {
 
 const ServerCallbackError = server.Writer.Error || error {InternalServerError};
 
-fn initBigdata(
-    path: []const u8,
-    bytes: *[]const u8,
-    map: *std.StringHashMap([]const u8),
-    allocator: std.mem.Allocator) !void
-{
-    const cwd = std.fs.cwd();
-    const file = try cwd.openFile(path, .{});
-    defer file.close();
-    bytes.* = try file.readToEndAlloc(allocator, 1024 * 1024 * 1024);
-    map.* = std.StringHashMap([]const u8).init(allocator);
-    try bigdata.load(bytes.*, map);
-}
-
-fn deinitBigdata(bytes: *[]const u8, map: *std.StringHashMap([]const u8), allocator: std.mem.Allocator) void
-{
-    map.deinit();
-    allocator.free(bytes.*);
-}
-
 const DynamicData = struct {
-    bigdata: []const u8,
-    map: std.StringHashMap([]const u8),
+    data: bigdata.Data,
     portfolioJson: []const u8,
     portfolio: portfolio.Portfolio,
 };
@@ -53,8 +32,7 @@ const DynamicData = struct {
 const ServerState = struct {
     allocator: std.mem.Allocator,
 
-    bigdataStatic: []const u8,
-    mapStatic: std.StringHashMap([]const u8),
+    dataStatic: bigdata.Data,
     dynamic: DynamicData,
     dynamicAlpha: DynamicData,
 
@@ -68,8 +46,7 @@ const ServerState = struct {
     {
         var self: Self = .{
             .allocator = allocator,
-            .bigdataStatic = undefined,
-            .mapStatic = undefined,
+            .dataStatic = undefined,
             .dynamic = undefined,
             .dynamicAlpha = undefined,
         };
@@ -82,9 +59,10 @@ const ServerState = struct {
         self.dynamicAlpha.portfolioJson = try allocator.dupe(u8, self.dynamic.portfolioJson);
         self.dynamicAlpha.portfolio = try portfolio.Portfolio.init(self.dynamicAlpha.portfolioJson, allocator);
 
-        try initBigdata(bigdataStaticPath, &self.bigdataStatic, &self.mapStatic, allocator);
-        try initBigdata(bigdataDynamicPath, &self.dynamic.bigdata, &self.dynamic.map, allocator);
-        try initBigdata(bigdataDynamicPath, &self.dynamicAlpha.bigdata, &self.dynamicAlpha.map, allocator);
+        try self.dataStatic.loadFromFile(bigdataStaticPath, allocator);
+        try self.dynamic.data.loadFromFile(bigdataDynamicPath, allocator);
+        try self.dynamicAlpha.data.loadFromFile(bigdataDynamicPath, allocator);
+
         return self;
     }
 
@@ -94,9 +72,9 @@ const ServerState = struct {
         self.allocator.free(self.dynamic.portfolioJson);
         self.dynamicAlpha.portfolio.deinit(self.allocator);
         self.allocator.free(self.dynamicAlpha.portfolioJson);
-        deinitBigdata(&self.bigdataStatic, &self.mapStatic, self.allocator);
-        deinitBigdata(&self.dynamic.bigdata, &self.dynamic.map, self.allocator);
-        deinitBigdata(&self.dynamicAlpha.bigdata, &self.dynamicAlpha.map, self.allocator);
+        self.dataStatic.deinit();
+        self.dynamic.data.deinit();
+        self.dynamicAlpha.data.deinit();
     }
 };
 
@@ -111,7 +89,7 @@ fn serverCallback(
     if (isAdmin) {
         return error.AdminSiteNotImplemented;
     }
-    const dynamicMap = if (isAlpha) &state.dynamicAlpha.map else &state.dynamic.map;
+    const dynamicMap = if (isAlpha) &state.dynamicAlpha.data.map else &state.dynamic.data.map;
     const portfolioJson = if (isAlpha) state.dynamicAlpha.portfolioJson else state.dynamic.portfolioJson;
     const pf = if (isAlpha) state.dynamicAlpha.portfolio else state.dynamic.portfolio;
 
@@ -140,7 +118,7 @@ fn serverCallback(
                     return;
                 }
 
-                const data = state.mapStatic.get(path.value) orelse blk: {
+                const data = state.dataStatic.map.get(path.value) orelse blk: {
                     if (dynamicMap.get(path.value)) |d| {
                         break :blk d;
                     }
@@ -172,7 +150,7 @@ fn serverCallback(
                         else => return err,
                     };
                 } else {
-                    const data = state.mapStatic.get(uri) orelse {
+                    const data = state.dataStatic.map.get(uri) orelse {
                         try server.writeCode(writer, ._404);
                         try server.writeEndHeader(writer);
                         return;
