@@ -14,7 +14,7 @@ fn stepPackage(self: *std.build.Step) !void
     std.log.info("Generating bigdata file archive...", .{});
 
     const genBigdataArgs = &[_][]const u8 {
-        "./zig-out/tools/genbigdata", "./zig-out/server-temp/static", "./zig-out/server/static.bigdata",
+        "./zig-out/tools/genbigdata", "./zig-out/server-temp/static", "static.bigdata",
     };
     if (zigkmBuild.utils.execCheckTermStdout(genBigdataArgs, allocator) == null) {
         return error.genbigdata;
