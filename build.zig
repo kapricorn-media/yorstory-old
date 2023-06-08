@@ -3,23 +3,23 @@ const Allocator = std.mem.Allocator;
 
 const zigkmBuild = @import("deps/zigkm-common/build.zig");
 
-fn stepPackage(self: *std.build.Step) !void
-{
-    _ = self;
+// fn stepPackage(self: *std.build.Step) !void
+// {
+//     _ = self;
 
-    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-    defer arena.deinit();
-    const allocator = arena.allocator();
+//     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+//     defer arena.deinit();
+//     const allocator = arena.allocator();
 
-    std.log.info("Generating bigdata file archive...", .{});
+//     std.log.info("Generating bigdata file archive...", .{});
 
-    const genBigdataArgs = &[_][]const u8 {
-        "./zig-out/tools/genbigdata", "./zig-out/server-temp/static", "./zig-out/server/static.bigdata",
-    };
-    if (zigkmBuild.utils.execCheckTermStdout(genBigdataArgs, allocator) == null) {
-        return error.genbigdata;
-    }
-}
+//     const genBigdataArgs = &[_][]const u8 {
+//         "./zig-out/tools/genbigdata", "./zig-out/server-temp/static", "./zig-out/server/static.bigdata",
+//     };
+//     if (zigkmBuild.utils.execCheckTermStdout(genBigdataArgs, allocator) == null) {
+//         return error.genbigdata;
+//     }
+// }
 
 pub fn build(b: *std.build.Builder) !void
 {
@@ -121,5 +121,5 @@ pub fn build(b: *std.build.Builder) !void
         .install_dir = .{.custom = "server"},
         .install_subdir = "scripts",
     }).step);
-    packageStep.makeFn = stepPackage;
+    // packageStep.makeFn = stepPackage;
 }
