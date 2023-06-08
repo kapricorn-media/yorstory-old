@@ -14,7 +14,7 @@ fn stepPackage(self: *std.build.Step) !void
     std.log.info("Generating bigdata file archive...", .{});
 
     const genBigdataArgs = &[_][]const u8 {
-        "./zig-out/tools/genbigdata", "./zig-out/server-temp/static", "static.bigdata",
+        "./zig-out/tools/genbigdata", "./zig-out/server-temp/static", "./zig-out/server/static.bigdata",
     };
     if (zigkmBuild.utils.execCheckTermStdout(genBigdataArgs, allocator) == null) {
         return error.genbigdata;
@@ -104,8 +104,8 @@ pub fn build(b: *std.build.Builder) !void
 
     const packageStep = b.step("package", "Package");
     packageStep.dependOn(b.getInstallStep());
-    // const installGenbigdataStep = b.addInstallArtifact(genbigdata);
-    // packageStep.dependOn(&installGenbigdataStep.step);
+    const installGenbigdataStep = b.addInstallArtifact(genbigdata);
+    packageStep.dependOn(&installGenbigdataStep.step);
     packageStep.dependOn(&b.addInstallDirectory(.{
         .source_dir = "deps/zigkm-common/src/app/static",
         .install_dir = .{.custom = "server-temp/static"},
