@@ -6,30 +6,10 @@ on:
       - main
 
 jobs:
-  zig-release:
-    runs-on: [self-hosted, release]
-    timeout-minutes: 10
-
-    steps:
-      - name: checkout
-        uses: actions/checkout@v2
-        with:
-          submodules: 'recursive'
-
-      - name: test
-        run: ~/zig-0.10.1/zig build -Drelease-fast=true -Dtarget=x86_64-linux test
-
-      - name: build
-        run: ~/zig-0.10.1/zig build -Drelease-fast=true -Dtarget=x86_64-linux package
-
-      - name: bigdata
-        run: ./zig-out/tools/genbigdata ./zig-out/server-temp/static ./zig-out/server/static.bigdata
-
-      - name: rename
-        run: mv zig-out/server yorstory
-
-      - name: zip
-        run: tar -czf yorstory.tar.gz yorstory
-
-      - name: copy
-        run: mkdir -p ~/ci/builds/yorstory && cp yorstory.tar.gz ~/ci/builds/yorstory/yorstory.`date '+%s'`.tar.gz
+  release:
+    uses: kapricorn-media/github/.github/workflows/zig-release-package.yaml@main
+    with:
+      zig-version: 0.10.1
+      package-name: yorstory
+      zig-build-command: package
+      package-subdir: server
