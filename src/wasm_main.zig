@@ -231,6 +231,7 @@ pub const App = struct {
 
         if (self.pageData == .Entry and self.pageData.Entry.galleryIndex != null and self.portfolio != null) {
             const indexCount = getGalleryIndexCount(self.portfolio.?.projects[self.pageData.Entry.portfolioIndex]);
+            std.log.info("indexCount={}", .{indexCount});
             if (self.inputState.keyboardState.keyDown(keyCodeEscape)) {
                 self.pageData.Entry.galleryIndex = null;
             } else if (self.inputState.keyboardState.keyDown(keyCodeArrowLeft)) {
@@ -681,30 +682,72 @@ fn getImageCount(pf: portfolio.Portfolio, entryData: anytype) usize
 
 fn getGalleryIndexCount(project: portfolio.Project) usize
 {
-    var i: usize = 0;
+    var count: usize = 0;
     for (project.sections) |section| {
-        if (section.images.len > 0) {
-            i += ((section.images.len - 1) / IMAGES_PER_ZOOM) + 1;
+        var group: usize = 0;
+        for (section.images) |_| {
+            group += 1;
+            if (group >= IMAGES_PER_ZOOM) {
+                count += 1;
+                group = 0;
+            }
+        }
+        if (group > 0) {
+            count += 1;
         }
     }
-    return i;
+    return count;
 }
 
 fn imageIndexToGalleryIndex(index: usize, project: portfolio.Project) usize
 {
     var i: usize = 0;
-    var galleryIndex: usize = 0;
+    var count: usize = 0;
     for (project.sections) |section| {
-        i += section.images.len;
-        if (i >= index) {
-            // const off = (i - index) / IMAGES_PER_ZOOM;
-            return galleryIndex;
+        var group: usize = 0;
+        for (section.images) |_| {
+            if (index >= i) {
+                std.log.info("{} -> {}", .{index, count});
+                return count;
+            }
+            group += 1;
+            i += 1;
+            if (group >= IMAGES_PER_ZOOM) {
+                count += 1;
+                group = 0;
+            }
         }
-        if (section.images.len > 0) {
-            galleryIndex += ((section.images.len - 1) / IMAGES_PER_ZOOM) + 1;
+        if (group > 0) {
+            count += 1;
         }
     }
-    return galleryIndex;
+    unreachable;
+}
+
+const Indices = struct {
+    section: usize,
+    image: usize,
+};
+
+fn galleryIndexToSectionImageIndices(galleryIndex: usize, project: portfolio.Project) Indices
+{
+    var count: usize = 0;
+    for (project.sections) |section| {
+        var i: usize = 0;
+        var group: usize = 0;
+        for (section.images) |_| {
+            i += 1;
+            group += 1;
+            if (group >= IMAGES_PER_ZOOM) {
+                count += 1;
+                group = 0;
+            }
+        }
+        if (group > 0) {
+            count += 1;
+        }
+    }
+    unreachable;
 }
 
 fn getImageUrlFromIndex(pf: portfolio.Portfolio, entryData: anytype, index: usize) ?[]const u8
@@ -1351,19 +1394,33 @@ fn drawDesktop(state: *App, deltaMs: u64, scrollYF: f32, screenSizeF: m.Vec2, re
                 renderQueue.quad(pos, screenSizeF, DEPTH_UI_OVER2, 0, m.Vec4.init(0.0, 0.0, 0.0, 1.0));
 
                 galleryImages.clearRetainingCapacity();
-                var i: usize = 0;
+                var count: usize = 0;
                 for (project.sections) |section| {
-                    if (section.images.len > 0) {
-                        i += ((section.images.len - 1) / IMAGES_PER_ZOOM) + 1;
-                    }
-                    if (i >= galleryIndex) {
-                        var count: usize = 0;
-                        for (section.images) |img| {
-                            if (count >= IMAGES_PER_ZOOM) {
-                                break;
-                            }
+                    var group: usize = 0;
+                    for (section.images) |_| {
+                        group += 1;
+                        if (group >= IMAGES_PER_ZOOM) {
                             count += 1;
-
+                            group = 0;
+                        }
+                    }
+                    if (group > 0) {
+                        count += 1;
+                    }
+                }
+                for (project.sections) |section| {
+                    const iNew = blk: {
+                        if (section.images.len > 0) {
+                            break :blk i + ((section.images.len - 1) / IMAGES_PER_ZOOM) + 1;
+                        } else {
+                            break :blk i;
+                        }
+                    };
+                    if (i >= galleryIndex) {
+                        const startIndex = (galleryIndex - iNew) * IMAGES_PER_ZOOM;
+                        const endIndex = std.math.min(startIndex + IMAGES_PER_ZOOM, section.images.len);
+                        std.log.info("{} [{}..{}]", .{galleryIndex, startIndex, endIndex});
+                        for (section.images[startIndex..endIndex]) |img| {
                             galleryImages.append(GridImage {
                                 .uri = img,
                                 .title = null,
@@ -1372,6 +1429,7 @@ fn drawDesktop(state: *App, deltaMs: u64, scrollYF: f32, screenSizeF: m.Vec2, re
                         }
                         break;
                     }
+                    i = iNew;
                 }
                 const spacing = gridSize * 0.25;
                 const aspect = 1.74; // TODO Copied from imagegrid
