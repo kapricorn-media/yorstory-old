@@ -42,6 +42,8 @@ const DEPTH_UI_BELOWALL = 1.0;
 const COLOR_YELLOW_HOME = m.Vec4.init(234.0 / 255.0, 1.0, 0.0, 1.0);
 const COLOR_RED_STICKER = m.Vec4.init(234.0 / 255.0, 65.0 / 255.0, 0.0, 1.0);
 
+const IMAGES_PER_ZOOM = 6;
+
 fn isVerticalAspect(screenSize: m.Vec2) bool
 {
     const aspect = screenSize.x / screenSize.y;
@@ -99,7 +101,7 @@ const PageData = union(PageType) {
     Home: void,
     Entry: struct {
         portfolioIndex: usize,
-        galleryIndex: ?usize,
+        gallerySelection: ?m.Vec2usize,
     },
     Unknown: void,
 };
@@ -117,7 +119,7 @@ fn uriToPageData(uri: []const u8, pf: ?portfolio.Portfolio) PageData
                 return PageData {
                     .Entry = .{
                         .portfolioIndex = i,
-                        .galleryIndex = null,
+                        .gallerySelection = null,
                     }
                 };
             }
@@ -229,22 +231,30 @@ pub const App = struct {
         const keyCodeArrowRight = 39;
         const keyCodeG = 71;
 
-        if (self.pageData == .Entry and self.pageData.Entry.galleryIndex != null and self.portfolio != null) {
-            const indexCount = getGalleryIndexCount(self.portfolio.?.projects[self.pageData.Entry.portfolioIndex]);
-            std.log.info("indexCount={}", .{indexCount});
+        if (self.pageData == .Entry and self.pageData.Entry.gallerySelection != null and self.portfolio != null) {
             if (self.inputState.keyboardState.keyDown(keyCodeEscape)) {
-                self.pageData.Entry.galleryIndex = null;
-            } else if (self.inputState.keyboardState.keyDown(keyCodeArrowLeft)) {
-                if (self.pageData.Entry.galleryIndex.? == 0) {
-                    self.pageData.Entry.galleryIndex.? = indexCount - 1;
-                } else {
-                    self.pageData.Entry.galleryIndex.? -= 1;
+                self.pageData.Entry.gallerySelection = null;
+            } else {
+                var newSelection: m.Vec2i = self.pageData.Entry.gallerySelection.?.toVec2i();
+                if (self.inputState.keyboardState.keyDown(keyCodeArrowLeft)) {
+                    newSelection.y -= 1;
+                } else if (self.inputState.keyboardState.keyDown(keyCodeArrowRight)) {
+                    newSelection.y += 1;
                 }
-            } else if (self.inputState.keyboardState.keyDown(keyCodeArrowRight)) {
-                self.pageData.Entry.galleryIndex.? += 1;
-                if (self.pageData.Entry.galleryIndex.? >= indexCount) {
-                    self.pageData.Entry.galleryIndex.? = 0;
+
+                const project = self.portfolio.?.projects[self.pageData.Entry.portfolioIndex];
+                var section = project.sections[@intCast(usize, newSelection.x)];
+                if (newSelection.y < 0) {
+                    newSelection.x = @mod(newSelection.x - 1, @intCast(i32, project.sections.len));
+                    section = project.sections[@intCast(usize, newSelection.x)];
+                    newSelection.y = @intCast(i32, (section.images.len - 1) / IMAGES_PER_ZOOM);
                 }
+                if (newSelection.y > (section.images.len - 1) / IMAGES_PER_ZOOM) {
+                    newSelection.x = @mod(newSelection.x + 1, @intCast(i32, project.sections.len));
+                    newSelection.y = 0;
+                }
+
+                self.pageData.Entry.gallerySelection.? = newSelection.toVec2usize();
             }
         }
         if (self.inputState.keyboardState.keyDown(keyCodeG)) {
@@ -607,7 +617,7 @@ const GridImage = struct {
     goToUri: ?[]const u8,
 };
 
-fn drawImageGrid(images: []const GridImage, indexOffset: usize, itemsPerRow: usize, topLeft: m.Vec2, width: f32, spacing: f32, depthTex: f32, texPriority: u32, fontData: *const app.asset_data.FontData, fontColor: m.Vec4, state: *App, scrollY: f32, mouseHoverGlobal: *bool, renderQueue: *app.render.RenderQueue, callback: *const fn(*App, GridImage, usize) void) f32
+fn drawImageGrid(images: []const GridImage, itemsPerRow: usize, topLeft: m.Vec2, width: f32, spacing: f32, depthTex: f32, texPriority: u32, fontData: *const app.asset_data.FontData, fontColor: m.Vec4, state: *App, scrollY: f32, mouseHoverGlobal: *bool, renderQueue: *app.render.RenderQueue, callback: *const fn(*App, GridImage, usize, anytype) void, callbackData: anytype) f32
 {
     const itemAspect = 1.74;
     const itemWidth = (width - spacing * (@intToFloat(f32, itemsPerRow) - 1)) / @intToFloat(f32, itemsPerRow);
@@ -650,7 +660,7 @@ fn drawImageGrid(images: []const GridImage, indexOffset: usize, itemsPerRow: usi
         }
 
         if (updateButton(itemPos, itemSize, &state.inputState.mouseState, scrollY, mouseHoverGlobal)) {
-            callback(state, img, indexOffset + i);
+            callback(state, img, i, callbackData);
         }
 
         yMax = std.math.max(yMax, itemPos.y + itemSize.y);
@@ -664,90 +674,6 @@ fn getTextureScaledSize(size: m.Vec2usize, screenSize: m.Vec2) m.Vec2
     const sizeF = m.Vec2.initFromVec2usize(size);
     const scaleFactor = screenSize.y / refSizeDesktop.y;
     return m.multScalar(sizeF, scaleFactor);
-}
-
-const IMAGES_PER_ZOOM = 6;
-
-fn getImageCount(pf: portfolio.Portfolio, entryData: anytype) usize
-{
-    const project = pf.projects[entryData.portfolioIndex];
-    var i: usize = 0;
-    for (project.sections) |section| {
-        for (section.images) |_| {
-            i += 1;
-        }
-    }
-    return i;
-}
-
-fn getGalleryIndexCount(project: portfolio.Project) usize
-{
-    var count: usize = 0;
-    for (project.sections) |section| {
-        var group: usize = 0;
-        for (section.images) |_| {
-            group += 1;
-            if (group >= IMAGES_PER_ZOOM) {
-                count += 1;
-                group = 0;
-            }
-        }
-        if (group > 0) {
-            count += 1;
-        }
-    }
-    return count;
-}
-
-fn imageIndexToGalleryIndex(index: usize, project: portfolio.Project) usize
-{
-    var i: usize = 0;
-    var count: usize = 0;
-    for (project.sections) |section| {
-        var group: usize = 0;
-        for (section.images) |_| {
-            if (index >= i) {
-                std.log.info("{} -> {}", .{index, count});
-                return count;
-            }
-            group += 1;
-            i += 1;
-            if (group >= IMAGES_PER_ZOOM) {
-                count += 1;
-                group = 0;
-            }
-        }
-        if (group > 0) {
-            count += 1;
-        }
-    }
-    unreachable;
-}
-
-const Indices = struct {
-    section: usize,
-    image: usize,
-};
-
-fn galleryIndexToSectionImageIndices(galleryIndex: usize, project: portfolio.Project) Indices
-{
-    var count: usize = 0;
-    for (project.sections) |section| {
-        var i: usize = 0;
-        var group: usize = 0;
-        for (section.images) |_| {
-            i += 1;
-            group += 1;
-            if (group >= IMAGES_PER_ZOOM) {
-                count += 1;
-                group = 0;
-            }
-        }
-        if (group > 0) {
-            count += 1;
-        }
-    }
-    unreachable;
 }
 
 fn getImageUrlFromIndex(pf: portfolio.Portfolio, entryData: anytype, index: usize) ?[]const u8
@@ -1265,27 +1191,33 @@ fn drawDesktop(state: *App, deltaMs: u64, scrollYF: f32, screenSizeF: m.Vec2, re
     // ==== THIRD FRAME ====
 
     const CB = struct {
-        fn home(theState: *App, image: GridImage, index: usize) void
+        fn home(theState: *App, image: GridImage, index: usize, args: anytype) void
         {
             _ = index;
-
+            _ = args;
             if (image.goToUri) |uri| {
                 theState.changePage(uri);
             }
         }
 
-        fn entry(theState: *App, image: GridImage, index: usize) void
+        fn new(theState: *App, image: GridImage, index: usize, args: anytype) void
         {
             _ = image;
-
             if (theState.pageData != .Entry) {
                 std.log.err("entry callback, but not an Entry page", .{});
                 return;
             }
-            if (theState.pageData.Entry.galleryIndex == null) {
-                const p = theState.portfolio.?.projects[theState.pageData.Entry.portfolioIndex];
-                theState.pageData.Entry.galleryIndex = imageIndexToGalleryIndex(index, p);
+            if (theState.pageData.Entry.gallerySelection == null) {
+                theState.pageData.Entry.gallerySelection = m.Vec2usize.init(args.sectionIndex, index / IMAGES_PER_ZOOM);
             }
+        }
+
+        fn noop(theState: *App, image: GridImage, index: usize, args: anytype) void
+        {
+            _ = theState;
+            _ = image;
+            _ = index;
+            _ = args;
         }
     };
 
@@ -1320,7 +1252,7 @@ fn drawDesktop(state: *App, deltaMs: u64, scrollYF: f32, screenSizeF: m.Vec2, re
             var galleryImages = std.ArrayList(GridImage).init(allocator);
 
             var yGallery = yMax;
-            var indexOffset: usize = 0; // TODO eh...
+            var indexOffset: usize = 0;
             for (project.sections) |section, i| {
                 if (section.name.len > 0 or section.description.len > 0) {
                     const numberSize = getTextureScaledSize(sCircle.size, screenSizeF);
@@ -1370,7 +1302,7 @@ fn drawDesktop(state: *App, deltaMs: u64, scrollYF: f32, screenSizeF: m.Vec2, re
                 const itemsPerRow = 6;
                 const topLeft = m.Vec2.init(contentMarginX, yGallery);
                 const spacing = gridSize * 0.25;
-                yGallery += drawImageGrid(galleryImages.items, indexOffset, itemsPerRow, topLeft, contentSubWidth, spacing, DEPTH_GRIDIMAGE, 9, fontText, colorUi, state, scrollYF, &mouseHoverGlobal, renderQueue, CB.entry);
+                yGallery += drawImageGrid(galleryImages.items, itemsPerRow, topLeft, contentSubWidth, spacing, DEPTH_GRIDIMAGE, 9, fontText, colorUi, state, scrollYF, &mouseHoverGlobal, renderQueue, CB.new, .{.sectionIndex = i});
                 yGallery += gridSize * 4.0;
                 indexOffset += section.images.len;
             }
@@ -1389,55 +1321,33 @@ fn drawDesktop(state: *App, deltaMs: u64, scrollYF: f32, screenSizeF: m.Vec2, re
 
             yMax += gridSize * 1;
 
-            if (entryData.galleryIndex) |galleryIndex| {
+            if (entryData.gallerySelection) |gallerySelection| {
                 const pos = m.Vec2.init(0.0, scrollYF);
                 renderQueue.quad(pos, screenSizeF, DEPTH_UI_OVER2, 0, m.Vec4.init(0.0, 0.0, 0.0, 1.0));
 
                 galleryImages.clearRetainingCapacity();
-                var count: usize = 0;
-                for (project.sections) |section| {
-                    var group: usize = 0;
-                    for (section.images) |_| {
-                        group += 1;
-                        if (group >= IMAGES_PER_ZOOM) {
-                            count += 1;
-                            group = 0;
-                        }
-                    }
-                    if (group > 0) {
-                        count += 1;
-                    }
+                const section = project.sections[gallerySelection.x];
+                const imageIndexStart = gallerySelection.y * IMAGES_PER_ZOOM;
+                const imageIndexEnd = std.math.min(
+                    (gallerySelection.y + 1) * IMAGES_PER_ZOOM,
+                    section.images.len
+                );
+                const images = section.images[imageIndexStart..imageIndexEnd];
+                for (images) |img| {
+                    galleryImages.append(GridImage {
+                        .uri = img,
+                        .title = null,
+                        .goToUri = null,
+                    }) catch unreachable;
                 }
-                for (project.sections) |section| {
-                    const iNew = blk: {
-                        if (section.images.len > 0) {
-                            break :blk i + ((section.images.len - 1) / IMAGES_PER_ZOOM) + 1;
-                        } else {
-                            break :blk i;
-                        }
-                    };
-                    if (i >= galleryIndex) {
-                        const startIndex = (galleryIndex - iNew) * IMAGES_PER_ZOOM;
-                        const endIndex = std.math.min(startIndex + IMAGES_PER_ZOOM, section.images.len);
-                        std.log.info("{} [{}..{}]", .{galleryIndex, startIndex, endIndex});
-                        for (section.images[startIndex..endIndex]) |img| {
-                            galleryImages.append(GridImage {
-                                .uri = img,
-                                .title = null,
-                                .goToUri = null,
-                            }) catch unreachable;
-                        }
-                        break;
-                    }
-                    i = iNew;
-                }
+
                 const spacing = gridSize * 0.25;
                 const aspect = 1.74; // TODO Copied from imagegrid
                 const perRow: usize = IMAGES_PER_ZOOM / 2;
                 const height = screenSizeF.x / @intToFloat(f32, perRow) / aspect * 2;
                 const yOffset = (screenSizeF.y - height) / 2;
                 const pospos = m.Vec2.init(0.0, scrollYF + yOffset);
-                _ = drawImageGrid(galleryImages.items, 0, perRow, pospos, screenSizeF.x, spacing, DEPTH_UI_OVER2 - 0.01, 9, fontText, colorUi, state, scrollYF, &mouseHoverGlobal, renderQueue, CB.entry);
+                _ = drawImageGrid(galleryImages.items, perRow, pospos, screenSizeF.x, spacing, DEPTH_UI_OVER2 - 0.01, 9, fontText, colorUi, state, scrollYF, &mouseHoverGlobal, renderQueue, CB.noop, {});
             }
         },
     }
@@ -1488,7 +1398,7 @@ fn drawDesktop(state: *App, deltaMs: u64, scrollYF: f32, screenSizeF: m.Vec2, re
         section3Start + gridSize * 14.0,
     );
     const spacing = gridSize * 0.25;
-    const projectGridY = drawImageGrid(images.items, 0, itemsPerRow, gridTopLeft, contentSubWidth, spacing, DEPTH_GRIDIMAGE, 8, fontText, colorUi, state, scrollYF, &mouseHoverGlobal, renderQueue, CB.home);
+    const projectGridY = drawImageGrid(images.items, itemsPerRow, gridTopLeft, contentSubWidth, spacing, DEPTH_GRIDIMAGE, 8, fontText, colorUi, state, scrollYF, &mouseHoverGlobal, renderQueue, CB.home, {});
 
     const section3Height = gridTopLeft.y - section3Start + projectGridY + gridSize * 8.0;
 
@@ -1704,11 +1614,12 @@ fn drawMobile(state: *App, deltaS: f32, scrollY: f32, screenSize: m.Vec2, render
     // ==== THIRD FRAME: GALLERY (ENTRY ONLY) ====
 
     const CB = struct {
-        fn entry(theState: *App, image: GridImage, index: usize) void
+        fn entry(theState: *App, image: GridImage, index: usize, args: anytype) void
         {
             _ = theState;
             _ = image;
             _ = index;
+            _ = args;
         }
     };
 
@@ -1779,7 +1690,7 @@ fn drawMobile(state: *App, deltaS: f32, scrollY: f32, screenSize: m.Vec2, render
                 const itemsPerRow = 1;
                 const topLeft = m.Vec2.init(sideMargin, yGallery);
                 const spacing = gridSize * 0.25;
-                yGallery += drawImageGrid(galleryImages.items, indexOffset, itemsPerRow, topLeft, contentWidth, spacing, DEPTH_GRIDIMAGE, 9, fontText, colorUi, state, scrollY, &mouseHoverGlobal, renderQueue, CB.entry);
+                yGallery += drawImageGrid(galleryImages.items, itemsPerRow, topLeft, contentWidth, spacing, DEPTH_GRIDIMAGE, 9, fontText, colorUi, state, scrollY, &mouseHoverGlobal, renderQueue, CB.entry, {});
                 yGallery += gridSize * 4.0;
                 indexOffset += section.images.len;
             }
