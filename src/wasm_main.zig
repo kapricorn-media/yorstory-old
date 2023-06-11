@@ -432,11 +432,11 @@ pub const App = struct {
                 .path = "images/decal-topleft.png",
                 .priority = 2,
             },
-            .{
-                .texture = .StickerShiny,
-                .path = "images/sticker-shiny.png",
-                .priority = 5,
-            },
+            // .{
+            //     .texture = .StickerShiny,
+            //     .path = "images/sticker-shiny.png",
+            //     .priority = 5,
+            // },
         });
 
         const helveticaBoldUrl = "/fonts/HelveticaNeueLTCom-Bd.ttf";
@@ -772,7 +772,7 @@ fn drawDesktop(state: *App, deltaMs: u64, scrollYF: f32, screenSizeF: m.Vec2, re
         const adjustedWidth = std.math.min(landingImageSize.x, landingImageSize.y * maxLandingImageAspect);
         break :blk (landingImageSize.x - adjustedWidth) / 2.0;
     };
-    const crosshairMarginX = marginX + gridSize * 5;
+    // const crosshairMarginX = marginX + gridSize * 5;
     const contentMarginX = marginX + gridSize * 9;
 
     const decalTopLeft = state.assets.getTextureData(.{.static = .DecalTopLeft});
@@ -802,7 +802,7 @@ fn drawDesktop(state: *App, deltaMs: u64, scrollYF: f32, screenSizeF: m.Vec2, re
             },
         }
     };
-    const stickerShiny = state.assets.getTextureData(.{.static = .StickerShiny});
+    // const stickerShiny = state.assets.getTextureData(.{.static = .StickerShiny});
 
     const allFontsLoaded = blk: {
         var loaded = true;
@@ -812,7 +812,7 @@ fn drawDesktop(state: *App, deltaMs: u64, scrollYF: f32, screenSizeF: m.Vec2, re
         }
         break :blk loaded;
     };
-    var allLandingAssetsLoaded = decalTopLeft != null and stickerMain != null and stickerShiny != null and allFontsLoaded;
+    var allLandingAssetsLoaded = decalTopLeft != null and stickerMain != null and allFontsLoaded;
     if (allLandingAssetsLoaded) {
         const parallaxIndex = blk: {
             switch (state.pageData) {
@@ -914,7 +914,7 @@ fn drawDesktop(state: *App, deltaMs: u64, scrollYF: f32, screenSizeF: m.Vec2, re
     if (allLandingAssetsLoaded) {
         const fontCategory = state.assets.getFontData(.Category) orelse unreachable;
         const sMain = stickerMain orelse unreachable;
-        const sShiny = stickerShiny orelse unreachable;
+        // const sShiny = stickerShiny orelse unreachable;
 
         const CategoryInfo = struct {
             name: []const u8,
@@ -975,15 +975,15 @@ fn drawDesktop(state: *App, deltaMs: u64, scrollYF: f32, screenSizeF: m.Vec2, re
             stickerPos, stickerSize, DEPTH_UI_GENERIC, 0, sMain, colorSticker
         );
 
-        // sticker (shiny)
-        const stickerShinySize = getTextureScaledSize(sShiny.size, screenSizeF);
-        const stickerShinyPos = m.Vec2.init(
-            screenSizeF.x - crosshairMarginX - stickerShinySize.x,
-            gridSize * 5.0
-        );
-        renderQueue.texQuadColor(
-            stickerShinyPos, stickerShinySize, DEPTH_UI_GENERIC, 0, sShiny, m.Vec4.white
-        );
+        // // sticker (shiny)
+        // const stickerShinySize = getTextureScaledSize(sShiny.size, screenSizeF);
+        // const stickerShinyPos = m.Vec2.init(
+        //     screenSizeF.x - crosshairMarginX - stickerShinySize.x,
+        //     gridSize * 5.0
+        // );
+        // renderQueue.texQuadColor(
+        //     stickerShinyPos, stickerShinySize, DEPTH_UI_GENERIC, 0, sShiny, m.Vec4.white
+        // );
     } else {
         // show loading indicator, if that is loaded
         if (stickerCircle != null and loadingGlyphs != null) {

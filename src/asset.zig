@@ -13,7 +13,7 @@ pub const Texture = enum {
     Lut1,
     ProjectSymbols,
     StickerCircle,
-    StickerShiny,
+    // StickerShiny,
     SymbolEye,
     YorstoryCompany,
 
