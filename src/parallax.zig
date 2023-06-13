@@ -204,11 +204,11 @@ pub const PARALLAX_SETS = [_]ParallaxSet {
             .Color = colorHexToVec4("#111111") catch unreachable,
         },
         .images = &[_]ParallaxImage{
-            ParallaxImage.init("DRIVE/PARALLAX/matahari.psd/1-bg.layer", 0.0),
-            ParallaxImage.init("DRIVE/PARALLAX/matahari.psd/2-bg-ladies.layer", 0.1),
-            ParallaxImage.init("DRIVE/PARALLAX/matahari.psd/3-mg-buddha.layer", 0.4),
-            ParallaxImage.init("DRIVE/PARALLAX/matahari.psd/4-matahari.layer", 0.6),
-            ParallaxImage.init("DRIVE/PARALLAX/matahari.psd/5-fg.layer", 1.2),
+            ParallaxImage.init("DRIVE/PARALLAX/matahari.psd/BG.layer", 0.0),
+            ParallaxImage.init("DRIVE/PARALLAX/matahari.psd/BG ladies.layer", 0.1),
+            ParallaxImage.init("DRIVE/PARALLAX/matahari.psd/MG Buddha.layer", 0.3),
+            ParallaxImage.init("DRIVE/PARALLAX/matahari.psd/Matahari.layer", 0.55),
+            ParallaxImage.init("DRIVE/PARALLAX/matahari.psd/FG.layer", 1.8),
         },
     },
 };
