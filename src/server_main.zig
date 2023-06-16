@@ -6,6 +6,7 @@ const bigdata = app.bigdata;
 const http = @import("zigkm-http-common");
 const server = @import("zigkm-http-server");
 
+const drive = @import("drive.zig");
 const portfolio = @import("portfolio.zig");
 
 const DEBUG = builtin.mode == .Debug;
