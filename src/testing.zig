@@ -36,5 +36,6 @@ pub fn main() !void
     try data.loadFromFile(existingPath, allocator);
     defer data.deinit();
 
-    try drive.fillFromGoogleDrive(&data, key, allocator);
+    const folderId = "1Q5sM_dtJjpBtQX728PFU4TfYdIWCnnJ_";
+    try drive.fillFromGoogleDrive(folderId, &data, key, allocator);
 }
