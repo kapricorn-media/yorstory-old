@@ -9,7 +9,7 @@ Restart=always
 RestartSec=1
 User=root
 WorkingDirectory=/usr/bin/yorstory
-ExecStart=/usr/bin/yorstory/yorstory static.bigdata data/empty.bigdata data/portfolio.json 443 /etc/letsencrypt/live/yorstory.ca/fullchain.pem /etc/letsencrypt/live/yorstory.ca/privkey.pem
+ExecStart=/usr/bin/yorstory/yorstory static.bigdata data/empty.bigdata data/portfolio.json 8000
 
 [Install]
 WantedBy=multi-user.target

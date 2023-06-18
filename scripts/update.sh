@@ -1,11 +1,20 @@
 #!/bin/bash -e
 
-mv yorstory yorstory-prev
-mv yorstory.tar.gz yorstory-prev.tar.gz
+PROJECT_NAME=yorstory
 
-curl $1 --output yorstory.tar.gz
-tar -xf yorstory.tar.gz
-cp -r yorstory-prev/data yorstory/data
+if [ "$#" -ne 1 ]; then
+    echo "Missing argument <url>"
+    exit 1
+fi
 
-sudo systemctl restart yorstory
-sudo systemctl status yorstory
+if test -f "$PROJECT_NAME-prev.tar.gz"; then
+    mv $PROJECT_NAME $PROJECT_NAME-prev
+    mv $PROJECT_NAME.tar.gz $PROJECT_NAME-prev.tar.gz
+fi
+
+curl $1 --output $PROJECT_NAME.tar.gz
+tar -xf $PROJECT_NAME.tar.gz
+cp -r $PROJECT_NAME-prev/data $PROJECT_NAME/data
+
+sudo systemctl restart $PROJECT_NAME
+sudo systemctl status $PROJECT_NAME
