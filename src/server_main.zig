@@ -85,11 +85,7 @@ fn serverCallback(
     writer: server.Writer) !void
 {
     const host = http.getHeader(request, "Host") orelse return error.NoHost;
-    const isAdmin = std.mem.startsWith(u8, host, "admin.");
     const isAlpha = std.mem.startsWith(u8, host, "alpha.");
-    if (isAdmin) {
-        return error.AdminSiteNotImplemented;
-    }
     const dynamicMap = if (isAlpha) &state.dynamicAlpha.data.map else &state.dynamic.data.map;
     const portfolioJson = if (isAlpha) state.dynamicAlpha.portfolioJson else state.dynamic.portfolioJson;
     const pf = if (isAlpha) state.dynamicAlpha.portfolio else state.dynamic.portfolio;
@@ -167,8 +163,12 @@ fn serverCallback(
             }
         },
         .Post => {
-            try server.writeCode(writer, ._404);
-            try server.writeEndHeader(writer);
+            if (std.mem.eql(u8, request.uri, "/drive")) {
+                std.log.err("DRIVE!", .{});
+            } else {
+                try server.writeCode(writer, ._404);
+                try server.writeEndHeader(writer);
+            }
         },
     }
 }
