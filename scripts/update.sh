@@ -8,9 +8,12 @@ if [ "$#" -ne 1 ]; then
 fi
 
 if test -f "$PROJECT_NAME-prev.tar.gz"; then
-    mv $PROJECT_NAME $PROJECT_NAME-prev
-    mv $PROJECT_NAME.tar.gz $PROJECT_NAME-prev.tar.gz
+    rm -rf $PROJECT_NAME-prev
+    rm $PROJECT_NAME-prev.tar.gz
 fi
+
+mv $PROJECT_NAME $PROJECT_NAME-prev
+mv $PROJECT_NAME.tar.gz $PROJECT_NAME-prev.tar.gz
 
 curl $1 --output $PROJECT_NAME.tar.gz
 tar -xf $PROJECT_NAME.tar.gz
