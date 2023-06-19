@@ -4,6 +4,9 @@ const std = @import("std");
 const app = @import("zigkm-app");
 const bigdata = app.bigdata;
 
+pub usingnamespace app.exports;
+pub usingnamespace @import("zigkm-stb").exports; // for stb linking
+
 const drive = @import("drive.zig");
 
 pub const log_level: std.log.Level = switch (builtin.mode) {
