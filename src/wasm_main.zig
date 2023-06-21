@@ -241,9 +241,9 @@ pub const App = struct {
 
         self.debug = false;
 
-        // if (self.pageData == .Admin) {
-        //     w.httpPostZ("/drive", "");
-        // }
+        if (self.pageData == .Admin) {
+            w.httpPostZ("/drive", "");
+        }
 
         try self.loadRelevantAssets(screenSize, tempAllocator);
     }
@@ -389,9 +389,7 @@ pub const App = struct {
 
     pub fn onHttp(self: *Self, isGet: bool, uri: []const u8, data: ?[]const u8) void
     {
-        std.debug.assert(isGet);
-
-        if (std.mem.eql(u8, uri, "/portfolio")) {
+        if (isGet and std.mem.eql(u8, uri, "/portfolio")) {
             const d = data orelse {
                 std.log.err("/portfolio request failed, no data", .{});
                 return;
@@ -403,6 +401,8 @@ pub const App = struct {
             };
             self.portfolio = pf;
             std.log.info("Loaded portfolio ({} projects)", .{pf.projects.len});
+        } else if (!isGet and std.mem.eql(u8, uri, "/drive")) {
+            std.log.info("DRIVE!", .{});
         }
     }
 
@@ -798,8 +798,7 @@ fn drawDesktop(state: *App, deltaMs: u64, scrollYF: f32, screenSizeF: m.Vec2, re
                     break :blk m.Vec4.white;
                 }
             },
-            .Admin => unreachable,
-            .Unknown => {
+            .Admin, .Unknown => {
                 break :blk m.Vec4.white;
             },
         }
@@ -826,8 +825,7 @@ fn drawDesktop(state: *App, deltaMs: u64, scrollYF: f32, screenSizeF: m.Vec2, re
     const decalTopLeft = state.assets.getTextureData(.{.static = .DecalTopLeft});
     const stickerMain = blk: {
         switch (state.pageData) {
-            .Admin => unreachable,
-            .Home, .Unknown => break :blk state.assets.getTextureData(.{.static = .StickerMainHome}),
+            .Admin, .Home, .Unknown => break :blk state.assets.getTextureData(.{.static = .StickerMainHome}),
             .Entry => |entryData| {
                 if (state.portfolio) |pf| {
                     const project = pf.projects[entryData.portfolioIndex];
@@ -864,8 +862,7 @@ fn drawDesktop(state: *App, deltaMs: u64, scrollYF: f32, screenSizeF: m.Vec2, re
     if (allLandingAssetsLoaded) {
         const parallaxIndex = blk: {
             switch (state.pageData) {
-                .Admin => unreachable,
-                .Home, .Unknown => break :blk state.activeParallaxSetIndex,
+                .Admin, .Home, .Unknown => break :blk state.activeParallaxSetIndex,
                 .Entry => |entryData| {
                     const project = state.portfolio.?.projects[entryData.portfolioIndex];
                     break :blk project.parallaxIndex;
@@ -1654,8 +1651,7 @@ fn drawMobile(state: *App, deltaS: f32, scrollY: f32, screenSize: m.Vec2, render
                 const project = state.portfolio.?.projects[entryData.portfolioIndex];
                 break :blk project.name;
             },
-            .Admin => unreachable,
-            .Unknown => unreachable,
+            .Admin, .Unknown => unreachable,
         }
     };
     const wasPos = m.Vec2.init(sideMargin, yWas);

@@ -165,6 +165,8 @@ fn serverCallback(
         .Post => {
             if (std.mem.eql(u8, request.uri, "/drive")) {
                 std.log.err("DRIVE!", .{});
+                try server.writeCode(writer, ._200);
+                try server.writeEndHeader(writer);
             } else {
                 try server.writeCode(writer, ._404);
                 try server.writeEndHeader(writer);
