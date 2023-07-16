@@ -46,7 +46,7 @@ pub fn build(b: *std.build.Builder) !void
     server.setTarget(target);
     zigkmBuild.addPackages(
         "deps/zigkm-common",
-        &[_]zigkmBuild.Package {.app, .http_client, .http_server},
+        &[_]zigkmBuild.Package {.app, .google, .http_client, .http_server},
         server
     );
     server.linkLibC();

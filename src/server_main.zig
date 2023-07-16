@@ -33,9 +33,11 @@ const DynamicData = struct {
 const ServerState = struct {
     allocator: std.mem.Allocator,
 
+    bigdataDynamicPath: []const u8,
     dataStatic: bigdata.Data,
     dynamic: DynamicData,
     dynamicAlpha: DynamicData,
+    rwLockAlpha: std.Thread.RwLock,
 
     const Self = @This();
 
@@ -47,9 +49,11 @@ const ServerState = struct {
     {
         var self: Self = .{
             .allocator = allocator,
+            .bigdataDynamicPath = bigdataDynamicPath,
             .dataStatic = undefined,
             .dynamic = undefined,
             .dynamicAlpha = undefined,
+            .rwLockAlpha = std.Thread.RwLock{},
         };
 
         const cwd = std.fs.cwd();
@@ -79,18 +83,37 @@ const ServerState = struct {
     }
 };
 
+fn isAuthenticated(request: server.Request) bool
+{
+    const auth = http.getHeader(request, "auth") orelse return false;
+    const authRef = std.os.getenv("AUTH_KEY") orelse return false;
+    return std.mem.eql(u8, auth, authRef);
+}
+
 fn serverCallback(
     state: *ServerState,
     request: server.Request,
     writer: server.Writer) !void
 {
     const host = http.getHeader(request, "Host") orelse return error.NoHost;
+    const isAdmin = std.mem.startsWith(u8, host, "admin.");
     const isAlpha = std.mem.startsWith(u8, host, "alpha.");
     const dynamicMap = if (isAlpha) &state.dynamicAlpha.data.map else &state.dynamic.data.map;
     const portfolioJson = if (isAlpha) state.dynamicAlpha.portfolioJson else state.dynamic.portfolioJson;
     const pf = if (isAlpha) state.dynamicAlpha.portfolio else state.dynamic.portfolio;
+    if (isAlpha) {
+        state.rwLockAlpha.lockShared();
+    }
+    defer {
+        if (isAlpha) {
+            state.rwLockAlpha.unlockShared();
+        }
+    }
 
     const allocator = state.allocator;
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+    const tempAllocator = arena.allocator(); 
 
     switch (request.method) {
         .Get => {
@@ -128,7 +151,7 @@ fn serverCallback(
                 try server.writeEndHeader(writer);
                 try writer.writeAll(data);
             } else if (std.mem.eql(u8, request.uri, "/main.wasm")) {
-                try server.writeFileResponse(writer, WASM_PATH, allocator);
+                try server.writeFileResponse(writer, WASM_PATH, tempAllocator);
             } else if (std.mem.eql(u8, request.uri, "/portfolio")) {
                 try server.writeCode(writer, ._200);
                 try server.writeContentLength(writer, portfolioJson.len);
@@ -140,9 +163,9 @@ fn serverCallback(
                 if (DEBUG) {
                     // For faster iteration
                     // TODO this path can change
-                    server.serveStatic(writer, uri, "deps/zigkm-common/src/app/static", allocator) catch |err| switch (err) {
+                    server.serveStatic(writer, uri, "deps/zigkm-common/src/app/static", tempAllocator) catch |err| switch (err) {
                         error.FileNotFound => {
-                            try server.serveStatic(writer, uri, "static", allocator);
+                            try server.serveStatic(writer, uri, "static", tempAllocator);
                         },
                         else => return err,
                     };
@@ -163,10 +186,58 @@ fn serverCallback(
             }
         },
         .Post => {
-            if (std.mem.eql(u8, request.uri, "/drive")) {
-                std.log.err("DRIVE!", .{});
-                try server.writeCode(writer, ._200);
-                try server.writeEndHeader(writer);
+            if (isAdmin) {
+                if (isAdmin and !isAuthenticated(request)) {
+                    try server.writeCode(writer, ._401);
+                    try server.writeEndHeader(writer);
+                    return;
+                }
+
+                if (isAlpha) {
+                    try server.writeCode(writer, ._403);
+                    try server.writeEndHeader(writer);
+                    return;
+                }
+
+                if (std.mem.eql(u8, request.uri, "/drive")) {
+                    const folderId = "1Q5sM_dtJjpBtQX728PFU4TfYdIWCnnJ_";
+                    const key = std.os.getenv("GOOGLE_DRIVE_API_KEY") orelse {
+                        std.log.err("Missing GOOGLE_DRIVE_API_KEY", .{});
+                        try server.writeCode(writer, ._500);
+                        try server.writeEndHeader(writer);
+                        return;
+                    };
+
+                    std.debug.assert(!isAlpha);
+                    if (!state.rwLockAlpha.tryLock()) {
+                        try server.writeCode(writer, ._503);
+                        try server.writeEndHeader(writer);
+                        return;
+                    }
+                    defer state.rwLockAlpha.unlock();
+
+                    try drive.fillFromGoogleDrive(folderId, &state.dynamicAlpha.data, key, tempAllocator);
+
+                    try server.writeCode(writer, ._200);
+                    try server.writeEndHeader(writer);
+                } else if (std.mem.eql(u8, request.uri, "/save")) {
+                    // Back up old file
+                    const timestampMs = std.time.milliTimestamp();
+                    const backupPath = try std.fmt.allocPrint(tempAllocator, "{s}.{}", .{state.bigdataDynamicPath, timestampMs});
+                    const cwd = std.fs.cwd();
+                    try cwd.rename(state.bigdataDynamicPath, backupPath);
+
+                    // Save new file
+                    try state.dynamicAlpha.data.saveToFile(state.bigdataDynamicPath, tempAllocator);
+
+                    // Respond and restart server
+                    try server.writeCode(writer, ._200);
+                    try server.writeEndHeader(writer);
+                    std.os.exit(0);
+                } else {
+                    try server.writeCode(writer, ._404);
+                    try server.writeEndHeader(writer);
+                }
             } else {
                 try server.writeCode(writer, ._404);
                 try server.writeEndHeader(writer);

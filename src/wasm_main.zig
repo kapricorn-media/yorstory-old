@@ -9,6 +9,7 @@ pub usingnamespace app.exports;
 pub usingnamespace @import("zigkm-stb").exports; // for stb linking
 
 const asset = @import("asset.zig");
+const page_admin = @import("page_admin.zig");
 const parallax = @import("parallax.zig");
 const portfolio = @import("portfolio.zig");
 
@@ -99,7 +100,7 @@ const PageType = enum {
 };
 
 const PageData = union(PageType) {
-    Admin: void,
+    Admin: page_admin.Data,
     Home: void,
     Entry: struct {
         portfolioIndex: usize,
@@ -112,7 +113,7 @@ fn hostUriToPageData(host: []const u8, uri: []const u8, pf: ?portfolio.Portfolio
 {
     if (std.mem.startsWith(u8, host, "admin.")) {
         return PageData {
-            .Admin = {},
+            .Admin = .{},
         };
     }
 
@@ -209,7 +210,7 @@ pub const App = struct {
         try self.renderState.load();
         try self.assets.load(permanentAllocator);
 
-        w.glClearColor(0.0, 0.0, 0.0, 1.0);
+        w.glClearColor(0.0, 0.0, 0.0, 0.0);
         w.glEnable(w.GL_DEPTH_TEST);
         w.glDepthFunc(w.GL_LEQUAL);
 
@@ -241,10 +242,6 @@ pub const App = struct {
 
         self.debug = false;
 
-        if (self.pageData == .Admin) {
-            w.httpPostZ("/drive", "");
-        }
-
         try self.loadRelevantAssets(screenSize, tempAllocator);
     }
 
@@ -266,11 +263,6 @@ pub const App = struct {
         const keyCodeArrowLeft = 37;
         const keyCodeArrowRight = 39;
         const keyCodeG = 71;
-        // const keyCodeR = 82;
-
-        if (self.inputState.keyboardState.keyDown('R')) {
-            w.httpPostZ("/drive", "");
-        }
 
         if (self.pageData == .Entry and self.pageData.Entry.gallerySelection != null and self.portfolio != null) {
             if (self.inputState.keyboardState.keyDown(keyCodeEscape)) {
@@ -344,22 +336,29 @@ pub const App = struct {
 
         w.glClear(w.GL_COLOR_BUFFER_BIT | w.GL_DEPTH_BUFFER_BIT);
 
-        const isVertical = isVerticalAspect(screenSizeF);
-
         var yMax: i32 = 0;
-        if (isVertical) {
-            yMax = drawMobile(self, deltaS, scrollYF, screenSizeF, renderQueue, tempAllocator);
-        } else {
-            yMax = drawDesktop(self, deltaMs, scrollYF, screenSizeF, renderQueue, tempAllocator);
-        }
         defer {
             self.yMaxPrev = yMax;
+        }
+        switch (self.pageData) {
+            .Home, .Entry, .Unknown => {
+                renderQueue.quad(m.Vec2.init(0, scrollYF), screenSizeF, 1.0, 0.0, m.Vec4.black);
+                const isVertical = isVerticalAspect(screenSizeF);
+                if (isVertical) {
+                    yMax = drawMobile(self, deltaS, scrollYF, screenSizeF, renderQueue, tempAllocator);
+                } else {
+                    yMax = drawDesktop(self, deltaMs, scrollYF, screenSizeF, renderQueue, tempAllocator);
+                }
+            },
+            .Admin => {
+                yMax = page_admin.updateAndRender(self, deltaS, scrollYF, screenSizeF, renderQueue, tempAllocator);
+            },
         }
 
         renderQueue.render2(&self.renderState, screenSizeF, scrollYF, tempAllocator);
         if (!m.eql(self.screenSizePrev, screenSize) or yMax != self.yMaxPrev) {
             std.log.info("resize, clearing HTML elements", .{});
-            w.clearAllEmbeds();
+            // w.clearAllEmbeds();
             // renderQueue.renderHtml();
         }
 
@@ -401,8 +400,13 @@ pub const App = struct {
             };
             self.portfolio = pf;
             std.log.info("Loaded portfolio ({} projects)", .{pf.projects.len});
-        } else if (!isGet and std.mem.eql(u8, uri, "/drive")) {
-            std.log.info("DRIVE!", .{});
+        }
+
+        switch (self.pageData) {
+            .Admin => page_admin.onHttp(self, isGet, uri, data),
+            .Entry => {},
+            .Home => {},
+            .Unknown => {},
         }
     }
 
@@ -788,6 +792,7 @@ fn drawDesktop(state: *App, deltaMs: u64, scrollYF: f32, screenSizeF: m.Vec2, re
 {
     const colorUi = blk: {
         switch (state.pageData) {
+            .Admin => unreachable,
             .Home => {
                 break :blk COLOR_YELLOW_HOME;
             },
@@ -798,7 +803,7 @@ fn drawDesktop(state: *App, deltaMs: u64, scrollYF: f32, screenSizeF: m.Vec2, re
                     break :blk m.Vec4.white;
                 }
             },
-            .Admin, .Unknown => {
+            .Unknown => {
                 break :blk m.Vec4.white;
             },
         }
@@ -825,7 +830,8 @@ fn drawDesktop(state: *App, deltaMs: u64, scrollYF: f32, screenSizeF: m.Vec2, re
     const decalTopLeft = state.assets.getTextureData(.{.static = .DecalTopLeft});
     const stickerMain = blk: {
         switch (state.pageData) {
-            .Admin, .Home, .Unknown => break :blk state.assets.getTextureData(.{.static = .StickerMainHome}),
+            .Admin => unreachable,
+            .Home, .Unknown => break :blk state.assets.getTextureData(.{.static = .StickerMainHome}),
             .Entry => |entryData| {
                 if (state.portfolio) |pf| {
                     const project = pf.projects[entryData.portfolioIndex];
@@ -862,7 +868,8 @@ fn drawDesktop(state: *App, deltaMs: u64, scrollYF: f32, screenSizeF: m.Vec2, re
     if (allLandingAssetsLoaded) {
         const parallaxIndex = blk: {
             switch (state.pageData) {
-                .Admin, .Home, .Unknown => break :blk state.activeParallaxSetIndex,
+                .Admin => unreachable,
+                .Home, .Unknown => break :blk state.activeParallaxSetIndex,
                 .Entry => |entryData| {
                     const project = state.portfolio.?.projects[entryData.portfolioIndex];
                     break :blk project.parallaxIndex;
@@ -1008,7 +1015,8 @@ fn drawDesktop(state: *App, deltaMs: u64, scrollYF: f32, screenSizeF: m.Vec2, re
             screenSizeF.y - gridSize * 5 - stickerSize.y
         );
         const colorSticker = switch (state.pageData) {
-            .Admin, .Home, .Unknown => colorUi,
+            .Admin => unreachable,
+            .Home, .Unknown => colorUi,
             .Entry => m.Vec4.white,
         };
         renderQueue.texQuadColor(
@@ -1257,7 +1265,8 @@ fn drawDesktop(state: *App, deltaMs: u64, scrollYF: f32, screenSizeF: m.Vec2, re
 
     const contentSubWidth = screenSizeF.x - contentMarginX * 2;
     switch (state.pageData) {
-        .Admin, .Home, .Unknown => {},
+        .Admin => unreachable,
+        .Home, .Unknown => {},
         .Entry => |entryData| {
             // content section
             const project = pf.projects[entryData.portfolioIndex];
@@ -1543,9 +1552,7 @@ fn drawMobile(state: *App, deltaS: f32, scrollY: f32, screenSize: m.Vec2, render
 
     const colorUi = blk: {
         switch (state.pageData) {
-            .Admin => {
-                break :blk m.Vec4.white;
-            },
+            .Admin => unreachable,
             .Home => {
                 break :blk COLOR_YELLOW_HOME;
             },
