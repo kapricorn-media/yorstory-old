@@ -228,7 +228,7 @@ pub fn tryLoadAndGetParallaxSet(assets: anytype, index: usize, priority: u32, te
                 .path = parallaxImage.url,
                 .filter = textureFilter,
                 .wrapMode = textureWrap,
-            }, priority) catch |err| {
+            }, priority, undefined) catch |err| {
                 std.log.err("Failed to register {s}, err {}", .{parallaxImage.url, err});
             };
         }

@@ -647,7 +647,7 @@ pub const App = struct {
                     .scale = ftl.scale,
                     .kerning = ftl.kerning,
                     .lineHeight = ftl.lineHeight,
-                });
+                }, allocator);
             }
         }
         for (texturesToLoad.items) |t| {
@@ -656,7 +656,7 @@ pub const App = struct {
                     .path = t.path,
                     .filter = defaultTextureFilter,
                     .wrapMode = defaultTextureWrap,
-                }, t.priority);
+                }, t.priority, allocator);
             }
         }
     }
@@ -694,7 +694,7 @@ fn drawImageGrid(images: []const GridImage, itemsPerRow: usize, topLeft: m.Vec2,
                     .path = img.uri,
                     .filter = defaultTextureFilter,
                     .wrapMode = defaultTextureWrap,
-                }, texPriority) catch |err| {
+                }, texPriority, undefined) catch |err| {
                     std.log.err("Failed to register {s}, err {}", .{img.uri, err});
                 };
             }
@@ -843,7 +843,7 @@ fn drawDesktop(state: *App, deltaMs: u64, scrollYF: f32, screenSizeF: m.Vec2, re
                                 .path = project.sticker,
                                 .filter = defaultTextureFilter,
                                 .wrapMode = defaultTextureWrap,
-                            }, 9) catch |err| {
+                            }, 9, allocator) catch |err| {
                                 std.log.err("Failed to register {s}, err {}", .{project.sticker, err});
                             };
                         }
@@ -1830,7 +1830,7 @@ fn drawMobile(state: *App, deltaS: f32, scrollY: f32, screenSize: m.Vec2, render
                     .path = project.cover,
                     .filter = defaultTextureFilter,
                     .wrapMode = defaultTextureWrap,
-                }, 5) catch |err| {
+                }, 5, allocator) catch |err| {
                     std.log.err("Failed to register {s}, err {}", .{project.cover, err});
                 };
             }
