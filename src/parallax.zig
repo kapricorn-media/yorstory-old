@@ -3,6 +3,8 @@ const std = @import("std");
 const app = @import("zigkm-app");
 const m = @import("zigkm-math");
 
+const App = @import("wasm_main.zig").App;
+
 fn hexU8ToFloatNormalized(hexString: []const u8) !f32
 {
     return @intToFloat(f32, try std.fmt.parseUnsigned(u8, hexString, 16)) / 255.0;
@@ -213,7 +215,7 @@ pub const PARALLAX_SETS = [_]ParallaxSet {
     },
 };
 
-pub fn tryLoadAndGetParallaxSet(assets: anytype, index: usize, priority: u32, textureWrap: app.asset_data.TextureWrapMode, textureFilter: app.asset_data.TextureFilter) ?*const ParallaxSet
+fn tryLoadAndGetParallaxSet(assets: anytype, index: usize, priority: u32, textureWrap: app.asset_data.TextureWrapMode, textureFilter: app.asset_data.TextureFilter) ?*const ParallaxSet
 {
     if (index >= PARALLAX_SETS.len) {
         return null;
@@ -235,4 +237,89 @@ pub fn tryLoadAndGetParallaxSet(assets: anytype, index: usize, priority: u32, te
     }
 
     return if (loaded) &PARALLAX_SETS[index] else null;
+}
+
+/// Returns bool to indicate whether the active parallax scene is fully loaded and was drawn.
+pub fn loadAndDrawParallax(
+    pos: m.Vec2, size: m.Vec2, depth: f32,
+    appData: *App,
+    renderQueue: *app.render.RenderQueue,
+    screenSize: m.Vec2,
+    deltaS: f64,
+    textureWrap: app.asset_data.TextureWrapMode,
+    textureFilter: app.asset_data.TextureFilter) bool
+{
+    const parallaxMotionMax = screenSize.x / 8.0;
+
+    const parallaxIndex = blk: {
+        switch (appData.pageData) {
+            .Admin => unreachable,
+            .Home, .Unknown => break :blk appData.activeParallaxSetIndex,
+            .Entry => |entryData| {
+                const project = appData.portfolio.?.projects[entryData.portfolioIndex];
+                break :blk project.parallaxIndex;
+            },
+        }
+    };
+
+    // Determine whether the active parallax set is loaded
+    var activeParallaxSet = tryLoadAndGetParallaxSet(
+        &appData.assets, parallaxIndex, 5, textureWrap, textureFilter
+    );
+
+    // Load later sets
+    if (appData.pageData == .Home and activeParallaxSet != null) {
+        appData.parallaxIdleTimeS += deltaS;
+        const nextSetIndex = (parallaxIndex + 1) % PARALLAX_SETS.len;
+        var nextParallaxSet = tryLoadAndGetParallaxSet(&appData.assets, nextSetIndex, 20, textureWrap, textureFilter);
+        if (nextParallaxSet) |_| {
+            if (appData.parallaxIdleTimeS >= @as(f64, App.PARALLAX_SET_SWAP_SECONDS)) {
+                appData.parallaxIdleTimeS = 0;
+                appData.activeParallaxSetIndex = nextSetIndex;
+                activeParallaxSet = nextParallaxSet;
+            } else {
+                for (PARALLAX_SETS) |_, i| {
+                    if (tryLoadAndGetParallaxSet(&appData.assets, i, 20, textureWrap, textureFilter) == null) {
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    if (activeParallaxSet) |parallaxSet| {
+        switch (parallaxSet.bgColor) {
+            .Color => |color| {
+                renderQueue.quad(pos, size, depth, 0, color);
+            },
+            .Gradient => |gradient| {
+                renderQueue.quadGradient(pos, size, depth, 0,
+                    [4]m.Vec4 {
+                        gradient.colorBottom,
+                        gradient.colorBottom,
+                        gradient.colorTop,
+                        gradient.colorTop,
+                    }
+                );
+            },
+        }
+
+        for (parallaxSet.images) |parallaxImage| {
+            const textureData = appData.assets.getTextureData(.{.dynamic = parallaxImage.url}) orelse unreachable;
+
+            const textureDataF = m.Vec2.initFromVec2usize(textureData.size);
+            const textureSize = m.Vec2.init(
+                size.y * textureDataF.x / textureDataF.y,
+                size.y
+            );
+            const parallaxOffsetX = appData.parallaxTX * parallaxMotionMax * parallaxImage.factor;
+
+            const imgPos = m.Vec2.init(
+                screenSize.x / 2.0 - textureSize.x / 2.0 + parallaxOffsetX,
+                pos.y
+            );
+            renderQueue.texQuad(imgPos, textureSize, depth, 0.0, textureData);
+        }
+    }
+    return activeParallaxSet != null;
 }

@@ -10,7 +10,7 @@ pub const Data = struct {
     driveReqInFlight: bool = false,
 };
 
-pub fn updateAndRender(state: *App, deltaS: f32, scrollY: f32, screenSize: m.Vec2, renderQueue: *app.render.RenderQueue, allocator: std.mem.Allocator) i32
+pub fn updateAndRender(state: *App, deltaS: f64, scrollY: f32, screenSize: m.Vec2, renderQueue: *app.render.RenderQueue, allocator: std.mem.Allocator) i32
 {
     _ = deltaS;
     _ = scrollY;

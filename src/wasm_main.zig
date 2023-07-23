@@ -177,10 +177,10 @@ pub const App = struct {
     shouldUpdatePage: bool,
     screenSizePrev: m.Vec2usize,
     scrollYPrev: i32,
-    timestampMsPrev: u64,
+    timestampNsPrev: u64,
     activeParallaxSetIndex: usize,
     parallaxTX: f32,
-    parallaxIdleTimeMs: u64,
+    parallaxIdleTimeS: f64,
     yMaxPrev: i32,
 
     // mobile
@@ -189,8 +189,8 @@ pub const App = struct {
     debug: bool,
 
     const Self = @This();
+    pub const PARALLAX_SET_SWAP_SECONDS = 6;
     const PARALLAX_SET_INDEX_START = 6;
-    const PARALLAX_SET_SWAP_SECONDS = 6;
     comptime {
         if (PARALLAX_SET_INDEX_START >= parallax.PARALLAX_SETS.len) {
             @compileError("start parallax index out of bounds");
@@ -234,10 +234,10 @@ pub const App = struct {
         self.shouldUpdatePage = false;
         self.screenSizePrev = m.Vec2usize.zero;
         self.scrollYPrev = -1;
-        self.timestampMsPrev = 0;
+        self.timestampNsPrev = 0;
         self.activeParallaxSetIndex = PARALLAX_SET_INDEX_START;
         self.parallaxTX = 0;
-        self.parallaxIdleTimeMs = 0;
+        self.parallaxIdleTimeS = 0;
         self.yMaxPrev = 0;
 
         self.debug = false;
@@ -245,7 +245,7 @@ pub const App = struct {
         try self.loadRelevantAssets(screenSize, tempAllocator);
     }
 
-    pub fn updateAndRender(self: *Self, screenSize: m.Vec2usize, scrollY: i32, timestampMs: u64) i32
+    pub fn updateAndRender(self: *Self, screenSize: m.Vec2usize, scrollY: i32, timestampNs: u64) i32
     {
         const screenSizeI = screenSize.toVec2i();
         const screenSizeF = screenSize.toVec2();
@@ -254,7 +254,7 @@ pub const App = struct {
             self.inputState.mouseState.clear();
             self.inputState.keyboardState.clear();
 
-            self.timestampMsPrev = timestampMs;
+            self.timestampNsPrev = timestampNs;
             self.scrollYPrev = scrollY;
             self.screenSizePrev = screenSize;
         }
@@ -285,8 +285,8 @@ pub const App = struct {
             self.debug = !self.debug;
         }
 
-        const deltaMs = if (self.timestampMsPrev > 0) (timestampMs - self.timestampMsPrev) else 0;
-        const deltaS = @intToFloat(f32, deltaMs) / 1000.0;
+        const deltaNs = if (self.timestampNsPrev > 0) (timestampNs - self.timestampNsPrev) else 0;
+        const deltaS = @intToFloat(f64, deltaNs) / 1000.0 / 1000.0 / 1000.0;
 
         var tempBufferAllocator = self.memory.tempBufferAllocator();
         const tempAllocator = tempBufferAllocator.allocator();
@@ -347,7 +347,7 @@ pub const App = struct {
                 if (isVertical) {
                     yMax = drawMobile(self, deltaS, scrollYF, screenSizeF, renderQueue, tempAllocator);
                 } else {
-                    yMax = drawDesktop(self, deltaMs, scrollYF, screenSizeF, renderQueue, tempAllocator);
+                    yMax = drawDesktop(self, deltaS, scrollYF, screenSizeF, renderQueue, tempAllocator);
                 }
             },
             .Admin => {
@@ -560,11 +560,11 @@ pub const App = struct {
             });
         } else {
             try texturesToLoad.appendSlice(&[_]TextureLoadInfo {
-                .{
-                    .texture = .MobileBackground,
-                    .path = "images/mobile/background.png",
-                    .priority = 5,
-                },
+                // .{
+                //     .texture = .MobileBackground,
+                //     .path = "images/mobile/background.png",
+                //     .priority = 5,
+                // },
                 .{
                     .texture = .MobileCrosshair,
                     .path = "images/mobile/crosshair.png",
@@ -788,7 +788,7 @@ fn drawCrosshairCorners(pos: m.Vec2, size: m.Vec2, depth: f32, gridSize: f32, de
     );
 }
 
-fn drawDesktop(state: *App, deltaMs: u64, scrollYF: f32, screenSizeF: m.Vec2, renderQueue: *app.render.RenderQueue, allocator: std.mem.Allocator) i32
+fn drawDesktop(state: *App, deltaS: f64, scrollYF: f32, screenSizeF: m.Vec2, renderQueue: *app.render.RenderQueue, allocator: std.mem.Allocator) i32
 {
     const colorUi = blk: {
         switch (state.pageData) {
@@ -808,9 +808,8 @@ fn drawDesktop(state: *App, deltaMs: u64, scrollYF: f32, screenSizeF: m.Vec2, re
             },
         }
     };
-    const parallaxMotionMax = screenSizeF.x / 8.0;
 
-    const mousePosF = m.Vec2.initFromVec2i(state.inputState.mouseState.pos);
+    const mousePosF = state.inputState.mouseState.pos.toVec2();
     var mouseHoverGlobal = false;
 
     const gridSize = getGridSize(screenSizeF);
@@ -866,87 +865,16 @@ fn drawDesktop(state: *App, deltaMs: u64, scrollYF: f32, screenSizeF: m.Vec2, re
     };
     var allLandingAssetsLoaded = decalTopLeft != null and stickerMain != null and allFontsLoaded;
     if (allLandingAssetsLoaded) {
-        const parallaxIndex = blk: {
-            switch (state.pageData) {
-                .Admin => unreachable,
-                .Home, .Unknown => break :blk state.activeParallaxSetIndex,
-                .Entry => |entryData| {
-                    const project = state.portfolio.?.projects[entryData.portfolioIndex];
-                    break :blk project.parallaxIndex;
-                },
-            }
-        };
-
-        // Determine whether the active parallax set is loaded
-        var activeParallaxSet = parallax.tryLoadAndGetParallaxSet(&state.assets, parallaxIndex, 5, defaultTextureWrap, defaultTextureFilter);
-
-        // Load later sets
-        if (state.pageData == .Home and activeParallaxSet != null) {
-            state.parallaxIdleTimeMs += deltaMs;
-            const nextSetIndex = (parallaxIndex + 1) % parallax.PARALLAX_SETS.len;
-            var nextParallaxSet = parallax.tryLoadAndGetParallaxSet(&state.assets, nextSetIndex, 20, defaultTextureWrap, defaultTextureFilter);
-            if (nextParallaxSet) |_| {
-                if (state.parallaxIdleTimeMs >= App.PARALLAX_SET_SWAP_SECONDS * 1000) {
-                    state.parallaxIdleTimeMs = 0;
-                    state.activeParallaxSetIndex = nextSetIndex;
-                    activeParallaxSet = nextParallaxSet;
-                } else {
-                    for (parallax.PARALLAX_SETS) |_, i| {
-                        if (parallax.tryLoadAndGetParallaxSet(&state.assets, i, 20, defaultTextureWrap, defaultTextureFilter) == null) {
-                            break;
-                        }
-                    }
-                }
-            }
-        }
-
         const targetParallaxTX = mousePosF.x / screenSizeF.x * 2.0 - 1.0; // -1 to 1
         state.parallaxTX = targetParallaxTX;
 
-        if (activeParallaxSet) |parallaxSet| {
-            const landingImagePos = m.Vec2.init(
-                marginX + gridSize * 1,
-                gridSize * 1
-            );
-            const landingImageSize = m.Vec2.init(
-                screenSizeF.x - marginX * 2 - gridSize * 2,
-                screenSizeF.y - gridSize * 3
-            );
-
-            switch (parallaxSet.bgColor) {
-                .Color => |color| {
-                    renderQueue.quad(landingImagePos, landingImageSize, DEPTH_LANDINGBACKGROUND, 0, color);
-                },
-                .Gradient => |gradient| {
-                    renderQueue.quadGradient(
-                        landingImagePos, landingImageSize, DEPTH_LANDINGBACKGROUND, 0,
-                        [4]m.Vec4 {
-                            gradient.colorBottom,
-                            gradient.colorBottom,
-                            gradient.colorTop,
-                            gradient.colorTop,
-                        }
-                    );
-                },
-            }
-
-            for (parallaxSet.images) |parallaxImage| {
-                const textureData = state.assets.getTextureData(.{.dynamic = parallaxImage.url}) orelse unreachable;
-
-                const textureDataF = m.Vec2.initFromVec2usize(textureData.size);
-                const textureSize = m.Vec2.init(
-                    landingImageSize.y * textureDataF.x / textureDataF.y,
-                    landingImageSize.y
-                );
-                const parallaxOffsetX = state.parallaxTX * parallaxMotionMax * parallaxImage.factor;
-
-                const imgPos = m.Vec2.init(
-                    screenSizeF.x / 2.0 - textureSize.x / 2.0 + parallaxOffsetX,
-                    landingImagePos.y
-                );
-                renderQueue.texQuad(imgPos, textureSize, DEPTH_LANDINGIMAGE, 0.0, textureData);
-            }
-        } else {
+        const landingImageMarginX = marginX + gridSize * 1;
+        const landingImagePos = m.Vec2.init(landingImageMarginX, gridSize * 1);
+        const landingImageSize = m.Vec2.init(
+            screenSizeF.x - landingImageMarginX * 2,
+            screenSizeF.y - gridSize * 3
+        );
+        if (!parallax.loadAndDrawParallax(landingImagePos, landingImageSize, DEPTH_LANDINGBACKGROUND, state, renderQueue, screenSizeF, deltaS, defaultTextureWrap, defaultTextureFilter)) {
             allLandingAssetsLoaded = false;
         }
     }
@@ -1546,10 +1474,8 @@ fn drawDesktop(state: *App, deltaMs: u64, scrollYF: f32, screenSizeF: m.Vec2, re
     return @floatToInt(i32, yMax);
 }
 
-fn drawMobile(state: *App, deltaS: f32, scrollY: f32, screenSize: m.Vec2, renderQueue: *app.render.RenderQueue, allocator: std.mem.Allocator) i32
+fn drawMobile(state: *App, deltaS: f64, scrollY: f32, screenSize: m.Vec2, renderQueue: *app.render.RenderQueue, allocator: std.mem.Allocator) i32
 {
-    _ = deltaS;
-
     const colorUi = blk: {
         switch (state.pageData) {
             .Admin => unreachable,
@@ -1569,7 +1495,7 @@ fn drawMobile(state: *App, deltaS: f32, scrollY: f32, screenSize: m.Vec2, render
         }
     };
 
-    const aspect = screenSize.x / screenSize.y;
+    // const aspect = screenSize.x / screenSize.y;
     const gridSize = getGridSize(screenSize);
 
     const quat = m.Quat.initFromEulerAngles(state.inputState.deviceState.angles);
@@ -1585,25 +1511,32 @@ fn drawMobile(state: *App, deltaS: f32, scrollY: f32, screenSize: m.Vec2, render
 
     // ==== FIRST FRAME: LANDING ====
 
-    if (state.assets.getTextureData(.{.static = .MobileBackground})) |bgTex| {
-        const bgTexSize = m.Vec2.initFromVec2usize(bgTex.size);
-        const bgAspect = bgTexSize.x / bgTexSize.y;
-        // _ = bgAspect;
-        // _ = aspect;
-        // const bgUvBottomLeft = m.Vec2.zero;
-        // const bgUvSize = m.Vec2.one;
-        // renderQueue.texQuadColorUvOffset(m.Vec2.zero, screenSize, DEPTH_LANDINGBACKGROUND, 0.0, bgUvBottomLeft, bgUvSize, bgTex, m.Vec4.white);
-        const backgroundSize = if (bgAspect < aspect)
-            m.Vec2.init(screenSize.x, screenSize.x / bgAspect)
-            else
-            m.Vec2.init(screenSize.y / bgTexSize.y * bgTexSize.x, screenSize.y);
-        std.log.info("{} vs {}: {}", .{bgAspect, aspect, backgroundSize});
-        const backgroundPos = m.Vec2.init(
-            (screenSize.x - backgroundSize.x) / 2.0,
-            (screenSize.y - backgroundSize.y) / 2.0,
-        );
-        renderQueue.texQuadColor(backgroundPos, backgroundSize, DEPTH_LANDINGBACKGROUND, 0.0, bgTex, m.Vec4.white);
+    {
+        const offsetTest = anglesTarget.z / 90.0 * 10.0;
+        state.parallaxTX = offsetTest;
+
+        const parallaxReady = parallax.loadAndDrawParallax(m.Vec2.zero, screenSize, DEPTH_LANDINGBACKGROUND, state, renderQueue, screenSize, deltaS, defaultTextureWrap, defaultTextureFilter);
+        _ = parallaxReady;
     }
+    // if (state.assets.getTextureData(.{.static = .MobileBackground})) |bgTex| {
+    //     const bgTexSize = m.Vec2.initFromVec2usize(bgTex.size);
+    //     const bgAspect = bgTexSize.x / bgTexSize.y;
+    //     // _ = bgAspect;
+    //     // _ = aspect;
+    //     // const bgUvBottomLeft = m.Vec2.zero;
+    //     // const bgUvSize = m.Vec2.one;
+    //     // renderQueue.texQuadColorUvOffset(m.Vec2.zero, screenSize, DEPTH_LANDINGBACKGROUND, 0.0, bgUvBottomLeft, bgUvSize, bgTex, m.Vec4.white);
+    //     const backgroundSize = if (bgAspect < aspect)
+    //         m.Vec2.init(screenSize.x, screenSize.x / bgAspect)
+    //         else
+    //         m.Vec2.init(screenSize.y / bgTexSize.y * bgTexSize.x, screenSize.y);
+    //     std.log.info("{} vs {}: {}", .{bgAspect, aspect, backgroundSize});
+    //     const backgroundPos = m.Vec2.init(
+    //         (screenSize.x - backgroundSize.x) / 2.0,
+    //         (screenSize.y - backgroundSize.y) / 2.0,
+    //     );
+    //     renderQueue.texQuadColor(backgroundPos, backgroundSize, DEPTH_LANDINGBACKGROUND, 0.0, bgTex, m.Vec4.white);
+    // }
 
     if (state.assets.getTextureData(.{.static = .MobileYorstoryCompany})) |yorTex| {
         const yorSize = getTextureScaledSize(yorTex.size, screenSize);
@@ -1622,7 +1555,8 @@ fn drawMobile(state: *App, deltaS: f32, scrollY: f32, screenSize: m.Vec2, render
     }
 
     if (state.assets.getTextureData(.{.static = .MobileCrosshair})) |crosshairTex| {
-        const offsetTest = anglesTarget.z / 90.0 * 100.0;
+        // const offsetTest = anglesTarget.z / 90.0 * 100.0;
+        const offsetTest = 0;
         const crosshairOffset = gridSize * 0.25;
         const pos = m.Vec2.init(-(gridSize + crosshairOffset) + offsetTest, -(gridSize + crosshairOffset));
         const size = m.Vec2.init(screenSize.x + gridSize * 2.0 + crosshairOffset * 2.0, screenSize.y + gridSize * 2.0 + crosshairOffset * 2.0);
