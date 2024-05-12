@@ -1,3 +1,5 @@
+const app = @import("zigkm-app");
+
 pub const Font = enum {
     Title,
     Subtitle,
@@ -26,3 +28,5 @@ pub const Texture = enum {
 
     StickerMainHome,
 };
+
+pub const AssetsType = app.asset.AssetsWithIds(Font, Texture, 128);

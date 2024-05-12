@@ -1,0 +1,849 @@
+{
+	"auto_complete":
+	{
+		"selected_items":
+		[
+		]
+	},
+	"buffers":
+	[
+		{
+			"file": "src/server_main.zig",
+			"settings":
+			{
+				"buffer_size": 15969,
+				"encoding": "UTF-8",
+				"line_ending": "Windows"
+			},
+			"undo_stack":
+			[
+				[
+					7,
+					1,
+					"paste",
+					null,
+					"AQAAAGIDAAAAAAAAiQMAAAAAAAAAAAAA",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAABiAwAAAAAAAGIDAAAAAAAAAAAAAAAA8L8"
+				],
+				[
+					8,
+					1,
+					"toggle_comment",
+					{
+						"block": false
+					},
+					"AQAAAGMDAAAAAAAAYwMAAAAAAAADAAAALy8g",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAACJAwAAAAAAAIkDAAAAAAAAAAAAAAAA8L8"
+				],
+				[
+					34,
+					1,
+					"insert",
+					{
+						"characters": "du"
+					},
+					"AgAAAG0IAAAAAAAAbggAAAAAAAAAAAAAbggAAAAAAABvCAAAAAAAAAAAAAA",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAABtCAAAAAAAAG0IAAAAAAAAAAAAAAAA8L8"
+				],
+				[
+					35,
+					1,
+					"left_delete",
+					null,
+					"AQAAAG4IAAAAAAAAbggAAAAAAAABAAAAdQ",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAABvCAAAAAAAAG8IAAAAAAAAAAAAAAAA8L8"
+				],
+				[
+					36,
+					1,
+					"insert",
+					{
+						"characters": "ynamic"
+					},
+					"BgAAAG4IAAAAAAAAbwgAAAAAAAAAAAAAbwgAAAAAAABwCAAAAAAAAAAAAABwCAAAAAAAAHEIAAAAAAAAAAAAAHEIAAAAAAAAcggAAAAAAAAAAAAAcggAAAAAAABzCAAAAAAAAAAAAABzCAAAAAAAAHQIAAAAAAAAAAAAAA",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAABuCAAAAAAAAG4IAAAAAAAAAAAAAAAA8L8"
+				],
+				[
+					40,
+					1,
+					"insert",
+					{
+						"characters": "."
+					},
+					"AQAAAHQIAAAAAAAAdQgAAAAAAAAAAAAA",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAAB0CAAAAAAAAHQIAAAAAAAAAAAAAAAA8L8"
+				],
+				[
+					44,
+					2,
+					"paste",
+					null,
+					"AwAAAF8IAAAAAAAAgwgAAAAAAAAAAAAAgwgAAAAAAACDCAAAAAAAACQAAAAKICAgICAgICBzZWxmLmR5bmFtaWMuZGF0YS5kZWluaXQoKTuDCAAAAAAAAKcIAAAAAAAAAAAAAA",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAACDCAAAAAAAAF8IAAAAAAAA////////738"
+				],
+				[
+					47,
+					1,
+					"insert",
+					{
+						"characters": "Alpha"
+					},
+					"BQAAAJgIAAAAAAAAmQgAAAAAAAAAAAAAmQgAAAAAAACaCAAAAAAAAAAAAACaCAAAAAAAAJsIAAAAAAAAAAAAAJsIAAAAAAAAnAgAAAAAAAAAAAAAnAgAAAAAAACdCAAAAAAAAAAAAAA",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAACYCAAAAAAAAJgIAAAAAAAAAAAAAAAA8L8"
+				],
+				[
+					57,
+					3,
+					"run_macro_file",
+					{
+						"file": "res://Packages/Default/Delete Line.sublime-macro"
+					},
+					"AwAAAAcTAAAAAAAABxMAAAAAAAAmAAAAICAgIHN0YXRlLmF1dGhTdGF0ZUxvY2subG9ja1NoYXJlZCgpOwoHEwAAAAAAAAcTAAAAAAAALgAAACAgICBkZWZlciBzdGF0ZS5hdXRoU3RhdGVMb2NrLnVubG9ja1NoYXJlZCgpOwoHEwAAAAAAAAcTAAAAAAAAAQAAAAo",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAAAREwAAAAAAAB4TAAAAAAAAAAAAAAAA8L8"
+				],
+				[
+					60,
+					1,
+					"insert",
+					{
+						"characters": "\nelse"
+					},
+					"BgAAAJMXAAAAAAAAlBcAAAAAAAAAAAAAlBcAAAAAAACcFwAAAAAAAAAAAACcFwAAAAAAAJ0XAAAAAAAAAAAAAJ0XAAAAAAAAnhcAAAAAAAAAAAAAnhcAAAAAAACfFwAAAAAAAAAAAACfFwAAAAAAAKAXAAAAAAAAAAAAAA",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAACTFwAAAAAAAJMXAAAAAAAAAAAAAAAA8L8"
+				],
+				[
+					61,
+					1,
+					"insert",
+					{
+						"characters": " =>"
+					},
+					"AwAAAKAXAAAAAAAAoRcAAAAAAAAAAAAAoRcAAAAAAACiFwAAAAAAAAAAAACiFwAAAAAAAKMXAAAAAAAAAAAAAA",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAACgFwAAAAAAAKAXAAAAAAAAAAAAAAAA8L8"
+				],
+				[
+					62,
+					1,
+					"insert",
+					{
+						"characters": " "
+					},
+					"AQAAAKMXAAAAAAAApBcAAAAAAAAAAAAA",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAACjFwAAAAAAAKMXAAAAAAAAAAAAAAAA8L8"
+				],
+				[
+					63,
+					1,
+					"insert_snippet",
+					{
+						"contents": "{$0}"
+					},
+					"AQAAAKQXAAAAAAAAphcAAAAAAAAAAAAA",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAACkFwAAAAAAAKQXAAAAAAAAAAAAAAAA8L8"
+				],
+				[
+					65,
+					1,
+					"insert",
+					{
+						"characters": ","
+					},
+					"AQAAAKYXAAAAAAAApxcAAAAAAAAAAAAA",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAACmFwAAAAAAAKYXAAAAAAAAAAAAAAAA8L8"
+				],
+				[
+					70,
+					2,
+					"left_delete",
+					null,
+					"AgAAAIkXAAAAAAAAiRcAAAAAAAAIAAAAICAgICAgICCIFwAAAAAAAIgXAAAAAAAAAQAAAAo",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAACRFwAAAAAAAIkXAAAAAAAAAAAAAAAA8L8"
+				],
+				[
+					73,
+					1,
+					"run_macro_file",
+					{
+						"file": "res://Packages/Default/Delete Line.sublime-macro"
+					},
+					"AQAAAHYXAAAAAAAAdhcAAAAAAAAVAAAAICAgICAgICAuUE9TVCA9PiB7fSwK",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAACKFwAAAAAAAIoXAAAAAAAAAAAAAAAA8L8"
+				],
+				[
+					76,
+					1,
+					"insert",
+					{
+						"characters": "\nconst"
+					},
+					"CAAAALwXAAAAAAAAvRcAAAAAAAAAAAAAvRcAAAAAAADBFwAAAAAAAAAAAADBFwAAAAAAAMUXAAAAAAAAAAAAAMUXAAAAAAAAxhcAAAAAAAAAAAAAxhcAAAAAAADHFwAAAAAAAAAAAADHFwAAAAAAAMgXAAAAAAAAAAAAAMgXAAAAAAAAyRcAAAAAAAAAAAAAyRcAAAAAAADKFwAAAAAAAAAAAAA",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAAC8FwAAAAAAALwXAAAAAAAAAAAAAAAA8L8"
+				],
+				[
+					77,
+					1,
+					"insert",
+					{
+						"characters": " data"
+					},
+					"BQAAAMoXAAAAAAAAyxcAAAAAAAAAAAAAyxcAAAAAAADMFwAAAAAAAAAAAADMFwAAAAAAAM0XAAAAAAAAAAAAAM0XAAAAAAAAzhcAAAAAAAAAAAAAzhcAAAAAAADPFwAAAAAAAAAAAAA",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAADKFwAAAAAAAMoXAAAAAAAAAAAAAAAA8L8"
+				],
+				[
+					78,
+					1,
+					"insert",
+					{
+						"characters": " ="
+					},
+					"AgAAAM8XAAAAAAAA0BcAAAAAAAAAAAAA0BcAAAAAAADRFwAAAAAAAAAAAAA",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAADPFwAAAAAAAM8XAAAAAAAAAAAAAAAA8L8"
+				],
+				[
+					79,
+					1,
+					"insert",
+					{
+						"characters": " if"
+					},
+					"AwAAANEXAAAAAAAA0hcAAAAAAAAAAAAA0hcAAAAAAADTFwAAAAAAAAAAAADTFwAAAAAAANQXAAAAAAAAAAAAAA",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAADRFwAAAAAAANEXAAAAAAAAAAAAAAAA8L8"
+				],
+				[
+					80,
+					1,
+					"insert",
+					{
+						"characters": " "
+					},
+					"AQAAANQXAAAAAAAA1RcAAAAAAAAAAAAA",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAADUFwAAAAAAANQXAAAAAAAAAAAAAAAA8L8"
+				],
+				[
+					81,
+					1,
+					"insert_snippet",
+					{
+						"contents": "($0)"
+					},
+					"AQAAANUXAAAAAAAA1xcAAAAAAAAAAAAA",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAADVFwAAAAAAANUXAAAAAAAAAAAAAAAA8L8"
+				],
+				[
+					82,
+					1,
+					"insert",
+					{
+						"characters": "a"
+					},
+					"AQAAANYXAAAAAAAA1xcAAAAAAAAAAAAA",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAADWFwAAAAAAANYXAAAAAAAAAAAAAAAA8L8"
+				],
+				[
+					83,
+					1,
+					"left_delete",
+					null,
+					"AQAAANYXAAAAAAAA1hcAAAAAAAABAAAAYQ",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAADXFwAAAAAAANcXAAAAAAAAAAAAAAAA8L8"
+				],
+				[
+					84,
+					1,
+					"insert",
+					{
+						"characters": "isAlpha"
+					},
+					"BwAAANYXAAAAAAAA1xcAAAAAAAAAAAAA1xcAAAAAAADYFwAAAAAAAAAAAADYFwAAAAAAANkXAAAAAAAAAAAAANkXAAAAAAAA2hcAAAAAAAAAAAAA2hcAAAAAAADbFwAAAAAAAAAAAADbFwAAAAAAANwXAAAAAAAAAAAAANwXAAAAAAAA3RcAAAAAAAAAAAAA",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAADWFwAAAAAAANYXAAAAAAAAAAAAAAAA8L8"
+				],
+				[
+					86,
+					1,
+					"insert",
+					{
+						"characters": " &state."
+					},
+					"CAAAAN4XAAAAAAAA3xcAAAAAAAAAAAAA3xcAAAAAAADgFwAAAAAAAAAAAADgFwAAAAAAAOEXAAAAAAAAAAAAAOEXAAAAAAAA4hcAAAAAAAAAAAAA4hcAAAAAAADjFwAAAAAAAAAAAADjFwAAAAAAAOQXAAAAAAAAAAAAAOQXAAAAAAAA5RcAAAAAAAAAAAAA5RcAAAAAAADmFwAAAAAAAAAAAAA",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAADeFwAAAAAAAN4XAAAAAAAAAAAAAAAA8L8"
+				],
+				[
+					87,
+					1,
+					"insert",
+					{
+						"characters": "dynamic.data,"
+					},
+					"DQAAAOYXAAAAAAAA5xcAAAAAAAAAAAAA5xcAAAAAAADoFwAAAAAAAAAAAADoFwAAAAAAAOkXAAAAAAAAAAAAAOkXAAAAAAAA6hcAAAAAAAAAAAAA6hcAAAAAAADrFwAAAAAAAAAAAADrFwAAAAAAAOwXAAAAAAAAAAAAAOwXAAAAAAAA7RcAAAAAAAAAAAAA7RcAAAAAAADuFwAAAAAAAAAAAADuFwAAAAAAAO8XAAAAAAAAAAAAAO8XAAAAAAAA8BcAAAAAAAAAAAAA8BcAAAAAAADxFwAAAAAAAAAAAADxFwAAAAAAAPIXAAAAAAAAAAAAAPIXAAAAAAAA8xcAAAAAAAAAAAAA",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAADmFwAAAAAAAOYXAAAAAAAAAAAAAAAA8L8"
+				],
+				[
+					88,
+					1,
+					"insert",
+					{
+						"characters": " "
+					},
+					"AQAAAPMXAAAAAAAA9BcAAAAAAAAAAAAA",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAADzFwAAAAAAAPMXAAAAAAAAAAAAAAAA8L8"
+				],
+				[
+					89,
+					2,
+					"left_delete",
+					null,
+					"AgAAAPMXAAAAAAAA8xcAAAAAAAABAAAAIPIXAAAAAAAA8hcAAAAAAAABAAAALA",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAAD0FwAAAAAAAPQXAAAAAAAAAAAAAAAA8L8"
+				],
+				[
+					90,
+					1,
+					"insert",
+					{
+						"characters": " else"
+					},
+					"BQAAAPIXAAAAAAAA8xcAAAAAAAAAAAAA8xcAAAAAAAD0FwAAAAAAAAAAAAD0FwAAAAAAAPUXAAAAAAAAAAAAAPUXAAAAAAAA9hcAAAAAAAAAAAAA9hcAAAAAAAD3FwAAAAAAAAAAAAA",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAADyFwAAAAAAAPIXAAAAAAAAAAAAAAAA8L8"
+				],
+				[
+					91,
+					1,
+					"insert",
+					{
+						"characters": " &state."
+					},
+					"CAAAAPcXAAAAAAAA+BcAAAAAAAAAAAAA+BcAAAAAAAD5FwAAAAAAAAAAAAD5FwAAAAAAAPoXAAAAAAAAAAAAAPoXAAAAAAAA+xcAAAAAAAAAAAAA+xcAAAAAAAD8FwAAAAAAAAAAAAD8FwAAAAAAAP0XAAAAAAAAAAAAAP0XAAAAAAAA/hcAAAAAAAAAAAAA/hcAAAAAAAD/FwAAAAAAAAAAAAA",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAAD3FwAAAAAAAPcXAAAAAAAAAAAAAAAA8L8"
+				],
+				[
+					92,
+					1,
+					"insert",
+					{
+						"characters": "dynamic.data;"
+					},
+					"DQAAAP8XAAAAAAAAABgAAAAAAAAAAAAAABgAAAAAAAABGAAAAAAAAAAAAAABGAAAAAAAAAIYAAAAAAAAAAAAAAIYAAAAAAAAAxgAAAAAAAAAAAAAAxgAAAAAAAAEGAAAAAAAAAAAAAAEGAAAAAAAAAUYAAAAAAAAAAAAAAUYAAAAAAAABhgAAAAAAAAAAAAABhgAAAAAAAAHGAAAAAAAAAAAAAAHGAAAAAAAAAgYAAAAAAAAAAAAAAgYAAAAAAAACRgAAAAAAAAAAAAACRgAAAAAAAAKGAAAAAAAAAAAAAAKGAAAAAAAAAsYAAAAAAAAAAAAAAsYAAAAAAAADBgAAAAAAAAAAAAA",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAAD/FwAAAAAAAP8XAAAAAAAAAAAAAAAA8L8"
+				],
+				[
+					95,
+					1,
+					"insert",
+					{
+						"characters": "Alpha"
+					},
+					"BQAAAO0XAAAAAAAA7hcAAAAAAAAAAAAA7hcAAAAAAADvFwAAAAAAAAAAAADvFwAAAAAAAPAXAAAAAAAAAAAAAPAXAAAAAAAA8RcAAAAAAAAAAAAA8RcAAAAAAADyFwAAAAAAAAAAAAA",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAADtFwAAAAAAAO0XAAAAAAAAAAAAAAAA8L8"
+				],
+				[
+					100,
+					1,
+					"left_delete",
+					null,
+					"AQAAAEwYAAAAAAAATBgAAAAAAAAHAAAAJnN0YXRlLg",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAABTGAAAAAAAAEwYAAAAAAAAAAAAAAAA8L8"
+				],
+				[
+					105,
+					1,
+					"left_delete",
+					null,
+					"AQAAAOs3AAAAAAAA6zcAAAAAAAABAAAAMw",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAADsNwAAAAAAAOw3AAAAAAAAAAAAAAAA8L8"
+				],
+				[
+					106,
+					1,
+					"insert",
+					{
+						"characters": "4"
+					},
+					"AQAAAOs3AAAAAAAA7DcAAAAAAAAAAAAA",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAADrNwAAAAAAAOs3AAAAAAAAAAAAAAAA8L8"
+				],
+				[
+					116,
+					1,
+					"insert",
+					{
+						"characters": "app"
+					},
+					"BAAAADQCAAAAAAAANQIAAAAAAAAAAAAANQIAAAAAAAA1AgAAAAAAAAQAAABtYWluNQIAAAAAAAA2AgAAAAAAAAAAAAA2AgAAAAAAADcCAAAAAAAAAAAAAA",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAAA0AgAAAAAAADgCAAAAAAAAAAAAAAAA8L8"
+				],
+				[
+					120,
+					1,
+					"insert",
+					{
+						"characters": "app"
+					},
+					"BAAAAEQCAAAAAAAARQIAAAAAAAAAAAAARQIAAAAAAABFAgAAAAAAAAQAAABtYWluRQIAAAAAAABGAgAAAAAAAAAAAABGAgAAAAAAAEcCAAAAAAAAAAAAAA",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAABEAgAAAAAAAEgCAAAAAAAAAAAAAAAA8L8"
+				]
+			]
+		}
+	],
+	"build_system": "yorstory",
+	"build_system_choices":
+	[
+		[
+			[
+				[
+					"yorstory",
+					""
+				],
+				[
+					"yorstory",
+					"Build (ReleaseFast)"
+				],
+				[
+					"yorstory",
+					"Test"
+				],
+				[
+					"yorstory",
+					"Test (ReleaseFast)"
+				],
+				[
+					"yorstory",
+					"Clean"
+				],
+				[
+					"yorstory",
+					"App: Build"
+				],
+				[
+					"yorstory",
+					"App: Build (ReleaseFast)"
+				],
+				[
+					"yorstory",
+					"App: Run"
+				],
+				[
+					"yorstory",
+					"App: Run (ReleaseFast)"
+				],
+				[
+					"yorstory",
+					"App: Package"
+				],
+				[
+					"yorstory",
+					"App: Package (ReleaseFast)"
+				],
+				[
+					"yorstory",
+					"Server: Build"
+				],
+				[
+					"yorstory",
+					"Server: Build (ReleaseFast)"
+				],
+				[
+					"yorstory",
+					"Server: Package"
+				],
+				[
+					"yorstory",
+					"Server: Package (ReleaseFast)"
+				],
+				[
+					"Packages/Zig Language/Build Systems/Zig.sublime-build",
+					""
+				],
+				[
+					"Packages/Zig Language/Build Systems/Zig.sublime-build",
+					"Run File"
+				],
+				[
+					"Packages/Zig Language/Build Systems/Zig.sublime-build",
+					"Run Project"
+				],
+				[
+					"Packages/Zig Language/Build Systems/Zig.sublime-build",
+					"Test File"
+				],
+				[
+					"Packages/Zig Language/Build Systems/Zig.sublime-build",
+					"Test Project"
+				],
+				[
+					"Packages/Zig Language/Build Systems/Zig.sublime-build",
+					"Format File"
+				],
+				[
+					"Packages/Zig Language/Build Systems/Zig.sublime-build",
+					"Format Project"
+				],
+				[
+					"Packages/Zig Language/Build Systems/Zig.sublime-build",
+					"Build Project"
+				]
+			],
+			[
+				"yorstory",
+				"Server: Build"
+			]
+		]
+	],
+	"build_varint": "",
+	"command_palette":
+	{
+		"height": 0.0,
+		"last_filter": "",
+		"selected_items":
+		[
+			[
+				"install",
+				"Package Control: Install Package"
+			]
+		],
+		"width": 0.0
+	},
+	"console":
+	{
+		"height": 0.0,
+		"history":
+		[
+		]
+	},
+	"distraction_free":
+	{
+		"menu_visible": true,
+		"show_minimap": false,
+		"show_open_files": false,
+		"show_tabs": false,
+		"side_bar_visible": false,
+		"status_bar_visible": false
+	},
+	"expanded_folders":
+	[
+		"/C/Users/jmric/dev/yorstory",
+		"/C/Users/jmric/dev/yorstory/deps",
+		"/C/Users/jmric/dev/yorstory/src",
+		"/C/Users/jmric/dev/yorstory/src/server_static",
+		"/C/Users/jmric/dev/yorstory/zig-out",
+		"/C/Users/jmric/dev/yorstory/zig-out/server",
+		"/C/Users/jmric/dev/zigkm-common"
+	],
+	"file_history":
+	[
+		"/C/Users/jmric/dev/yorstory/src/parallax.zig",
+		"/C/Users/jmric/dev/yorstory/src/page_admin.zig",
+		"/C/Users/jmric/dev/yorstory/build.zig",
+		"/C/Users/jmric/dev/yorstory/src/app_main.zig",
+		"/C/Users/jmric/dev/yorstory/src/server_static/wasm.html",
+		"/C/Users/jmric/dev/yorstory/src/wasm_main.zig",
+		"/C/Users/jmric/dev/yorstory/src/portfolio.zig",
+		"/C/Users/jmric/dev/yorstory/build.zig.zon",
+		"/C/Users/jmric/dev/zigkm-common/src/math.zig",
+		"/C/Users/jmric/dev/zigkm-common/build.zig",
+		"/C/Users/jmric/dev/yorstory/src/asset.zig",
+		"/C/Users/jmric/dev/yorstory/src/drive.zig",
+		"/C/Users/jmric/dev/yorstory/src/server_main.zig",
+		"/C/Users/jmric/dev/yorstory/yorstory.sublime-project",
+		"/C/Users/jmric/dev/update/src/server_main.zig",
+		"/C/Users/jmric/dev/update/src/defs.zig",
+		"/C/Users/jmric/dev/update/src/app_main.zig",
+		"/C/Users/jmric/dev/update/src/ui_update.zig",
+		"/C/Users/jmric/AppData/Roaming/Blender Foundation/Blender/4.0/scripts/addons/__init__.py",
+		"/C/Users/jmric/Downloads/v289.20240226_030756.log",
+		"/C/Users/jmric/zig/0.12.0-dev.2063+804cee3b9/files/lib/std/mem.zig",
+		"/C/Users/jmric/dev/update/TODO",
+		"/C/Users/jmric/dev/update/src/asset.zig",
+		"/C/Users/jmric/dev/update/build.zig.zon",
+		"/C/Users/jmric/dev/update/update.sublime-project",
+		"/C/Users/jmric/dev/zigkm-common/src/app/ui.zig",
+		"/C/Users/jmric/dev/zigkm-common/src/app/render.zig",
+		"/C/Users/jmric/dev/update/src/profile.zig",
+		"/C/Users/jmric/zig/zig/0.12.0-dev.2063+804cee3b9/files/lib/std/math.zig",
+		"/C/Users/jmric/dev/zigkm-common/src/app/uix.zig",
+		"/C/Users/jmric/dev/zigkm-common/src/app/asset_data.zig",
+		"/C/Users/jmric/dev/bosses/src/draw.zig",
+		"/C/Users/jmric/dev/bosses/src/scene.zig",
+		"/C/Users/jmric/dev/bosses/src/common.zig"
+	],
+	"find":
+	{
+		"height": 27.0
+	},
+	"find_in_files":
+	{
+		"height": 104.0,
+		"where_history":
+		[
+			""
+		]
+	},
+	"find_state":
+	{
+		"case_sensitive": false,
+		"find_history":
+		[
+			"wasm_main",
+			"Json",
+			"lerp(",
+			"std.math.",
+			"portfolio",
+			"UsPrev",
+			"timestampNs",
+			"floattoint",
+			"inttofloat"
+		],
+		"highlight": true,
+		"in_selection": false,
+		"preserve_case": false,
+		"regex": false,
+		"replace_history":
+		[
+			"timestampUs"
+		],
+		"reverse": false,
+		"scrollbar_highlights": true,
+		"show_context": true,
+		"use_buffer2": true,
+		"use_gitignore": true,
+		"whole_word": false,
+		"wrap": true
+	},
+	"groups":
+	[
+		{
+			"sheets":
+			[
+				{
+					"buffer": 0,
+					"file": "src/server_main.zig",
+					"selected": true,
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 15969,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								8382,
+								8382
+							]
+						],
+						"settings":
+						{
+							"syntax": "Packages/Zig Language/Syntaxes/Zig.sublime-syntax",
+							"tab_size": 4,
+							"translate_tabs_to_spaces": true
+						},
+						"translation.x": 0.0,
+						"translation.y": 4028.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 0,
+					"stack_multiselect": false,
+					"type": "text"
+				}
+			]
+		}
+	],
+	"incremental_find":
+	{
+		"height": 27.0
+	},
+	"input":
+	{
+		"height": 40.0
+	},
+	"layout":
+	{
+		"cells":
+		[
+			[
+				0,
+				0,
+				1,
+				1
+			]
+		],
+		"cols":
+		[
+			0.0,
+			1.0
+		],
+		"rows":
+		[
+			0.0,
+			1.0
+		]
+	},
+	"menu_visible": true,
+	"output.exec":
+	{
+		"height": 344.0
+	},
+	"output.find_results":
+	{
+		"height": 0.0
+	},
+	"pinned_build_system": "",
+	"project": "yorstory.sublime-project",
+	"replace":
+	{
+		"height": 50.0
+	},
+	"save_all_on_build": true,
+	"select_file":
+	{
+		"height": 0.0,
+		"last_filter": "",
+		"selected_items":
+		[
+			[
+				"wasm_ma",
+				"yorstory\\src\\wasm_main.zig"
+			],
+			[
+				"admin",
+				"yorstory\\src\\page_admin.zig"
+			],
+			[
+				"math.zi",
+				"zigkm-common\\src\\math.zig"
+			],
+			[
+				"wasm_m",
+				"yorstory\\src\\wasm_main.zig"
+			],
+			[
+				"drive",
+				"yorstory\\src\\drive.zig"
+			],
+			[
+				"build.zi",
+				"zigkm-common\\build.zig"
+			],
+			[
+				"server",
+				"update\\src\\server_main.zig"
+			],
+			[
+				"server_",
+				"update\\src\\server_main.zig"
+			],
+			[
+				"defs.",
+				"update\\src\\defs.zig"
+			],
+			[
+				"ui_up",
+				"update\\src\\ui_update.zig"
+			],
+			[
+				"app_m",
+				"update\\src\\app_main.zig"
+			],
+			[
+				"app_ma",
+				"update\\src\\app_main.zig"
+			],
+			[
+				"defs.zi",
+				"update\\src\\defs.zig"
+			],
+			[
+				"mem.",
+				"zig\\lib\\std\\mem.zig"
+			],
+			[
+				"ui_u",
+				"update\\src\\ui_update.zig"
+			],
+			[
+				"ui_upda",
+				"update\\src\\ui_update.zig"
+			],
+			[
+				"app_mai",
+				"update\\src\\app_main.zig"
+			],
+			[
+				"app_main",
+				"update\\src\\app_main.zig"
+			],
+			[
+				"render",
+				"zigkm-common\\src\\app\\render.zig"
+			],
+			[
+				"profile",
+				"update\\src\\profile.zig"
+			],
+			[
+				"uix.z",
+				"zigkm-common\\src\\app\\uix.zig"
+			],
+			[
+				"ui.zi",
+				"zigkm-common\\src\\app\\ui.zig"
+			],
+			[
+				"uix.zig",
+				"zigkm-common\\src\\app\\uix.zig"
+			],
+			[
+				"asset_data",
+				"zigkm-common\\src\\app\\asset_data.zig"
+			],
+			[
+				"render.",
+				"zigkm-common\\src\\app\\render.zig"
+			],
+			[
+				"common.",
+				"bosses\\src\\common.zig"
+			],
+			[
+				"draw.z",
+				"bosses\\src\\draw.zig"
+			]
+		],
+		"width": 0.0
+	},
+	"select_project":
+	{
+		"height": 499.0,
+		"last_filter": "bosses",
+		"selected_items":
+		[
+			[
+				"bosses",
+				"C:\\Users\\jmric\\dev\\bosses\\bosses.sublime-project"
+			]
+		],
+		"width": 378.0
+	},
+	"select_symbol":
+	{
+		"height": 0.0,
+		"last_filter": "",
+		"selected_items":
+		[
+		],
+		"width": 0.0
+	},
+	"selected_group": 0,
+	"settings":
+	{
+	},
+	"show_minimap": true,
+	"show_open_files": false,
+	"show_tabs": true,
+	"side_bar_visible": true,
+	"side_bar_width": 287.0,
+	"status_bar_visible": true,
+	"template_settings":
+	{
+	}
+}

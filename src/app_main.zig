@@ -8,6 +8,10 @@ const w = app.wasm_bindings;
 pub usingnamespace app.exports;
 pub usingnamespace @import("zigkm-stb").exports; // for stb linking
 
+pub const MEMORY_PERMANENT = 1 * 1024 * 1024;
+const MEMORY_TRANSIENT = 31 * 1024 * 1024;
+pub const MEMORY_FOOTPRINT = MEMORY_PERMANENT + MEMORY_TRANSIENT;
+
 const asset = @import("asset.zig");
 const page_admin = @import("page_admin.zig");
 const parallax = @import("parallax.zig");
@@ -19,11 +23,6 @@ pub const log_level: std.log.Level = switch (builtin.mode) {
     .ReleaseFast => .info,
     .ReleaseSmall => .info,
 };
-
-const SIZE_PERMANENT = 256 * 1024;
-const SIZE_TRANSIENT = 32 * 1024 * 1024;
-
-pub const MEMORY_FOOTPRINT = SIZE_PERMANENT + SIZE_TRANSIENT;
 
 const defaultTextureFilter = app.asset_data.TextureFilter.linear;
 const defaultTextureWrap = app.asset_data.TextureWrapMode.clampToEdge;
@@ -80,7 +79,7 @@ fn updateButton(topLeft: m.Vec2, size: m.Vec2, mouseState: *const app.input.Mous
     const buttonRect = m.Rect.initOriginSize(topLeftScroll, size);
     if (m.isInsideRect(mousePosF, buttonRect)) {
         mouseHoverGlobal.* = true;
-        for (mouseState.clickEvents[0..mouseState.numClickEvents]) |clickEvent| {
+        for (mouseState.clickEvents.slice()) |clickEvent| {
             const clickPosF = m.Vec2.initFromVec2i(clickEvent.pos);
             if (!clickEvent.down and clickEvent.clickType == app.input.ClickType.Left and m.isInsideRect(clickPosF, buttonRect)) {
                 return true;
@@ -123,7 +122,7 @@ fn hostUriToPageData(host: []const u8, uri: []const u8, pf: ?portfolio.Portfolio
         };
     }
     if (pf) |pfpf| {
-        for (pfpf.projects) |p, i| {
+        for (pfpf.projects, 0..) |p, i| {
             if (std.mem.eql(u8, uri, p.uri)) {
                 return PageData {
                     .Entry = .{
@@ -148,14 +147,14 @@ fn updateGallerySelection(prev: m.Vec2usize, increment: bool, project: portfolio
         newSelection.y -= 1;
     }
 
-    var section = project.sections[@intCast(usize, newSelection.x)];
+    var section = project.sections[@intCast(newSelection.x)];
     if (newSelection.y < 0) {
-        newSelection.x = @mod(newSelection.x - 1, @intCast(i32, project.sections.len));
-        section = project.sections[@intCast(usize, newSelection.x)];
-        newSelection.y = @intCast(i32, (section.images.len - 1) / IMAGES_PER_ZOOM);
+        newSelection.x = @mod(newSelection.x - 1, @as(i32, @intCast(project.sections.len)));
+        section = project.sections[@intCast(newSelection.x)];
+        newSelection.y = @intCast((section.images.len - 1) / IMAGES_PER_ZOOM);
     }
     if (newSelection.y > (section.images.len - 1) / IMAGES_PER_ZOOM) {
-        newSelection.x = @mod(newSelection.x + 1, @intCast(i32, project.sections.len));
+        newSelection.x = @mod(newSelection.x + 1, @as(i32, @intCast(project.sections.len)));
         newSelection.y = 0;
     }
 
@@ -166,27 +165,27 @@ pub const App = struct {
     memory: app.memory.Memory,
     inputState: app.input.InputState,
     renderState: app.render.RenderState,
-    assets: app.asset.AssetsWithIds(asset.Font, asset.Texture, 256),
+    assets: asset.AssetsType,
 
-    fbTexture: c_uint,
-    fbDepthRenderbuffer: c_uint,
-    fb: c_uint,
+    fbTexture: c_uint = 0,
+    fbDepthRenderbuffer: c_uint = 0,
+    fb: c_uint = 0,
 
-    portfolio: ?portfolio.Portfolio,
-    pageData: PageData,
-    shouldUpdatePage: bool,
-    screenSizePrev: m.Vec2usize,
-    scrollYPrev: i32,
-    timestampNsPrev: u64,
-    activeParallaxSetIndex: usize,
-    parallaxTX: f32,
-    parallaxIdleTimeS: f64,
-    yMaxPrev: i32,
+    portfolio: ?portfolio.Portfolio = null,
+    pageData: PageData = .{.Home = {}},
+    shouldUpdatePage: bool = false,
+    screenSizePrev: m.Vec2usize = .{.x = 0, .y = 0},
+    scrollYPrev: i32 = 0,
+    timestampUsPrev: i64 = 0,
+    activeParallaxSetIndex: usize = 0,
+    parallaxTX: f32 = 0,
+    parallaxIdleTimeS: f64 = 0,
+    yMaxPrev: i32 = 0,
 
     // mobile
-    anglesRef: m.Vec3,
+    anglesRef: m.Vec3 = .{.x = 0, .y = 0, .z = 0},
 
-    debug: bool,
+    debug: bool = false,
 
     const Self = @This();
     pub const PARALLAX_SET_SWAP_SECONDS = 6;
@@ -197,11 +196,11 @@ pub const App = struct {
         }
     }
 
-    pub fn load(self: *Self, memory: []u8, screenSize: m.Vec2usize, scale: f32) !void
+    pub fn load(self: *Self, screenSize: m.Vec2usize, scale: f32) !void
     {
-        std.log.info("App load ({}x{}, {}) ({} MB)", .{screenSize.x, screenSize.y, scale, memory.len / 1024 / 1024});
+        std.log.info("App load ({}x{}, {})", .{screenSize.x, screenSize.y, scale});
 
-        self.memory = app.memory.Memory.init(memory, SIZE_PERMANENT, @sizeOf(Self));
+        // self.memory = app.memory.Memory.init(memory, MEMORY_PERMANENT, @sizeOf(Self));
 
         const permanentAllocator = self.memory.permanentAllocator();
         var tempBufferAllocator = self.memory.tempBufferAllocator();
@@ -225,7 +224,7 @@ pub const App = struct {
         self.fbDepthRenderbuffer = 0;
         self.fb = 0;
 
-        w.httpGetZ("/portfolio"); // Load portfolio data ASAP
+        w.httpRequestZ(.GET, "/portfolio", "", "", ""); // Load portfolio data ASAP
 
         self.portfolio = null;
         const host = try w.getHostAlloc(tempAllocator);
@@ -234,7 +233,7 @@ pub const App = struct {
         self.shouldUpdatePage = false;
         self.screenSizePrev = m.Vec2usize.zero;
         self.scrollYPrev = -1;
-        self.timestampNsPrev = 0;
+        self.timestampUsPrev = 0;
         self.activeParallaxSetIndex = PARALLAX_SET_INDEX_START;
         self.parallaxTX = 0;
         self.parallaxIdleTimeS = 0;
@@ -245,16 +244,20 @@ pub const App = struct {
         try self.loadRelevantAssets(screenSize, tempAllocator);
     }
 
-    pub fn updateAndRender(self: *Self, screenSize: m.Vec2usize, scrollY: i32, timestampNs: u64) i32
+    pub fn updateAndRender(self: *Self, screenSize: m.Vec2usize, timestampUs: i64) bool
     {
+        const result = self.updateAndRenderOld(screenSize, timestampUs);
+        return result > 0;
+    }
+
+    pub fn updateAndRenderOld(self: *Self, screenSize: m.Vec2usize, timestampUs: i64) i32
+    {
+        const scrollY: i32 = 0;
         const screenSizeI = screenSize.toVec2i();
         const screenSizeF = screenSize.toVec2();
-        const scrollYF = @intToFloat(f32, scrollY);
+        const scrollYF: f32 = @floatFromInt(scrollY);
         defer {
-            self.inputState.mouseState.clear();
-            self.inputState.keyboardState.clear();
-
-            self.timestampNsPrev = timestampNs;
+            self.timestampUsPrev = timestampUs;
             self.scrollYPrev = scrollY;
             self.screenSizePrev = screenSize;
         }
@@ -285,8 +288,8 @@ pub const App = struct {
             self.debug = !self.debug;
         }
 
-        const deltaNs = if (self.timestampNsPrev > 0) (timestampNs - self.timestampNsPrev) else 0;
-        const deltaS = @intToFloat(f64, deltaNs) / 1000.0 / 1000.0 / 1000.0;
+        const deltaUs = if (self.timestampUsPrev > 0) (timestampUs - self.timestampUsPrev) else 0;
+        const deltaS = @as(f64, @floatFromInt(deltaUs)) / 1000.0 / 1000.0;
 
         var tempBufferAllocator = self.memory.tempBufferAllocator();
         const tempAllocator = tempBufferAllocator.allocator();
@@ -295,7 +298,7 @@ pub const App = struct {
             std.log.warn("Failed to allocate RenderQueue", .{});
             return -1;
         };
-        renderQueue.load();
+        renderQueue.clear();
 
         const screenResize = !m.eql(self.screenSizePrev, screenSize);
         if (screenResize) {
@@ -386,16 +389,12 @@ pub const App = struct {
         };
     }
 
-    pub fn onHttp(self: *Self, isGet: bool, uri: []const u8, data: ?[]const u8) void
+    pub fn onHttp(self: *Self, method: std.http.Method, code: u32, uri: []const u8, data: []const u8, tempAllocator: std.mem.Allocator) void
     {
-        if (isGet and std.mem.eql(u8, uri, "/portfolio")) {
-            const d = data orelse {
-                std.log.err("/portfolio request failed, no data", .{});
-                return;
-            };
-            const pf = portfolio.Portfolio.init(d, self.memory.permanentAllocator()) catch |err| {
+        if (method == .GET and std.mem.eql(u8, uri, "/portfolio") and code == 200) {
+            const pf = portfolio.Portfolio.init(data, self.memory.permanentAllocator()) catch |err| {
                 std.log.err("Error {} while parsing /portfolio response", .{err});
-                std.log.err("Response:\n{s}", .{d});
+                std.log.err("Response:\n{s}", .{data});
                 return;
             };
             self.portfolio = pf;
@@ -403,7 +402,7 @@ pub const App = struct {
         }
 
         switch (self.pageData) {
-            .Admin => page_admin.onHttp(self, isGet, uri, data),
+            .Admin => page_admin.onHttp(self, method, code, uri, data, tempAllocator),
             .Entry => {},
             .Home => {},
             .Unknown => {},
@@ -671,13 +670,13 @@ const GridImage = struct {
 fn drawImageGrid(images: []const GridImage, itemsPerRow: usize, topLeft: m.Vec2, width: f32, spacing: f32, depthTex: f32, texPriority: u32, fontData: *const app.asset_data.FontData, fontColor: m.Vec4, state: *App, scrollY: f32, mouseHoverGlobal: *bool, renderQueue: *app.render.RenderQueue, callback: *const fn(*App, GridImage, usize, anytype) void, callbackData: anytype) f32
 {
     const itemAspect = 1.74;
-    const itemWidth = (width - spacing * (@intToFloat(f32, itemsPerRow) - 1)) / @intToFloat(f32, itemsPerRow);
+    const itemWidth = (width - spacing * (@as(f32, @floatFromInt(itemsPerRow)) - 1)) / @as(f32, @floatFromInt(itemsPerRow));
     const itemSize = m.Vec2.init(itemWidth, itemWidth / itemAspect);
 
     var yMax: f32 = topLeft.y;
-    for (images) |img, i| {
-        const rowF = @intToFloat(f32, i / itemsPerRow);
-        const colF = @intToFloat(f32, i % itemsPerRow);
+    for (images, 0..) |img, i| {
+        const rowF: f32 = @floatFromInt(i / itemsPerRow);
+        const colF: f32 = @floatFromInt(i % itemsPerRow);
         const spacingY = if (img.title) |_| spacing * 8 else spacing;
         const itemPos = m.Vec2.init(
             topLeft.x + colF * (itemSize.x + spacing),
@@ -707,14 +706,14 @@ fn drawImageGrid(images: []const GridImage, itemsPerRow: usize, topLeft: m.Vec2,
             );
             renderQueue.text(title, textPos, DEPTH_UI_GENERIC, fontData, fontColor);
 
-            yMax = std.math.max(yMax, textPos.y);
+            yMax = @max(yMax, textPos.y);
         }
 
         if (updateButton(itemPos, itemSize, &state.inputState.mouseState, scrollY, mouseHoverGlobal)) {
             callback(state, img, i, callbackData);
         }
 
-        yMax = std.math.max(yMax, itemPos.y + itemSize.y);
+        yMax = @max(yMax, itemPos.y + itemSize.y);
     }
 
     return yMax - topLeft.y;
@@ -820,7 +819,7 @@ fn drawDesktop(state: *App, deltaS: f64, scrollYF: f32, screenSizeF: m.Vec2, ren
             screenSizeF.x - gridSize * 2.0,
             screenSizeF.y - gridSize * 3.0
         );
-        const adjustedWidth = std.math.min(landingImageSize.x, landingImageSize.y * maxLandingImageAspect);
+        const adjustedWidth = @min(landingImageSize.x, landingImageSize.y * maxLandingImageAspect);
         break :blk (landingImageSize.x - adjustedWidth) / 2.0;
     };
     // const crosshairMarginX = marginX + gridSize * 5;
@@ -972,7 +971,7 @@ fn drawDesktop(state: *App, deltaS: f64, scrollYF: f32, screenSizeF: m.Vec2, ren
                 const spacing = gridSize * 0.28;
                 const dotSize = m.Vec2.init(gridSize * 0.16, gridSize * 0.16);
                 const dotOrigin = m.Vec2.init(
-                    screenSizeF.x / 2.0 - dotSize.x / 2.0 - spacing * @intToFloat(f32, i - 1),
+                    screenSizeF.x / 2.0 - dotSize.x / 2.0 - spacing * @as(f32, @floatFromInt(i - 1)),
                     screenSizeF.y / 2.0 - dotSize.y / 2.0 - gridSize * 1,
                 );
                 renderQueue.quad(dotOrigin, dotSize, DEPTH_UI_GENERIC - 0.01, 0, m.Vec4.black);
@@ -981,35 +980,36 @@ fn drawDesktop(state: *App, deltaS: f64, scrollYF: f32, screenSizeF: m.Vec2, ren
     }
 
     {
+        // TODO hm
         // rounded black frame
-        const framePos = m.Vec2.init(marginX + gridSize * 1, gridSize * 1);
-        const frameSize = m.Vec2.init(
-            screenSizeF.x - marginX * 2 - gridSize * 2,
-            screenSizeF.y - gridSize * 3,
-        );
-        renderQueue.roundedFrame(.{
-            .bottomLeft = m.Vec2.zero,
-            .size = screenSizeF,
-            .depth = DEPTH_UI_OVER1,
-            .frameBottomLeft = framePos,
-            .frameSize = frameSize,
-            .cornerRadius = gridSize,
-            .color = m.Vec4.black
-        });
+        // const framePos = m.Vec2.init(marginX + gridSize * 1, gridSize * 1);
+        // const frameSize = m.Vec2.init(
+        //     screenSizeF.x - marginX * 2 - gridSize * 2,
+        //     screenSizeF.y - gridSize * 3,
+        // );
+        // renderQueue.roundedFrame(.{
+        //     .bottomLeft = m.Vec2.zero,
+        //     .size = screenSizeF,
+        //     .depth = DEPTH_UI_OVER1,
+        //     .frameBottomLeft = framePos,
+        //     .frameSize = frameSize,
+        //     .cornerRadius = gridSize,
+        //     .color = m.Vec4.black
+        // });
     }
 
     const section1Height = screenSizeF.y;
 
     if (!allLandingAssetsLoaded) {
-        return @floatToInt(i32, section1Height);
+        return @intFromFloat(section1Height);
     }
 
     // ==== SECOND FRAME ====
 
-    const fontTitle = state.assets.getFontData(.Title) orelse return @floatToInt(i32, section1Height);
-    const fontSubtitle = state.assets.getFontData(.Subtitle) orelse return @floatToInt(i32, section1Height);
-    const fontText = state.assets.getFontData(.Text) orelse return @floatToInt(i32, section1Height);
-    const sCircle = stickerCircle orelse return @floatToInt(i32, section1Height);
+    const fontTitle = state.assets.getFontData(.Title) orelse return @intFromFloat(section1Height);
+    const fontSubtitle = state.assets.getFontData(.Subtitle) orelse return @intFromFloat(section1Height);
+    const fontText = state.assets.getFontData(.Text) orelse return @intFromFloat(section1Height);
+    const sCircle = stickerCircle orelse return @intFromFloat(section1Height);
 
     var section2Height: f32 = 0;
     if (state.pageData == .Home) {
@@ -1080,12 +1080,12 @@ fn drawDesktop(state: *App, deltaS: f64, scrollYF: f32, screenSizeF: m.Vec2, ren
             wasPos.y - wasRect.min.y + gridSize * 3.2,
         );
         const wasTextWidth = screenSizeF.x / 2.0 - wasTextPos1.x - gridSize;
-        renderQueue.textWithMaxWidth("Yorstory is a creative development studio specializing in sequential art. We are storytellers with over 20 years of experience in the Television, Film, and Video Game industries.", wasTextPos1, DEPTH_UI_GENERIC, wasTextWidth, fontText, colorUi);
+        renderQueue.textMaxWidth("Yorstory is a creative development studio specializing in sequential art. We are storytellers with over 20 years of experience in the Television, Film, and Video Game industries.", wasTextPos1, DEPTH_UI_GENERIC, wasTextWidth, fontText, colorUi);
         const wasTextPos2 = m.Vec2.init(
             screenSizeF.x / 2.0,
             wasTextPos1.y,
         );
-        renderQueue.textWithMaxWidth("Our diverse experience has given us an unparalleled understanding of multiple mediums, giving us the tools to create a cohesive, story-centric vision along with the visuals needed to create a shared understanding between multiple departments and disciplines.", wasTextPos2, DEPTH_UI_GENERIC, wasTextWidth, fontText, colorUi);
+        renderQueue.textMaxWidth("Our diverse experience has given us an unparalleled understanding of multiple mediums, giving us the tools to create a cohesive, story-centric vision along with the visuals needed to create a shared understanding between multiple departments and disciplines.", wasTextPos2, DEPTH_UI_GENERIC, wasTextWidth, fontText, colorUi);
 
         if (symbolEye) |se| {
             const eyeSize = getTextureScaledSize(sCircle.size, screenSizeF);
@@ -1098,7 +1098,7 @@ fn drawDesktop(state: *App, deltaS: f64, scrollYF: f32, screenSizeF: m.Vec2, ren
                     break :blk scrollYF - eyeSize.y;
                 } else if (scrollYF <= eyeCheckpoint2) {
                     const t = (scrollYF - eyeCheckpoint1) / (eyeCheckpoint2 - eyeCheckpoint1);
-                    break :blk scrollYF + m.lerpFloat(-eyeSize.y, eyeOffset, t);
+                    break :blk scrollYF + std.math.lerp(-eyeSize.y, eyeOffset, t);
                 } else {
                     break :blk wasPosBaseY + eyeOffset;
                 }
@@ -1136,21 +1136,22 @@ fn drawDesktop(state: *App, deltaS: f64, scrollYF: f32, screenSizeF: m.Vec2, ren
         }
 
         {
+            // TODO
             // rounded black frame
-            const framePos = m.Vec2.init(marginX + gridSize * 1, secondFrameYStill + gridSize * 1);
-            const frameSize = m.Vec2.init(
-                screenSizeF.x - marginX * 2 - gridSize * 2,
-                screenSizeF.y - gridSize * 3,
-            );
-            renderQueue.roundedFrame(.{
-                .bottomLeft = m.Vec2.init(0.0, secondFrameYStill),
-                .size = screenSizeF,
-                .depth = DEPTH_UI_OVER1,
-                .frameBottomLeft = framePos,
-                .frameSize = frameSize,
-                .cornerRadius = gridSize,
-                .color = m.Vec4.black
-            });
+            // const framePos = m.Vec2.init(marginX + gridSize * 1, secondFrameYStill + gridSize * 1);
+            // const frameSize = m.Vec2.init(
+            //     screenSizeF.x - marginX * 2 - gridSize * 2,
+            //     screenSizeF.y - gridSize * 3,
+            // );
+            // renderQueue.roundedFrame(.{
+            //     .bottomLeft = m.Vec2.init(0.0, secondFrameYStill),
+            //     .size = screenSizeF,
+            //     .depth = DEPTH_UI_OVER1,
+            //     .frameBottomLeft = framePos,
+            //     .frameSize = frameSize,
+            //     .cornerRadius = gridSize,
+            //     .color = m.Vec4.black
+            // });
         }
     }
 
@@ -1188,8 +1189,8 @@ fn drawDesktop(state: *App, deltaS: f64, scrollYF: f32, screenSizeF: m.Vec2, ren
     };
 
     var yMax = section1Height + section2Height;
-    const fontNumber = state.assets.getFontData(.Number) orelse return @floatToInt(i32, yMax);
-    const pf = state.portfolio orelse return @floatToInt(i32, yMax);
+    const fontNumber = state.assets.getFontData(.Number) orelse return @intFromFloat(yMax);
+    const pf = state.portfolio orelse return @intFromFloat(yMax);
 
     const contentSubWidth = screenSizeF.x - contentMarginX * 2;
     switch (state.pageData) {
@@ -1212,7 +1213,7 @@ fn drawDesktop(state: *App, deltaS: f64, scrollYF: f32, screenSizeF: m.Vec2, ren
             );
             const contentSubPosWidth = screenSizeF.x - contentMarginX * 2;
             const contentSubRect = app.render.textRect(project.contentDescription, fontText, contentSubPosWidth);
-            renderQueue.textWithMaxWidth(project.contentDescription, contentSubPos, DEPTH_UI_GENERIC, contentSubPosWidth, fontText, colorUi);
+            renderQueue.textMaxWidth(project.contentDescription, contentSubPos, DEPTH_UI_GENERIC, contentSubPosWidth, fontText, colorUi);
 
             yMax = contentSubPos.y + contentSubRect.size().y + gridSize * 3.0;
 
@@ -1220,7 +1221,7 @@ fn drawDesktop(state: *App, deltaS: f64, scrollYF: f32, screenSizeF: m.Vec2, ren
 
             var yGallery = yMax;
             var indexOffset: usize = 0;
-            for (project.sections) |section, i| {
+            for (project.sections, 0..) |section, i| {
                 if (section.name.len > 0 or section.description.len > 0) {
                     const numberSize = getTextureScaledSize(sCircle.size, screenSizeF);
                     const numberPos = m.Vec2.init(
@@ -1244,7 +1245,7 @@ fn drawDesktop(state: *App, deltaS: f64, scrollYF: f32, screenSizeF: m.Vec2, ren
 
                     const subDescriptionWidth = screenSizeF.x - contentMarginX * 2;
                     const subDescriptionRect = app.render.textRect(section.description, fontText, subDescriptionWidth);
-                    renderQueue.textWithMaxWidth(
+                    renderQueue.textMaxWidth(
                         section.description,
                         m.Vec2.init(contentMarginX, yGallery),
                         DEPTH_UI_GENERIC,
@@ -1295,7 +1296,7 @@ fn drawDesktop(state: *App, deltaS: f64, scrollYF: f32, screenSizeF: m.Vec2, ren
                 galleryImages.clearRetainingCapacity();
                 const section = project.sections[gallerySelection.x];
                 const imageIndexStart = gallerySelection.y * IMAGES_PER_ZOOM;
-                const imageIndexEnd = std.math.min(
+                const imageIndexEnd = @min(
                     (gallerySelection.y + 1) * IMAGES_PER_ZOOM,
                     section.images.len
                 );
@@ -1314,7 +1315,7 @@ fn drawDesktop(state: *App, deltaS: f64, scrollYF: f32, screenSizeF: m.Vec2, ren
                 const spacing = gridSize * 0.25;
                 const aspect = 1.74; // TODO Copied from imagegrid
                 const perRow: usize = IMAGES_PER_ZOOM / 2;
-                const galleryHeight = galleryWidth / @intToFloat(f32, perRow) / aspect * 2;
+                const galleryHeight = galleryWidth / @as(f32, @floatFromInt(perRow)) / aspect * 2;
                 const yOffset = (screenSizeF.y - galleryHeight) / 2;
                 const pospos = m.Vec2.init(galleryMarginX, scrollYF + yOffset);
                 _ = drawImageGrid(galleryImages.items, perRow, pospos, galleryWidth, spacing, DEPTH_UI_OVER2 - 0.01, 9, fontText, colorUi, state, scrollYF, &mouseHoverGlobal, renderQueue, CB.noop, {});
@@ -1381,7 +1382,7 @@ fn drawDesktop(state: *App, deltaS: f64, scrollYF: f32, screenSizeF: m.Vec2, ren
     renderQueue.text(projectsText, contentHeaderPos, DEPTH_UI_GENERIC, fontTitle, colorUi);
 
     var images = std.ArrayList(GridImage).init(allocator);
-    for (pf.projects) |project, i| {
+    for (pf.projects, 0..) |project, i| {
         if (state.pageData == .Entry and state.pageData.Entry.portfolioIndex == i) {
             continue;
         }
@@ -1434,22 +1435,23 @@ fn drawDesktop(state: *App, deltaS: f64, scrollYF: f32, screenSizeF: m.Vec2, ren
     }
 
     {
+        // TODO
         // rounded black frame
-        const frameTotalSize = m.Vec2.init(screenSizeF.x, section3Height);
-        const framePos = m.Vec2.init(marginX + gridSize * 1, section3YScrolling + gridSize * 1);
-        const frameSize = m.Vec2.init(
-            screenSizeF.x - marginX * 2 - gridSize * 2,
-            section3Height - gridSize * 3,
-        );
-        renderQueue.roundedFrame(.{
-            .bottomLeft = m.Vec2.init(0.0, section3YScrolling),
-            .size = frameTotalSize,
-            .depth = DEPTH_UI_OVER1,
-            .frameBottomLeft = framePos,
-            .frameSize = frameSize,
-            .cornerRadius = gridSize,
-            .color = m.Vec4.black
-        });
+        // const frameTotalSize = m.Vec2.init(screenSizeF.x, section3Height);
+        // const framePos = m.Vec2.init(marginX + gridSize * 1, section3YScrolling + gridSize * 1);
+        // const frameSize = m.Vec2.init(
+        //     screenSizeF.x - marginX * 2 - gridSize * 2,
+        //     section3Height - gridSize * 3,
+        // );
+        // renderQueue.roundedFrame(.{
+        //     .bottomLeft = m.Vec2.init(0.0, section3YScrolling),
+        //     .size = frameTotalSize,
+        //     .depth = DEPTH_UI_OVER1,
+        //     .frameBottomLeft = framePos,
+        //     .frameSize = frameSize,
+        //     .cornerRadius = gridSize,
+        //     .color = m.Vec4.black
+        // });
     }
 
     yMax += section3Height;
@@ -1471,7 +1473,7 @@ fn drawDesktop(state: *App, deltaS: f64, scrollYF: f32, screenSizeF: m.Vec2, ren
         }
     }
 
-    return @floatToInt(i32, yMax);
+    return @intFromFloat(yMax);
 }
 
 fn drawMobile(state: *App, deltaS: f64, scrollY: f32, screenSize: m.Vec2, renderQueue: *app.render.RenderQueue, allocator: std.mem.Allocator) i32
@@ -1504,8 +1506,8 @@ fn drawMobile(state: *App, deltaS: f64, scrollY: f32, screenSize: m.Vec2, render
     // TODO use something more linear
     state.anglesRef = m.lerp(state.anglesRef, anglesTarget, 0.01);
 
-    const fontTitle = state.assets.getFontData(.Title) orelse return @floatToInt(i32, screenSize.y);
-    const fontText = state.assets.getFontData(.Text) orelse return @floatToInt(i32, screenSize.y);
+    const fontTitle = state.assets.getFontData(.Title) orelse return @intFromFloat(screenSize.y);
+    const fontText = state.assets.getFontData(.Text) orelse return @intFromFloat(screenSize.y);
 
     var mouseHoverGlobal = false;
 
@@ -1577,7 +1579,7 @@ fn drawMobile(state: *App, deltaS: f64, scrollY: f32, screenSize: m.Vec2, render
     // ==== SECOND FRAME: WE ARE STORYTELLERS ====
 
     if (state.pageData == .Unknown) {
-        return @floatToInt(i32, y);
+        return @intFromFloat(y);
     }
 
     // slightly offset from the crosshair (aligned with the circle)
@@ -1621,7 +1623,7 @@ fn drawMobile(state: *App, deltaS: f64, scrollY: f32, screenSize: m.Vec2, render
             const project = state.portfolio.?.projects[entryData.portfolioIndex];
 
             const text1Pos = m.Vec2.init(sideMargin, yWas);
-            renderQueue.textWithMaxWidth(project.contentDescription, text1Pos, DEPTH_UI_GENERIC, contentWidth, fontText, colorUi);
+            renderQueue.textMaxWidth(project.contentDescription, text1Pos, DEPTH_UI_GENERIC, contentWidth, fontText, colorUi);
             const text1Rect = app.render.textRect(project.contentDescription, fontText, contentWidth);
             yWas += text1Rect.size().y;
         },
@@ -1643,7 +1645,7 @@ fn drawMobile(state: *App, deltaS: f64, scrollY: f32, screenSize: m.Vec2, render
         }
     };
 
-    const pf = state.portfolio orelse return @floatToInt(i32, y);
+    const pf = state.portfolio orelse return @intFromFloat(y);
 
     var y3 = y;
     switch (state.pageData) {
@@ -1652,9 +1654,9 @@ fn drawMobile(state: *App, deltaS: f64, scrollY: f32, screenSize: m.Vec2, render
         .Unknown => unreachable,
         .Entry => |entryData| {
             const project = pf.projects[entryData.portfolioIndex];
-            const fontNumber = state.assets.getFontData(.Number) orelse return @floatToInt(i32, y3);
-            const fontSubtitle = state.assets.getFontData(.Subtitle) orelse return @floatToInt(i32, y3);
-            const sCircle = state.assets.getTextureData(.{.static = .StickerCircle}) orelse return @floatToInt(i32, y3);
+            const fontNumber = state.assets.getFontData(.Number) orelse return @intFromFloat(y3);
+            const fontSubtitle = state.assets.getFontData(.Subtitle) orelse return @intFromFloat(y3);
+            const sCircle = state.assets.getTextureData(.{.static = .StickerCircle}) orelse return @intFromFloat(y3);
 
             y3 += gridSize * 2.0;
 
@@ -1662,7 +1664,7 @@ fn drawMobile(state: *App, deltaS: f64, scrollY: f32, screenSize: m.Vec2, render
 
             var yGallery = y3;
             var indexOffset: usize = 0; // TODO eh...
-            for (project.sections) |section, i| {
+            for (project.sections, 0..) |section, i| {
                 if (section.name.len > 0 or section.description.len > 0) {
                     const numberSize = getTextureScaledSize(sCircle.size, screenSize);
                     const numberPos = m.Vec2.init(
@@ -1686,7 +1688,7 @@ fn drawMobile(state: *App, deltaS: f64, scrollY: f32, screenSize: m.Vec2, render
 
                     const subDescriptionWidth = screenSize.x - sideMargin * 2;
                     const subDescriptionRect = app.render.textRect(section.description, fontText, subDescriptionWidth);
-                    renderQueue.textWithMaxWidth(
+                    renderQueue.textMaxWidth(
                         section.description,
                         m.Vec2.init(sideMargin, yGallery),
                         DEPTH_UI_GENERIC,
@@ -1743,7 +1745,7 @@ fn drawMobile(state: *App, deltaS: f64, scrollY: f32, screenSize: m.Vec2, render
     }
 
     var yProjects = y + gridSize * 1.0;
-    for (pf.projects) |project, i| {
+    for (pf.projects, 0..) |project, i| {
         if (state.pageData == .Entry and state.pageData.Entry.portfolioIndex == i) {
             continue;
         }
@@ -1797,5 +1799,5 @@ fn drawMobile(state: *App, deltaS: f64, scrollY: f32, screenSize: m.Vec2, render
         w.setCursorZ("auto");
     }
 
-    return @floatToInt(i32, y);
+    return @intFromFloat(y);
 }

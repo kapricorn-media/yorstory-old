@@ -30,8 +30,8 @@ pub const Portfolio = struct {
 
     pub fn init(json: []const u8, allocator: std.mem.Allocator) !Self
     {
-        var tokenStream = std.json.TokenStream.init(json);
-        return std.json.parse(Portfolio, &tokenStream, .{.allocator = allocator});
+        const result = try std.json.parseFromSlice(Portfolio, allocator, json, .{});
+        return result.value;
     }
 
     pub fn deinit(self: *Self, allocator: std.mem.Allocator) void

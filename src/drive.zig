@@ -71,7 +71,7 @@ pub fn fillFromGoogleDrive(folderId: []const u8, data: *bigdata.Data, key: []con
                 var coverFound = false;
                 var stickerFound = false;
                 var galleryFound = false;
-                var listProject = try google.drive.listFiles(f.id, authData, tempAllocator);
+                const listProject = try google.drive.listFiles(f.id, authData, tempAllocator);
                 for (listProject.files) |ff| {
                     switch (ff.typeData) {
                         .file => {
@@ -91,7 +91,7 @@ pub fn fillFromGoogleDrive(folderId: []const u8, data: *bigdata.Data, key: []con
                             if (std.mem.eql(u8, ff.name, "GALLERY")) {
                                 galleryFound = true;
                                 var sections: ?bool = null;
-                                var listGallery = try google.drive.listFiles(ff.id, authData, tempAllocator);
+                                const listGallery = try google.drive.listFiles(ff.id, authData, tempAllocator);
                                 for (listGallery.files) |fff| {
                                     switch (fff.typeData) {
                                         .file => {
@@ -111,7 +111,7 @@ pub fn fillFromGoogleDrive(folderId: []const u8, data: *bigdata.Data, key: []con
                                             }
                                             sections = true;
 
-                                            var listGallery2 = try google.drive.listFiles(fff.id, authData, tempAllocator);
+                                            const listGallery2 = try google.drive.listFiles(fff.id, authData, tempAllocator);
                                             for (listGallery2.files) |ffff| {
                                                 if (ffff.typeData != .file) {
                                                     continue;

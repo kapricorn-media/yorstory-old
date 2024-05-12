@@ -3,11 +3,11 @@ const std = @import("std");
 const app = @import("zigkm-app");
 const m = @import("zigkm-math");
 
-const App = @import("wasm_main.zig").App;
+const App = @import("app_main.zig").App;
 
 fn hexU8ToFloatNormalized(hexString: []const u8) !f32
 {
-    return @intToFloat(f32, try std.fmt.parseUnsigned(u8, hexString, 16)) / 255.0;
+    return @as(f32, @floatFromInt(try std.fmt.parseUnsigned(u8, hexString, 16))) / 255.0;
 }
 
 fn colorHexToVec4(hexString: []const u8) !m.Vec4
@@ -271,14 +271,14 @@ pub fn loadAndDrawParallax(
     if (appData.pageData == .Home and activeParallaxSet != null) {
         appData.parallaxIdleTimeS += deltaS;
         const nextSetIndex = (parallaxIndex + 1) % PARALLAX_SETS.len;
-        var nextParallaxSet = tryLoadAndGetParallaxSet(&appData.assets, nextSetIndex, 20, textureWrap, textureFilter);
+        const nextParallaxSet = tryLoadAndGetParallaxSet(&appData.assets, nextSetIndex, 20, textureWrap, textureFilter);
         if (nextParallaxSet) |_| {
             if (appData.parallaxIdleTimeS >= @as(f64, App.PARALLAX_SET_SWAP_SECONDS)) {
                 appData.parallaxIdleTimeS = 0;
                 appData.activeParallaxSetIndex = nextSetIndex;
                 activeParallaxSet = nextParallaxSet;
             } else {
-                for (PARALLAX_SETS) |_, i| {
+                for (PARALLAX_SETS, 0..) |_, i| {
                     if (tryLoadAndGetParallaxSet(&appData.assets, i, 20, textureWrap, textureFilter) == null) {
                         break;
                     }
