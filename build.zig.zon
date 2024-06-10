@@ -1,0 +1,12 @@
+.{
+    .name = "yorstory",
+    .version = "0.1.0",
+    .paths = .{""},
+    .dependencies = .{
+        .zigkm_common = .{
+            .url = "https://github.com/kapricorn-media/zigkm-common/archive/7c32100269201741e44d440461de11c3f61d85e3.tar.gz",
+            .hash = "1220f85359815083e8b268fcd8236b922dfa0ad793d56468709371558720ef57704c",
+            //.path = "../zigkm-common",
+        },
+    },
+}

@@ -23,19 +23,21 @@
     <!-- schema.org -->
     <!-- TODO: ADD TAGS -->
     <!-- - - - - - - - - - - - - - - - - - - - - - - - - -->
-
     <link rel="stylesheet" type="text/css" href="/css/main.css">
 
-    <script type="application/javascript" src="/js/common.js"></script>
-    <script type="application/javascript" src="/js/main.js"></script>
-    <script type="application/javascript" src="/js/wasm_worker.js"></script>
-    <script type="application/javascript" src="/js/wasm.js"></script>
+    <script type="module" src="/js/common.js"></script>
+    <script type="module" src="/js/main.js"></script>
+    <script type="module" src="/js/wasm.js"></script>
+    <script type="module" src="/js/wasm_worker.js"></script>
 </head>
 
 <body>
     <canvas id="canvas"></canvas>
     <div id="dummyBackground"></div>
-    <script>_documentOnLoad();</script>
+    <script type="module">
+        import {_documentOnLoad} from '/js/main.js';
+        _documentOnLoad();
+    </script>
 </body>
 
 </html>

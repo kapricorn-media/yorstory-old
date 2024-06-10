@@ -7,9 +7,10 @@ on:
 
 jobs:
   release:
-    uses: kapricorn-media/github/.github/workflows/zig-release-package.yaml@main
+    uses: kapricorn-media/github/.github/workflows/zig-release.yaml@main
     with:
-      zig-version: 0.10.1
+      zig-version: 0.12.0-dev.2063+804cee3b9
       package-name: yorstory
-      zig-build-command: package
+      zig-build-command: server_package
       package-subdir: server
+      releaseFlag: -Doptimize=ReleaseFast

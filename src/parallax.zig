@@ -3,11 +3,11 @@ const std = @import("std");
 const app = @import("zigkm-app");
 const m = @import("zigkm-math");
 
-const App = @import("wasm_main.zig").App;
+const App = @import("app_main.zig").App;
 
 fn hexU8ToFloatNormalized(hexString: []const u8) !f32
 {
-    return @intToFloat(f32, try std.fmt.parseUnsigned(u8, hexString, 16)) / 255.0;
+    return @as(f32, @floatFromInt(try std.fmt.parseUnsigned(u8, hexString, 16))) / 255.0;
 }
 
 fn colorHexToVec4(hexString: []const u8) !m.Vec4
@@ -158,22 +158,22 @@ pub const PARALLAX_SETS = [_]ParallaxSet {
             ParallaxImage.init("DRIVE/PARALLAX/thanos.psd/6-flare.layer", 1.2),
         },
     },
-    .{
-        .bgColor = .{
-            .Color = colorHexToVec4("#000000") catch unreachable,
-        },
-        .images = &[_]ParallaxImage{
-            ParallaxImage.init("DRIVE/PARALLAX/moon-forest.psd/1-bg.layer", 0.01),
-            ParallaxImage.init("DRIVE/PARALLAX/moon-forest.psd/2-hill.layer", 0.05),
-            ParallaxImage.init("DRIVE/PARALLAX/moon-forest.psd/3-tree-back.layer", 0.1),
-            ParallaxImage.init("DRIVE/PARALLAX/moon-forest.psd/4-person-back.layer", 0.35),
-            ParallaxImage.init("DRIVE/PARALLAX/moon-forest.psd/5-glow1.layer", 0.0),
-            ParallaxImage.init("DRIVE/PARALLAX/moon-forest.psd/6-person-front.layer", 0.85),
-            ParallaxImage.init("DRIVE/PARALLAX/moon-forest.psd/7-glow2.layer", 0.0),
-            ParallaxImage.init("DRIVE/PARALLAX/moon-forest.psd/8-tree-front1.layer", 1.2),
-            ParallaxImage.init("DRIVE/PARALLAX/moon-forest.psd/9-tree-front2.layer", 1.3),
-        },
-    },
+    // .{
+    //     .bgColor = .{
+    //         .Color = colorHexToVec4("#000000") catch unreachable,
+    //     },
+    //     .images = &[_]ParallaxImage{
+    //         ParallaxImage.init("DRIVE/PARALLAX/moon-forest.psd/1-bg.layer", 0.01),
+    //         ParallaxImage.init("DRIVE/PARALLAX/moon-forest.psd/2-hill.layer", 0.05),
+    //         ParallaxImage.init("DRIVE/PARALLAX/moon-forest.psd/3-tree-back.layer", 0.1),
+    //         ParallaxImage.init("DRIVE/PARALLAX/moon-forest.psd/4-person-back.layer", 0.35),
+    //         ParallaxImage.init("DRIVE/PARALLAX/moon-forest.psd/5-glow1.layer", 0.0),
+    //         ParallaxImage.init("DRIVE/PARALLAX/moon-forest.psd/6-person-front.layer", 0.85),
+    //         ParallaxImage.init("DRIVE/PARALLAX/moon-forest.psd/7-glow2.layer", 0.0),
+    //         ParallaxImage.init("DRIVE/PARALLAX/moon-forest.psd/8-tree-front1.layer", 1.2),
+    //         ParallaxImage.init("DRIVE/PARALLAX/moon-forest.psd/9-tree-front2.layer", 1.3),
+    //     },
+    // },
     .{
         .bgColor = .{
             .Color = colorHexToVec4("#000000") catch unreachable,
@@ -206,11 +206,11 @@ pub const PARALLAX_SETS = [_]ParallaxSet {
             .Color = colorHexToVec4("#111111") catch unreachable,
         },
         .images = &[_]ParallaxImage{
-            ParallaxImage.init("DRIVE/PARALLAX/matahari.psd/BG.layer", 0.0),
-            ParallaxImage.init("DRIVE/PARALLAX/matahari.psd/BG ladies.layer", 0.1),
-            ParallaxImage.init("DRIVE/PARALLAX/matahari.psd/MG Buddha.layer", 0.3),
-            ParallaxImage.init("DRIVE/PARALLAX/matahari.psd/Matahari.layer", 0.55),
-            ParallaxImage.init("DRIVE/PARALLAX/matahari.psd/FG.layer", 1.8),
+            ParallaxImage.init("DRIVE/PARALLAX/matahari.psd/1-bg.layer", 0.0),
+            ParallaxImage.init("DRIVE/PARALLAX/matahari.psd/2-bg-ladies.layer", 0.1),
+            ParallaxImage.init("DRIVE/PARALLAX/matahari.psd/3-mg-buddha.layer", 0.3),
+            ParallaxImage.init("DRIVE/PARALLAX/matahari.psd/4-matahari.layer", 0.55),
+            ParallaxImage.init("DRIVE/PARALLAX/matahari.psd/5-fg.layer", 1.8),
         },
     },
 };
@@ -271,14 +271,14 @@ pub fn loadAndDrawParallax(
     if (appData.pageData == .Home and activeParallaxSet != null) {
         appData.parallaxIdleTimeS += deltaS;
         const nextSetIndex = (parallaxIndex + 1) % PARALLAX_SETS.len;
-        var nextParallaxSet = tryLoadAndGetParallaxSet(&appData.assets, nextSetIndex, 20, textureWrap, textureFilter);
+        const nextParallaxSet = tryLoadAndGetParallaxSet(&appData.assets, nextSetIndex, 20, textureWrap, textureFilter);
         if (nextParallaxSet) |_| {
             if (appData.parallaxIdleTimeS >= @as(f64, App.PARALLAX_SET_SWAP_SECONDS)) {
                 appData.parallaxIdleTimeS = 0;
                 appData.activeParallaxSetIndex = nextSetIndex;
                 activeParallaxSet = nextParallaxSet;
             } else {
-                for (PARALLAX_SETS) |_, i| {
+                for (PARALLAX_SETS, 0..) |_, i| {
                     if (tryLoadAndGetParallaxSet(&appData.assets, i, 20, textureWrap, textureFilter) == null) {
                         break;
                     }
@@ -307,16 +307,16 @@ pub fn loadAndDrawParallax(
         for (parallaxSet.images) |parallaxImage| {
             const textureData = appData.assets.getTextureData(.{.dynamic = parallaxImage.url}) orelse unreachable;
 
-            const textureDataF = m.Vec2.initFromVec2usize(textureData.size);
-            const textureSize = m.Vec2.init(
-                size.y * textureDataF.x / textureDataF.y,
-                size.y
-            );
-            const parallaxOffsetX = appData.parallaxTX * parallaxMotionMax * parallaxImage.factor;
+            const canvasSize = textureData.canvasSize.toVec2();
+            const layerTopLeft = textureData.topLeft.toVec2();
+            const scale = size.y / canvasSize.y;
+            const textureSize = m.multScalar(textureData.size.toVec2(), scale);
 
+            const layerOffsetX = (layerTopLeft.x - canvasSize.x / 2.0) * scale;
+            const parallaxOffsetX = appData.parallaxTX * parallaxMotionMax * parallaxImage.factor;
             const imgPos = m.Vec2.init(
-                screenSize.x / 2.0 - textureSize.x / 2.0 + parallaxOffsetX,
-                pos.y
+                layerOffsetX + screenSize.x / 2.0 + parallaxOffsetX,
+                layerTopLeft.y * scale + pos.y
             );
             renderQueue.texQuad(imgPos, textureSize, depth, 0.0, textureData);
         }

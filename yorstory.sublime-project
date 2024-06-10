@@ -1,70 +1,82 @@
 {
     "folders": [
+        {"path": "."},
         {
-            "path": ".",
-        }
+            "path": "~/zig/0.12.0-dev.2063+804cee3b9/files",
+            "name": "zig",
+        },
+        {
+            "path": "../zigkm-common",
+            "name": "zigkm-common",
+        },
     ],
-    "settings": {
-        "binary_file_patterns": [
-            "*.jpg",
-            "*.jpeg",
-            "*.png",
-            "*.gif",
-            "*.ttf",
-            "*.tga",
-            "*.dds",
-            "*.ico",
-            "*.eot",
-            "*.pdf",
-            "*.swf",
-            "*.jar",
-            "*.zip",
-            "*.pdb",
-            "*.map",
-            "*.ipch",
-            "*.obj",
-            "*.exe",
-            "*.db"
-        ],
-        "rulers": [
-            100
-        ],
-        "word_wrap": true,
-        "wrap_width": 100,
-        "translate_tabs_to_spaces": true
-    },
     "build_systems": [
         {
             "name": "yorstory",
             "working_dir": "$folder",
-            "shell_cmd": "zig-0.10.1 build --prominent-compile-errors",
-            "file_regex": "^\\s*.*yorstory\\/([^:]*):(\\d+):(\\d+): ([^\\n]+)",
+            "shell_cmd": "zigup run 0.12.0-dev.2063+804cee3b9 build",
+            "file_regex": "^\\s*([^\\n:]*):(\\d+):(\\d+): ([^\\n]+)",
             "variants": [
                 {
-                    "name": "Build (release-fast)",
-                    "shell_cmd": "zig-0.10.1 build --prominent-compile-errors -Drelease-fast=true",
+                    "name": "Build (ReleaseFast)",
+                    "shell_cmd": "zigup run 0.12.0-dev.2063+804cee3b9 build -Doptimize=ReleaseFast",
                 },
                 {
                     "name": "Test",
-                    "shell_cmd": "zig-0.10.1 build --prominent-compile-errors test",
+                    "shell_cmd": "zigup run 0.12.0-dev.2063+804cee3b9 build test",
                 },
                 {
-                    "name": "Test (release-fast)",
-                    "shell_cmd": "zig-0.10.1 build --prominent-compile-errors -Drelease-fast=true test",
+                    "name": "Test (ReleaseFast)",
+                    "shell_cmd": "zigup run 0.12.0-dev.2063+804cee3b9 build -Doptimize=ReleaseFast test",
                 },
                 {
                     "name": "Clean",
                     "shell_cmd": "rm -rf zig-cache zig-out",
+                    "windows": {
+                        "shell_cmd": "rmdir zig-cache zig-out /s /q"
+                    }
                 },
                 {
-                    "name": "Package",
-                    "shell_cmd": "zig-0.10.1 build --prominent-compile-errors package",
+                    "name": "App: Build",
+                    "shell_cmd": "zigup run 0.12.0-dev.2063+804cee3b9 build app_build",
                 },
                 {
-                    "name": "Package (release-fast)",
-                    "shell_cmd": "zig-0.10.1 build --prominent-compile-errors -Drelease-fast=true package",
+                    "name": "App: Build (ReleaseFast)",
+                    "shell_cmd": "zigup run 0.12.0-dev.2063+804cee3b9 build -Doptimize=ReleaseFast app_build",
+                },
+                {
+                    "name": "App: Run",
+                    "shell_cmd": "zigup run 0.12.0-dev.2063+804cee3b9 build app_run",
+                },
+                {
+                    "name": "App: Run (ReleaseFast)",
+                    "shell_cmd": "zigup run 0.12.0-dev.2063+804cee3b9 build -Doptimize=ReleaseFast app_run",
+                },
+                {
+                    "name": "App: Package",
+                    "shell_cmd": "zigup run 0.12.0-dev.2063+804cee3b9 build app_package",
+                },
+                {
+                    "name": "App: Package (ReleaseFast)",
+                    "shell_cmd": "zigup run 0.12.0-dev.2063+804cee3b9 build -Doptimize=ReleaseFast app_package",
+                },
+                {
+                    "name": "Server: Build",
+                    "shell_cmd": "zigup run 0.12.0-dev.2063+804cee3b9 build server_build",
+                },
+                {
+                    "name": "Server: Build (ReleaseFast)",
+                    "shell_cmd": "zigup run 0.12.0-dev.2063+804cee3b9 build -Doptimize=ReleaseFast server_build",
+                },
+                {
+                    "name": "Server: Package",
+                    "shell_cmd": "zigup run 0.12.0-dev.2063+804cee3b9 build server_package",
+                },
+                {
+                    "name": "Server: Package (ReleaseFast)",
+                    "shell_cmd": "zigup run 0.12.0-dev.2063+804cee3b9 build -Doptimize=ReleaseFast server_package",
                 }
-            ]
+            ],
         }
     ]
 }
