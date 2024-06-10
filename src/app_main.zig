@@ -72,16 +72,19 @@ fn fromRefFontSizePx(refFontSizePx: f32, screenSize: m.Vec2) f32
 }
 
 // return true when pressed
-fn updateButton(topLeft: m.Vec2, size: m.Vec2, mouseState: *const app.input.MouseState, scrollY: f32, mouseHoverGlobal: *bool) bool
+fn updateButton(topLeft: m.Vec2, size: m.Vec2, mouseState: *const app.input.MouseState, screenSize: m.Vec2, scrollY: f32, mouseHoverGlobal: *bool) bool
 {
-    const mousePosF = m.Vec2.initFromVec2i(mouseState.pos);
-    const topLeftScroll = m.add(topLeft, m.Vec2.init(0, -scrollY));
-    const buttonRect = m.Rect.initOriginSize(topLeftScroll, size);
-    if (m.isInsideRect(mousePosF, buttonRect)) {
+    var mousePos = mouseState.pos.toVec2();
+    // Adjust for fake scroll-document coordinates.
+    mousePos.y = screenSize.y - mousePos.y + scrollY;
+    const buttonRect = m.Rect.initOriginSize(topLeft, size);
+    if (m.isInsideRect(mousePos, buttonRect)) {
         mouseHoverGlobal.* = true;
         for (mouseState.clickEvents.slice()) |clickEvent| {
-            const clickPosF = m.Vec2.initFromVec2i(clickEvent.pos);
-            if (!clickEvent.down and clickEvent.clickType == app.input.ClickType.Left and m.isInsideRect(clickPosF, buttonRect)) {
+            var clickPos = clickEvent.pos.toVec2();
+            // Adjust for fake scroll-document coordinates.
+            clickPos.y = screenSize.y - clickPos.y + scrollY;
+            if (!clickEvent.down and clickEvent.clickType == app.input.ClickType.Left and m.isInsideRect(clickPos, buttonRect)) {
                 return true;
             }
         }
@@ -258,7 +261,6 @@ pub const App = struct {
         const keyCodeEscape = 27;
         const keyCodeArrowLeft = 37;
         const keyCodeArrowRight = 39;
-        const keyCodeG = 71;
 
         if (self.pageData == .Entry and self.pageData.Entry.gallerySelection != null and self.portfolio != null) {
             if (self.inputState.keyboardState.keyDown(keyCodeEscape)) {
@@ -277,8 +279,12 @@ pub const App = struct {
                 }
             }
         }
-        if (self.inputState.keyboardState.keyDown(keyCodeG)) {
+        // TODO debug disable
+        if (self.inputState.keyboardState.keyDown('G')) {
             self.debug = !self.debug;
+        }
+        if (self.inputState.keyboardState.keyDown('Y')) {
+            self.activeParallaxSetIndex = (self.activeParallaxSetIndex + 1) % parallax.PARALLAX_SETS.len;
         }
 
         const deltaUs = if (self.timestampUsPrev > 0) (timestampUs - self.timestampUsPrev) else 0;
@@ -471,6 +477,11 @@ pub const App = struct {
                 .path = "images/decal-topleft.png",
                 .priority = 2,
             },
+            .{
+                .texture = .RoundedCorner,
+                .path = "images/rounded-corner.png",
+                .priority = 2,
+            },
         });
 
         const helveticaBoldUrl = "/fonts/HelveticaNeueLTCom-Bd.ttf";
@@ -659,13 +670,69 @@ pub const App = struct {
     }
 };
 
+fn drawRoundedFrame(renderQueue: *app.render.RenderQueue, bottomLeft: m.Vec2, size: m.Vec2, depth: f32, frameBottomLeft: m.Vec2, frameSize: m.Vec2, cornerRadius: f32, color: m.Vec4, texRoundedCorner: *const app.asset_data.TextureData) void
+{
+    // Horizontal
+    renderQueue.quad(
+        bottomLeft,
+        m.Vec2.init(frameBottomLeft.x, size.y),
+        depth, 0, color
+    );
+    renderQueue.quad(
+        m.Vec2.init(bottomLeft.x + frameBottomLeft.x + frameSize.x, bottomLeft.y),
+        m.Vec2.init(size.x - frameBottomLeft.x - frameSize.x, size.y),
+        depth, 0, color
+    );
+    // Vertical
+    renderQueue.quad(
+        bottomLeft,
+        m.Vec2.init(size.x, frameBottomLeft.y),
+        depth, 0, color
+    );
+    renderQueue.quad(
+        m.Vec2.init(bottomLeft.x, bottomLeft.y + frameBottomLeft.y + frameSize.y),
+        m.Vec2.init(size.x, size.y - frameBottomLeft.y - frameSize.y),
+        depth, 0, color
+    );
+    // Corners
+    renderQueue.texQuadColorUvOffset(
+        m.add(bottomLeft, frameBottomLeft),
+        m.Vec2.init(cornerRadius, cornerRadius),
+        depth, 0,
+        m.Vec2.zero,
+        m.Vec2.one,
+        texRoundedCorner, color
+    );
+    renderQueue.texQuadColorUvOffset(
+        m.Vec2.init(bottomLeft.x + frameBottomLeft.x + frameSize.x - cornerRadius, bottomLeft.y + frameBottomLeft.y),
+        m.Vec2.init(cornerRadius, cornerRadius),
+        depth, 0,
+        m.Vec2.init(1, 0), m.Vec2.init(-1, 1),
+        texRoundedCorner, color
+    );
+    renderQueue.texQuadColorUvOffset(
+        m.Vec2.init(bottomLeft.x + frameBottomLeft.x, bottomLeft.y + frameBottomLeft.y + frameSize.y - cornerRadius),
+        m.Vec2.init(cornerRadius, cornerRadius),
+        depth, 0,
+        m.Vec2.init(0, 1), m.Vec2.init(1, -1),
+        texRoundedCorner, color
+    );
+    renderQueue.texQuadColorUvOffset(
+        m.Vec2.init(bottomLeft.x + frameBottomLeft.x + frameSize.x - cornerRadius, bottomLeft.y + frameBottomLeft.y + frameSize.y - cornerRadius),
+        m.Vec2.init(cornerRadius, cornerRadius),
+        depth, 0,
+        m.Vec2.init(1, 1), m.Vec2.init(-1, -1),
+        texRoundedCorner, color
+    );
+}
+
 const GridImage = struct {
     uri: []const u8,
     title: ?[]const u8,
     goToUri: ?[]const u8,
 };
 
-fn drawImageGrid(images: []const GridImage, itemsPerRow: usize, topLeft: m.Vec2, width: f32, spacing: f32, depthTex: f32, texPriority: u32, fontData: *const app.asset_data.FontData, fontColor: m.Vec4, state: *App, scrollY: f32, mouseHoverGlobal: *bool, renderQueue: *app.render.RenderQueue, callback: *const fn(*App, GridImage, usize, anytype) void, callbackData: anytype) f32
+fn drawImageGrid(images: []const GridImage, itemsPerRow: usize, topLeft: m.Vec2, width: f32, spacing: f32, depthTex: f32, texPriority: u32, fontData: *const app.asset_data.FontData, fontColor: m.Vec4, state: *App, screenSize: m.Vec2, scrollY: f32, mouseHoverGlobal: *bool, renderQueue: *app.render.RenderQueue, callback: *const fn(*App, GridImage, usize, anytype) void, callbackData: anytype) f32
 {
     const itemAspect = 1.74;
     const itemWidth = (width - spacing * (@as(f32, @floatFromInt(itemsPerRow)) - 1)) / @as(f32, @floatFromInt(itemsPerRow));
@@ -707,7 +774,7 @@ fn drawImageGrid(images: []const GridImage, itemsPerRow: usize, topLeft: m.Vec2,
             yMax = @max(yMax, textPos.y);
         }
 
-        if (updateButton(itemPos, itemSize, &state.inputState.mouseState, scrollY, mouseHoverGlobal)) {
+        if (updateButton(itemPos, itemSize, &state.inputState.mouseState, screenSize, scrollY, mouseHoverGlobal)) {
             callback(state, img, i, callbackData);
         }
 
@@ -851,6 +918,7 @@ fn drawDesktop(state: *App, deltaS: f64, scrollYF: f32, screenSizeF: m.Vec2, ren
             },
         }
     };
+    const texRoundedCorner = state.assets.getTextureData(.{.static = .RoundedCorner}) orelse return 0;
 
     const allFontsLoaded = blk: {
         var loaded = true;
@@ -925,7 +993,7 @@ fn drawDesktop(state: *App, deltaS: f64, scrollYF: f32, screenSizeF: m.Vec2, ren
             const categoryButtonSize = m.Vec2.init(categorySize.x * 1.2, categorySize.y * 2.0);
             const categoryButtonPos = m.Vec2.init(categoryPos.x - categorySize.x * 0.1, categoryPos.y - categorySize.y);
             if (c.uri) |uri| {
-                if (updateButton(categoryButtonPos, categoryButtonSize, &state.inputState.mouseState, scrollYF, &mouseHoverGlobal)) {
+                if (updateButton(categoryButtonPos, categoryButtonSize, &state.inputState.mouseState, screenSizeF, scrollYF, &mouseHoverGlobal)) {
                     state.changePage(uri);
                 }
             }
@@ -980,11 +1048,11 @@ fn drawDesktop(state: *App, deltaS: f64, scrollYF: f32, screenSizeF: m.Vec2, ren
     {
         // TODO hm
         // rounded black frame
-        // const framePos = m.Vec2.init(marginX + gridSize * 1, gridSize * 1);
-        // const frameSize = m.Vec2.init(
-        //     screenSizeF.x - marginX * 2 - gridSize * 2,
-        //     screenSizeF.y - gridSize * 3,
-        // );
+        const framePos = m.Vec2.init(marginX + gridSize * 1, gridSize * 1);
+        const frameSize = m.Vec2.init(
+            screenSizeF.x - marginX * 2 - gridSize * 2,
+            screenSizeF.y - gridSize * 3,
+        );
         // renderQueue.roundedFrame(.{
         //     .bottomLeft = m.Vec2.zero,
         //     .size = screenSizeF,
@@ -994,6 +1062,7 @@ fn drawDesktop(state: *App, deltaS: f64, scrollYF: f32, screenSizeF: m.Vec2, ren
         //     .cornerRadius = gridSize,
         //     .color = m.Vec4.black
         // });
+        drawRoundedFrame(renderQueue, m.Vec2.zero, screenSizeF, DEPTH_UI_OVER1, framePos, frameSize, gridSize, m.Vec4.black, texRoundedCorner);
     }
 
     const section1Height = screenSizeF.y;
@@ -1027,10 +1096,10 @@ fn drawDesktop(state: *App, deltaS: f64, scrollYF: f32, screenSizeF: m.Vec2, ren
 
         // draw moving gradient
         const gradientColor = m.Vec4.init(86.0 / 255.0, 0.0, 214.0 / 255.0, 1.0);
-        const gradientPos = m.Vec2.init(0.0, secondFrameYScrolling);
+        const gradientPos = m.Vec2.init(0, secondFrameYScrolling);
         const gradientSize = m.Vec2.init(screenSizeF.x, section2Height);
         renderQueue.quadGradient(
-            gradientPos, gradientSize, DEPTH_LANDINGBACKGROUND, 0.0,
+            gradientPos, gradientSize, DEPTH_LANDINGBACKGROUND, 0,
             [4]m.Vec4 {m.Vec4.black, m.Vec4.black, gradientColor, gradientColor}
         );
 
@@ -1136,11 +1205,12 @@ fn drawDesktop(state: *App, deltaS: f64, scrollYF: f32, screenSizeF: m.Vec2, ren
         {
             // TODO
             // rounded black frame
-            // const framePos = m.Vec2.init(marginX + gridSize * 1, secondFrameYStill + gridSize * 1);
-            // const frameSize = m.Vec2.init(
-            //     screenSizeF.x - marginX * 2 - gridSize * 2,
-            //     screenSizeF.y - gridSize * 3,
-            // );
+            const framePos = m.Vec2.init(marginX + gridSize * 1, gridSize * 1);
+            const frameSize = m.Vec2.init(
+                screenSizeF.x - marginX * 2 - gridSize * 2,
+                screenSizeF.y - gridSize * 3,
+            );
+            drawRoundedFrame(renderQueue, m.Vec2.init(0, secondFrameYStill), screenSizeF, DEPTH_UI_OVER1, framePos, frameSize, gridSize, m.Vec4.black, texRoundedCorner);
             // renderQueue.roundedFrame(.{
             //     .bottomLeft = m.Vec2.init(0.0, secondFrameYStill),
             //     .size = screenSizeF,
@@ -1268,7 +1338,7 @@ fn drawDesktop(state: *App, deltaS: f64, scrollYF: f32, screenSizeF: m.Vec2, ren
                 const itemsPerRow = 6;
                 const topLeft = m.Vec2.init(contentMarginX, yGallery);
                 const spacing = gridSize * 0.25;
-                yGallery += drawImageGrid(galleryImages.items, itemsPerRow, topLeft, contentSubWidth, spacing, DEPTH_GRIDIMAGE, 9, fontText, colorUi, state, scrollYF, &mouseHoverGlobal, renderQueue, CB.entry, .{.sectionIndex = i});
+                yGallery += drawImageGrid(galleryImages.items, itemsPerRow, topLeft, contentSubWidth, spacing, DEPTH_GRIDIMAGE, 9, fontText, colorUi, state, screenSizeF, scrollYF, &mouseHoverGlobal, renderQueue, CB.entry, .{.sectionIndex = i});
                 yGallery += gridSize * 4.0;
                 indexOffset += section.images.len;
             }
@@ -1316,7 +1386,7 @@ fn drawDesktop(state: *App, deltaS: f64, scrollYF: f32, screenSizeF: m.Vec2, ren
                 const galleryHeight = galleryWidth / @as(f32, @floatFromInt(perRow)) / aspect * 2;
                 const yOffset = (screenSizeF.y - galleryHeight) / 2;
                 const pospos = m.Vec2.init(galleryMarginX, scrollYF + yOffset);
-                _ = drawImageGrid(galleryImages.items, perRow, pospos, galleryWidth, spacing, DEPTH_UI_OVER2 - 0.01, 9, fontText, colorUi, state, scrollYF, &mouseHoverGlobal, renderQueue, CB.noop, {});
+                _ = drawImageGrid(galleryImages.items, perRow, pospos, galleryWidth, spacing, DEPTH_UI_OVER2 - 0.01, 9, fontText, colorUi, state, screenSizeF, scrollYF, &mouseHoverGlobal, renderQueue, CB.noop, {});
 
                 if (state.assets.getTextureData(.{.static = .StickerCircleX})) |circleX| {
                     const circleXPos = m.Vec2.init(gridSize * 1.0, scrollYF + gridSize * 1.0);
@@ -1326,7 +1396,7 @@ fn drawDesktop(state: *App, deltaS: f64, scrollYF: f32, screenSizeF: m.Vec2, ren
                         DEPTH_UI_OVER2 - 0.01, 0,
                         circleX, m.Vec4.white
                     );
-                    if (updateButton(circleXPos, circleXSize, &state.inputState.mouseState, scrollYF, &mouseHoverGlobal)) {
+                    if (updateButton(circleXPos, circleXSize, &state.inputState.mouseState, screenSizeF, scrollYF, &mouseHoverGlobal)) {
                         state.pageData.Entry.gallerySelection = null;
                     }
                 }
@@ -1352,10 +1422,10 @@ fn drawDesktop(state: *App, deltaS: f64, scrollYF: f32, screenSizeF: m.Vec2, ren
                     const arrowLeftClickPos = m.Vec2.init(0, scrollYF + yOffset);
                     const arrowRightClickPos = m.Vec2.init(screenSizeF.x - galleryMarginX, scrollYF + yOffset);
                     const arrowClickSize = m.Vec2.init(galleryMarginX, screenSizeF.y - yOffset * 2);
-                    if (updateButton(arrowLeftClickPos, arrowClickSize, &state.inputState.mouseState, scrollYF, &mouseHoverGlobal)) {
+                    if (updateButton(arrowLeftClickPos, arrowClickSize, &state.inputState.mouseState, screenSizeF, scrollYF, &mouseHoverGlobal)) {
                         state.pageData.Entry.gallerySelection.? = updateGallerySelection(gallerySelection, false, project);
                     }
-                    if (updateButton(arrowRightClickPos, arrowClickSize, &state.inputState.mouseState, scrollYF, &mouseHoverGlobal)) {
+                    if (updateButton(arrowRightClickPos, arrowClickSize, &state.inputState.mouseState, screenSizeF, scrollYF, &mouseHoverGlobal)) {
                         state.pageData.Entry.gallerySelection.? = updateGallerySelection(gallerySelection, true, project);
                     }
                 }
@@ -1368,11 +1438,11 @@ fn drawDesktop(state: *App, deltaS: f64, scrollYF: f32, screenSizeF: m.Vec2, ren
 
     // draw moving gradient (estimate based on previous frame)
     const gradientColor = m.Vec4.init(86.0 / 255.0, 0.0, 214.0 / 255.0, 1.0);
-    const gradientPos = m.Vec2.init(0.0, section3YScrolling);
+    const gradientPos = m.Vec2.init(gridSize, section3YScrolling + gridSize);
     // const gradientSize = m.Vec2.init(screenSizeF.x, section3Height * 1.5);
-    const gradientSize = m.Vec2.init(screenSizeF.x, @as(f32, @floatFromInt(state.yMaxPrev)) - section3Start);
+    const gradientSize = m.Vec2.init(screenSizeF.x - gridSize * 2, @as(f32, @floatFromInt(state.yMaxPrev)) - section3Start - gridSize * 2);
     renderQueue.quadGradient(
-        gradientPos, gradientSize, DEPTH_LANDINGBACKGROUND, 0.0,
+        gradientPos, gradientSize, DEPTH_LANDINGBACKGROUND, gridSize,
         [4]m.Vec4 {m.Vec4.black, m.Vec4.black, gradientColor, gradientColor}
     );
 
@@ -1419,7 +1489,7 @@ fn drawDesktop(state: *App, deltaS: f64, scrollYF: f32, screenSizeF: m.Vec2, ren
         section3Start + gridSize * 14.0,
     );
     const spacing = gridSize * 0.25;
-    const projectGridY = drawImageGrid(images.items, itemsPerRow, gridTopLeft, contentSubWidth, spacing, DEPTH_GRIDIMAGE, 8, fontText, colorUi, state, scrollYF, &mouseHoverGlobal, renderQueue, CB.home, {});
+    const projectGridY = drawImageGrid(images.items, itemsPerRow, gridTopLeft, contentSubWidth, spacing, DEPTH_GRIDIMAGE, 8, fontText, colorUi, state, screenSizeF, scrollYF, &mouseHoverGlobal, renderQueue, CB.home, {});
 
     const section3Height = gridTopLeft.y - section3Start + projectGridY + gridSize * 8.0;
 
@@ -1431,26 +1501,6 @@ fn drawDesktop(state: *App, deltaS: f64, scrollYF: f32, screenSizeF: m.Vec2, ren
             crosshairRectPos, crosshairRectSize, DEPTH_UI_GENERIC,
             gridSize, dtl, screenSizeF, colorUi, renderQueue
         );
-    }
-
-    {
-        // TODO
-        // rounded black frame
-        // const frameTotalSize = m.Vec2.init(screenSizeF.x, section3Height);
-        // const framePos = m.Vec2.init(marginX + gridSize * 1, section3YScrolling + gridSize * 1);
-        // const frameSize = m.Vec2.init(
-        //     screenSizeF.x - marginX * 2 - gridSize * 2,
-        //     section3Height - gridSize * 3,
-        // );
-        // renderQueue.roundedFrame(.{
-        //     .bottomLeft = m.Vec2.init(0.0, section3YScrolling),
-        //     .size = frameTotalSize,
-        //     .depth = DEPTH_UI_OVER1,
-        //     .frameBottomLeft = framePos,
-        //     .frameSize = frameSize,
-        //     .cornerRadius = gridSize,
-        //     .color = m.Vec4.black
-        // });
     }
 
     yMax += section3Height;
@@ -1712,7 +1762,7 @@ fn drawMobile(state: *App, deltaS: f64, scrollY: f32, screenSize: m.Vec2, render
                 const itemsPerRow = 1;
                 const topLeft = m.Vec2.init(sideMargin, yGallery);
                 const spacing = gridSize * 0.25;
-                yGallery += drawImageGrid(galleryImages.items, itemsPerRow, topLeft, contentWidth, spacing, DEPTH_GRIDIMAGE, 9, fontText, colorUi, state, scrollY, &mouseHoverGlobal, renderQueue, CB.entry, {});
+                yGallery += drawImageGrid(galleryImages.items, itemsPerRow, topLeft, contentWidth, spacing, DEPTH_GRIDIMAGE, 9, fontText, colorUi, state, screenSize, scrollY, &mouseHoverGlobal, renderQueue, CB.entry, {});
                 yGallery += gridSize * 4.0;
                 indexOffset += section.images.len;
             }
@@ -1770,7 +1820,7 @@ fn drawMobile(state: *App, deltaS: f64, scrollY: f32, screenSize: m.Vec2, render
                 };
             }
         }
-        if (updateButton(coverPos, coverSize, &state.inputState.mouseState, scrollY, &mouseHoverGlobal)) {
+        if (updateButton(coverPos, coverSize, &state.inputState.mouseState, screenSize, scrollY, &mouseHoverGlobal)) {
             state.changePage(project.uri);
         }
 

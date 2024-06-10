@@ -10,6 +10,7 @@ pub const Font = enum {
 
 pub const Texture = enum {
     DecalTopLeft,
+    RoundedCorner,
     LoadingGlyphs,
     LogosAll,
     Lut1,
@@ -29,4 +30,4 @@ pub const Texture = enum {
     StickerMainHome,
 };
 
-pub const AssetsType = app.asset.AssetsWithIds(Font, Texture, 128);
+pub const AssetsType = app.asset.AssetsWithIds(Font, Texture, 512);
