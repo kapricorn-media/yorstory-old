@@ -80,6 +80,20 @@ pub const PARALLAX_SETS = [_]ParallaxSet {
     },
     .{
         .bgColor = .{
+            .Color = colorHexToVec4("#111111") catch unreachable,
+        },
+        .images = &[_]ParallaxImage{
+            ParallaxImage.init("DRIVE/PARALLAX/flyers.psd/1-bg.layer", 0.0),
+            ParallaxImage.init("DRIVE/PARALLAX/flyers.psd/2-light.layer", 0.05),
+            ParallaxImage.init("DRIVE/PARALLAX/flyers.psd/3-flyer1.layer", 0.1),
+            ParallaxImage.init("DRIVE/PARALLAX/flyers.psd/4-flyer2.layer", 0.2),
+            ParallaxImage.init("DRIVE/PARALLAX/flyers.psd/5-flyer3.layer", 0.4),
+            ParallaxImage.init("DRIVE/PARALLAX/flyers.psd/6-window.layer", 0.7),
+            ParallaxImage.init("DRIVE/PARALLAX/flyers.psd/7-person.layer", 1.2),
+        },
+    },
+    .{
+        .bgColor = .{
             .Gradient = .{
                 .colorTop = colorHexToVec4("#1a1b1a") catch unreachable,
                 .colorBottom = colorHexToVec4("#ffffff") catch unreachable,
@@ -92,20 +106,6 @@ pub const PARALLAX_SETS = [_]ParallaxSet {
             ParallaxImage.init("DRIVE/PARALLAX/on-hill.psd/4-rock-left.layer", 0.6),
             ParallaxImage.init("DRIVE/PARALLAX/on-hill.psd/5-tree-right.layer", 0.75),
             ParallaxImage.init("DRIVE/PARALLAX/on-hill.psd/6-tree-left.layer", 1.2),
-        },
-    },
-    .{
-        .bgColor = .{
-            .Color = colorHexToVec4("#111111") catch unreachable,
-        },
-        .images = &[_]ParallaxImage{
-            ParallaxImage.init("DRIVE/PARALLAX/flyers.psd/1-bg.layer", 0.0),
-            ParallaxImage.init("DRIVE/PARALLAX/flyers.psd/2-light.layer", 0.05),
-            ParallaxImage.init("DRIVE/PARALLAX/flyers.psd/3-flyer1.layer", 0.1),
-            ParallaxImage.init("DRIVE/PARALLAX/flyers.psd/4-flyer2.layer", 0.2),
-            ParallaxImage.init("DRIVE/PARALLAX/flyers.psd/5-flyer3.layer", 0.4),
-            ParallaxImage.init("DRIVE/PARALLAX/flyers.psd/6-window.layer", 0.7),
-            ParallaxImage.init("DRIVE/PARALLAX/flyers.psd/7-person.layer", 1.2),
         },
     },
     .{
@@ -158,22 +158,6 @@ pub const PARALLAX_SETS = [_]ParallaxSet {
             ParallaxImage.init("DRIVE/PARALLAX/thanos.psd/6-flare.layer", 1.2),
         },
     },
-    // .{
-    //     .bgColor = .{
-    //         .Color = colorHexToVec4("#000000") catch unreachable,
-    //     },
-    //     .images = &[_]ParallaxImage{
-    //         ParallaxImage.init("DRIVE/PARALLAX/moon-forest.psd/1-bg.layer", 0.01),
-    //         ParallaxImage.init("DRIVE/PARALLAX/moon-forest.psd/2-hill.layer", 0.05),
-    //         ParallaxImage.init("DRIVE/PARALLAX/moon-forest.psd/3-tree-back.layer", 0.1),
-    //         ParallaxImage.init("DRIVE/PARALLAX/moon-forest.psd/4-person-back.layer", 0.35),
-    //         ParallaxImage.init("DRIVE/PARALLAX/moon-forest.psd/5-glow1.layer", 0.0),
-    //         ParallaxImage.init("DRIVE/PARALLAX/moon-forest.psd/6-person-front.layer", 0.85),
-    //         ParallaxImage.init("DRIVE/PARALLAX/moon-forest.psd/7-glow2.layer", 0.0),
-    //         ParallaxImage.init("DRIVE/PARALLAX/moon-forest.psd/8-tree-front1.layer", 1.2),
-    //         ParallaxImage.init("DRIVE/PARALLAX/moon-forest.psd/9-tree-front2.layer", 1.3),
-    //     },
-    // },
     .{
         .bgColor = .{
             .Color = colorHexToVec4("#000000") catch unreachable,
