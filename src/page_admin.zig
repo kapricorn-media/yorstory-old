@@ -31,11 +31,11 @@ pub fn updateAndRender(state: *App, deltaS: f64, scrollY: f32, screenSize: m.Vec
     const fontText = state.assets.getFontData(.Text) orelse return 0;
     const msgDepth = 0.5;
 
-    const titlePos = m.Vec2.init(50, 50 + fontTitle.lineHeight);
+    const titlePos = m.Vec2.init(50, 50);
     renderQueue.text("Admin Page", titlePos, msgDepth, fontTitle, m.Vec4.black);
 
     const msg = if (pageData.driveReqInFlight) "[ Updating from Google Drive ]" else "[ Idle ]";
-    const msgPos = m.add(titlePos, m.Vec2.init(0, 50 + fontText.lineHeight));
+    const msgPos = m.add(titlePos, m.Vec2.init(50, 50 + fontTitle.lineHeight));
     renderQueue.text(msg, msgPos, msgDepth, fontText, m.Vec4.black);
 
     return 0;

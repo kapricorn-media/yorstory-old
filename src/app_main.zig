@@ -189,7 +189,7 @@ pub const App = struct {
 
     const Self = @This();
     pub const PARALLAX_SET_SWAP_SECONDS = 6;
-    const PARALLAX_SET_INDEX_START = 6;
+    const PARALLAX_SET_INDEX_START = 1;
     comptime {
         if (PARALLAX_SET_INDEX_START >= parallax.PARALLAX_SETS.len) {
             @compileError("start parallax index out of bounds");
@@ -244,15 +244,8 @@ pub const App = struct {
         try self.loadRelevantAssets(screenSize, tempAllocator);
     }
 
-    pub fn updateAndRender(self: *Self, screenSize: m.Vec2usize, timestampUs: i64) bool
+    pub fn updateAndRender(self: *Self, screenSize: m.Vec2usize, timestampUs: i64, scrollY: i32) i32
     {
-        const result = self.updateAndRenderOld(screenSize, timestampUs);
-        return result > 0;
-    }
-
-    pub fn updateAndRenderOld(self: *Self, screenSize: m.Vec2usize, timestampUs: i64) i32
-    {
-        const scrollY: i32 = 0;
         const screenSizeI = screenSize.toVec2i();
         const screenSizeF = screenSize.toVec2();
         const scrollYF: f32 = @floatFromInt(scrollY);
@@ -299,6 +292,11 @@ pub const App = struct {
             return -1;
         };
         renderQueue.clear();
+        renderQueue.setOffsetScaleAnchor(
+            m.Vec2.init(0, scrollYF + screenSizeF.y),
+            m.Vec2.init(1.0, -1.0),
+            m.Vec2.init(0.0, 1.0)
+        );
 
         const screenResize = !m.eql(self.screenSizePrev, screenSize);
         if (screenResize) {
@@ -358,7 +356,7 @@ pub const App = struct {
             },
         }
 
-        renderQueue.render2(&self.renderState, screenSizeF, scrollYF, tempAllocator);
+        renderQueue.render(&self.renderState, screenSizeF, tempAllocator);
         if (!m.eql(self.screenSizePrev, screenSize) or yMax != self.yMaxPrev) {
             std.log.info("resize, clearing HTML elements", .{});
             // w.clearAllEmbeds();
@@ -1109,8 +1107,8 @@ fn drawDesktop(state: *App, deltaS: f64, scrollYF: f32, screenSizeF: m.Vec2, ren
             );
             const eyeStickerColor = m.Vec4.init(0.0, 46.0 / 255.0, 226.0 / 255.0, 1.0);
             // TODO change plus to minus once depth/blend shit is fixed
-            const eyeDepth = DEPTH_UI_GENERIC + 0.02;
-            const eyeSymbolDepth = DEPTH_UI_GENERIC + 0.01;
+            const eyeDepth = DEPTH_UI_GENERIC - 0.01;
+            const eyeSymbolDepth = DEPTH_UI_GENERIC - 0.02;
             renderQueue.texQuadColor(eyePos, eyeSize, eyeDepth, 0, sCircle, eyeStickerColor);
             renderQueue.texQuadColor(eyePos, eyeSize, eyeSymbolDepth, 0, se, colorUi);
         }
@@ -1368,6 +1366,16 @@ fn drawDesktop(state: *App, deltaS: f64, scrollYF: f32, screenSizeF: m.Vec2, ren
     const section3Start = yMax;
     const section3YScrolling = section3Start;
 
+    // draw moving gradient (estimate based on previous frame)
+    const gradientColor = m.Vec4.init(86.0 / 255.0, 0.0, 214.0 / 255.0, 1.0);
+    const gradientPos = m.Vec2.init(0.0, section3YScrolling);
+    // const gradientSize = m.Vec2.init(screenSizeF.x, section3Height * 1.5);
+    const gradientSize = m.Vec2.init(screenSizeF.x, @as(f32, @floatFromInt(state.yMaxPrev)) - section3Start);
+    renderQueue.quadGradient(
+        gradientPos, gradientSize, DEPTH_LANDINGBACKGROUND, 0.0,
+        [4]m.Vec4 {m.Vec4.black, m.Vec4.black, gradientColor, gradientColor}
+    );
+
     if (state.assets.getTextureData(.{.static = .YorstoryCompany})) |yorstoryCompany| {
         const pos = m.Vec2.init(contentMarginX, section3YScrolling + gridSize * 3.0);
         const size = getTextureScaledSize(yorstoryCompany.size, screenSizeF);
@@ -1414,15 +1422,6 @@ fn drawDesktop(state: *App, deltaS: f64, scrollYF: f32, screenSizeF: m.Vec2, ren
     const projectGridY = drawImageGrid(images.items, itemsPerRow, gridTopLeft, contentSubWidth, spacing, DEPTH_GRIDIMAGE, 8, fontText, colorUi, state, scrollYF, &mouseHoverGlobal, renderQueue, CB.home, {});
 
     const section3Height = gridTopLeft.y - section3Start + projectGridY + gridSize * 8.0;
-
-    // draw moving gradient
-    const gradientColor = m.Vec4.init(86.0 / 255.0, 0.0, 214.0 / 255.0, 1.0);
-    const gradientPos = m.Vec2.init(0.0, section3YScrolling);
-    const gradientSize = m.Vec2.init(screenSizeF.x, section3Height * 1.5);
-    renderQueue.quadGradient(
-        gradientPos, gradientSize, DEPTH_LANDINGBACKGROUND, 0.0,
-        [4]m.Vec4 {m.Vec4.black, m.Vec4.black, gradientColor, gradientColor}
-    );
 
     if (decalTopLeft) |dtl| {
         const crosshairRectPos = m.Vec2.init(marginX, section3YScrolling);

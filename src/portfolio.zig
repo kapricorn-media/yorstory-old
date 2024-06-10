@@ -30,7 +30,9 @@ pub const Portfolio = struct {
 
     pub fn init(json: []const u8, allocator: std.mem.Allocator) !Self
     {
-        const result = try std.json.parseFromSlice(Portfolio, allocator, json, .{});
+        const result = try std.json.parseFromSlice(Portfolio, allocator, json, .{
+            .allocate = .alloc_always,
+        });
         return result.value;
     }
 

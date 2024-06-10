@@ -29,21 +29,23 @@ const DynamicData = struct {
 
 const ServerState = struct {
     allocator: std.mem.Allocator,
-    bigdataPath: []const u8,
+    dataStatic: bigdata.Data,
+    bigdataDynamicPath: []const u8,
     dynamic: DynamicData,
     dynamicAlpha: DynamicData,
     rwLockAlpha: std.Thread.RwLock,
 
     const Self = @This();
 
-    fn init(allocator: std.mem.Allocator, bigdataPath: []const u8, portfolioJsonPath: []const u8) !Self
+    fn init(allocator: std.mem.Allocator, bigdataStaticPath: []const u8, bigdataDynamicPath: []const u8, portfolioJsonPath: []const u8) !Self
     {
         var self: Self = .{
             .allocator = allocator,
-            .bigdataPath = bigdataPath,
+            .dataStatic = undefined,
+            .bigdataDynamicPath = bigdataDynamicPath,
             .dynamic = undefined,
             .dynamicAlpha = undefined,
-            .rwLockAlpha = std.Thread.RwLock{},
+            .rwLockAlpha = .{},
         };
 
         const cwd = std.fs.cwd();
@@ -54,9 +56,12 @@ const ServerState = struct {
         self.dynamicAlpha.portfolioJson = try allocator.dupe(u8, self.dynamic.portfolioJson);
         self.dynamicAlpha.portfolio = try portfolio.Portfolio.init(self.dynamicAlpha.portfolioJson, allocator);
 
-        try self.dynamic.data.loadFromFile(bigdataPath, allocator);
+        try self.dataStatic.loadFromFile(bigdataStaticPath, allocator);
+        errdefer self.dataStatic.deinit();
+
+        try self.dynamic.data.loadFromFile(bigdataDynamicPath, allocator);
         errdefer self.dynamic.data.deinit();
-        try self.dynamicAlpha.data.loadFromFile(bigdataPath, allocator);
+        try self.dynamicAlpha.data.loadFromFile(bigdataDynamicPath, allocator);
         errdefer self.dynamicAlpha.data.deinit();
 
         return self;
@@ -68,6 +73,18 @@ const ServerState = struct {
         self.dynamicAlpha.data.deinit();
     }
 };
+
+fn fillFromGoogleDriveThread(state: *ServerState) !void
+{
+    const folderId = "1Q5sM_dtJjpBtQX728PFU4TfYdIWCnnJ_";
+    // DEBUG
+    const key = "AIzaSyABIqpwoX4rSLyGz5nXqp2pknRagH_azkI";
+
+    state.rwLockAlpha.lock();
+    defer state.rwLockAlpha.unlock();
+
+    try drive.fillFromGoogleDrive(folderId, &state.dynamicAlpha.data, key, state.allocator);
+}
 
 // const ServerCallbackError = server.Writer.Error || error {InternalServerError};
 
@@ -137,14 +154,31 @@ const ServerState = struct {
 //     return std.mem.eql(u8, auth, authRef);
 // }
 
+fn isAuthenticated(req: *httpz.Request, allocator: std.mem.Allocator) bool
+{
+    _ = req;
+    _ = allocator;
+    return true;
+    // const auth = req.header("auth") orelse return false;
+    // const authRef = std.process.getEnvVarOwned(allocator, "AUTH_KEY") catch {
+    //     std.log.err("Failed to load AUTH_KEY env variable", .{});
+    //     return false;
+    // };
+    // defer allocator.free(authRef);
+    // return std.mem.eql(u8, auth, authRef);
+}
+
 fn requestHandler(state: *ServerState, req: *httpz.Request, res: *httpz.Response) !void
 {
+    var arena = std.heap.ArenaAllocator.init(state.allocator);
+    defer arena.deinit();
+    const tempAllocator = arena.allocator();
+
     const host = req.header("host") orelse req.header("Host") orelse return error.NoHost;
     const isAdmin = std.mem.startsWith(u8, host, "admin.");
     const isAlpha = std.mem.startsWith(u8, host, "alpha.");
+    const isAuth = isAuthenticated(req, tempAllocator);
     const portfolioJson = if (isAlpha) state.dynamicAlpha.portfolioJson else state.dynamic.portfolioJson;
-    _ = isAdmin;
-    _ = portfolioJson;
     const pf = if (isAlpha) state.dynamicAlpha.portfolio else state.dynamic.portfolio;
     if (isAlpha) {
         state.rwLockAlpha.lockShared();
@@ -154,11 +188,6 @@ fn requestHandler(state: *ServerState, req: *httpz.Request, res: *httpz.Response
             state.rwLockAlpha.unlockShared();
         }
     }
-
-    var arena = std.heap.ArenaAllocator.init(state.allocator);
-    defer arena.deinit();
-    const tempAllocator = arena.allocator();
-    _ = tempAllocator;
 
     switch (req.method) {
         .GET => {
@@ -170,14 +199,82 @@ fn requestHandler(state: *ServerState, req: *httpz.Request, res: *httpz.Response
             }
             if (isPortfolioUri) {
                 req.url.path = "/wasm.html";
+            } else if (std.mem.eql(u8, req.url.path, "/portfolio")) {
+                res.content_type = .JSON;
+                try res.writer().writeAll(portfolioJson);
+            }
+        },
+        .POST => {
+            if (isAdmin) {
+                if (isAdmin and !isAuth) {
+                    res.status = 401;
+                    // try server.writeCode(writer, ._401);
+                    // try server.writeEndHeader(writer);
+                    return;
+                }
+
+                if (isAlpha) {
+                    res.status = 403;
+                    // try server.writeCode(writer, ._403);
+                    // try server.writeEndHeader(writer);
+                    return;
+                }
+
+                if (std.mem.eql(u8, req.url.path, "/drive")) {
+                    // const folderId = "1Q5sM_dtJjpBtQX728PFU4TfYdIWCnnJ_";
+                    // DEBUG
+                    // const key = "AIzaSyABIqpwoX4rSLyGz5nXqp2pknRagH_azkI";
+                    // const key = std.process.getEnvVarOwned(tempAllocator, "GOOGLE_DRIVE_API_KEY") catch {
+                    //     std.log.err("Missing GOOGLE_DRIVE_API_KEY", .{});
+                    //     res.status = 500;
+                    //     // try server.writeCode(writer, ._500);
+                    //     // try server.writeEndHeader(writer);
+                    //     return;
+                    // };
+
+                    // if (!state.rwLockAlpha.tryLock()) {
+                    //     res.status = 503;
+                    //     // try server.writeCode(writer, ._503);
+                    //     // try server.writeEndHeader(writer);
+                    //     return;
+                    // }
+                    // defer state.rwLockAlpha.unlock();
+
+                    const folderId = "1Q5sM_dtJjpBtQX728PFU4TfYdIWCnnJ_";
+                    const key = "AIzaSyABIqpwoX4rSLyGz5nXqp2pknRagH_azkI";
+                    try drive.fillFromGoogleDrive(folderId, &state.dynamicAlpha.data, key, state.allocator);
+                    // _ = try std.Thread.spawn(.{}, fillFromGoogleDriveThread, .{state});
+                    // try drive.fillFromGoogleDrive(folderId, &state.dynamicAlpha.data, key, state.allocator);
+
+                    try res.writer().writeByte('y');
+                    // try server.writeCode(writer, ._200);
+                    // try server.writeEndHeader(writer);
+                } else if (std.mem.eql(u8, req.url.path, "/save")) {
+                    // Back up old file
+                    const timestampMs = std.time.milliTimestamp();
+                    const backupPath = try std.fmt.allocPrint(tempAllocator, "{s}.{}", .{state.bigdataDynamicPath, timestampMs});
+                    const cwd = std.fs.cwd();
+                    try cwd.rename(state.bigdataDynamicPath, backupPath);
+
+                    // Save new file
+                    try state.dynamicAlpha.data.saveToFile(state.bigdataDynamicPath, tempAllocator);
+
+                    // Respond and restart server
+                    try res.writer().writeByte('y');
+                    std.os.exit(0);
+                }
             }
         },
         else => {},
     }
 
     if (!app.server_utils.responded(res)) {
-        const data = if (isAlpha) &state.dynamicAlpha.data else &state.dynamic.data;
-        try app.server_utils.serverAppEndpoints(req, res, data, PATH_WASM, DEBUG);
+        // const data = if (isAlpha) &state.dynamicAlpha.data else &state.dynamic.data;
+        try app.server_utils.serverAppEndpoints(req, res, &state.dataStatic, PATH_WASM, false, DEBUG);
+    }
+    if (!app.server_utils.responded(res)) {
+        // const data = if (isAlpha) &state.dynamicAlpha.data else &state.dynamic.data;
+        try app.server_utils.serverAppEndpoints(req, res, &state.dynamic.data, PATH_WASM, true, DEBUG);
     }
 
     if (!app.server_utils.responded(res)) {
@@ -366,17 +463,18 @@ pub fn main() !void
 
     const args = try std.process.argsAlloc(allocator);
     defer std.process.argsFree(allocator, args);
-    if (args.len != 4) {
-        std.log.err("Expected arguments: datafile port portfolio-json", .{});
+    if (args.len != 5) {
+        std.log.err("Expected arguments: datafile-static datafile-dynamic port portfolio-json", .{});
         return error.BadArgs;
     }
 
-    const dataFile = args[1];
-    const portfolioJson = args[3];
-    var state = try ServerState.init(allocator, dataFile, portfolioJson);
+    const datafileStatic = args[1];
+    const datafileDynamic = args[2];
+    const portfolioJson = args[4];
+    var state = try ServerState.init(allocator, datafileStatic, datafileDynamic, portfolioJson);
     defer state.deinit();
 
-    const port = try std.fmt.parseUnsigned(u16, args[2], 10);
+    const port = try std.fmt.parseUnsigned(u16, args[3], 10);
 
     var server = try httpz.ServerCtx(*ServerState, *ServerState).init(
         allocator, .{.port = port }, &state

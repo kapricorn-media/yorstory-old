@@ -10,8 +10,12 @@ fn addIfNewOrUpdatedDrive(
     file: google.drive.FileMetadata,
     authData: google.auth.AuthData,
     data: *bigdata.Data,
-    tempAllocator: std.mem.Allocator) !void
+    allocator: std.mem.Allocator) !void
 {
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+    const tempAllocator = arena.allocator();
+
     std.debug.assert(file.typeData == .file);
     const fileData = file.typeData.file;
 
@@ -22,23 +26,21 @@ fn addIfNewOrUpdatedDrive(
         return;
     }
 
-    std.log.info("Inserting {s}", .{path});
-    _ = authData;
-    _ = tempAllocator;
-    // const downloadResponse = try google.drive.downloadFile(file.id, authData, tempAllocator);
-    // if (downloadResponse.code != ._200) {
-    //     std.log.err("File download failed with code {}, response:\n{s}", .{
-    //         downloadResponse.code, downloadResponse.body
-    //     });
-    //     return error.downloadFile;
-    // }
+    std.log.info("Inserting {s} ({s})", .{path, file.id});
+    var downloadResponse = try google.drive.downloadFile(file.id, authData, tempAllocator);
+    defer downloadResponse.deinit();
+    if (downloadResponse.status != .ok) {
+        std.log.err("File download failed with status {}", .{downloadResponse.status});
+        return error.downloadFile;
+    }
+    const body = downloadResponse.body orelse return error.downloadFileNoBody;
+    const md5 = bigdata.calculateMd5Checksum(body);
+    if (!std.mem.eql(u8, &md5FromMetadata, &md5)) {
+        return error.mismatchedChecksums;
+    }
 
-    // const md5 = bigdata.calculateMd5Checksum(downloadResponse.body);
-    // if (!std.mem.eql(u8, &md5FromMetadata, &md5)) {
-    //     return error.mismatchedChecksums;
-    // }
-
-    // try data.put(path, downloadResponse.body, tempAllocator);
+    std.log.info("Put {s} {} bytes", .{path, body.len});
+    // try data.put(path, body, tempAllocator);
 }
 
 pub fn fillFromGoogleDrive(folderId: []const u8, data: *bigdata.Data, key: []const u8, allocator: std.mem.Allocator) !void
@@ -63,7 +65,7 @@ pub fn fillFromGoogleDrive(folderId: []const u8, data: *bigdata.Data, key: []con
                     const path = try std.fmt.allocPrint(
                         tempAllocator, "/DRIVE/PARALLAX/{s}", .{ff.name}
                     );
-                    try addIfNewOrUpdatedDrive(path, ff, authData, data, tempAllocator);
+                    try addIfNewOrUpdatedDrive(path, ff, authData, data, allocator);
                 }
             } else {
                 std.debug.print("Project: {s}\n", .{f.name});
@@ -80,11 +82,11 @@ pub fn fillFromGoogleDrive(folderId: []const u8, data: *bigdata.Data, key: []con
                             );
                             if (std.mem.eql(u8, ff.name, "cover.png")) {
                                 coverFound = true;
-                                try addIfNewOrUpdatedDrive(path, ff, authData, data, tempAllocator);
+                                try addIfNewOrUpdatedDrive(path, ff, authData, data, allocator);
                             }
                             if (std.mem.eql(u8, ff.name, "sticker-main.png")) {
                                 stickerFound = true;
-                                try addIfNewOrUpdatedDrive(path, ff, authData, data, tempAllocator);
+                                try addIfNewOrUpdatedDrive(path, ff, authData, data, allocator);
                             }
                         },
                         .folder => {
@@ -103,7 +105,7 @@ pub fn fillFromGoogleDrive(folderId: []const u8, data: *bigdata.Data, key: []con
                                             const path = try std.fmt.allocPrint(
                                                 tempAllocator, "/DRIVE/{s}/{s}/{s}", .{f.name, ff.name, fff.name}
                                             );
-                                            try addIfNewOrUpdatedDrive(path, fff, authData, data, tempAllocator);
+                                            try addIfNewOrUpdatedDrive(path, fff, authData, data, allocator);
                                         },
                                         .folder => {
                                             if (sections != null and !sections.?) {
@@ -119,7 +121,7 @@ pub fn fillFromGoogleDrive(folderId: []const u8, data: *bigdata.Data, key: []con
                                                 const path = try std.fmt.allocPrint(
                                                     tempAllocator, "/DRIVE/{s}/{s}/{s}/{s}", .{f.name, ff.name, fff.name, ffff.name}
                                                 );
-                                                try addIfNewOrUpdatedDrive(path, ffff, authData, data, tempAllocator);
+                                                try addIfNewOrUpdatedDrive(path, ffff, authData, data, allocator);
                                             }
                                         },
                                     }
