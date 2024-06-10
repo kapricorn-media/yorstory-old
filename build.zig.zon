@@ -4,9 +4,9 @@
     .paths = .{""},
     .dependencies = .{
         .zigkm_common = .{
-            //.url = "https://github.com/kapricorn-media/zigkm-common/archive/9fd3f678a6d32699c793ac981bed30db70878033.tar.gz",
-            //.hash = "1220c23d6cd304a745ed950af1359874278f83a73747a465f53e3c007a740c1e7a51",
-            .path = "../zigkm-common",
+            .url = "https://github.com/kapricorn-media/zigkm-common/archive/7c32100269201741e44d440461de11c3f61d85e3.tar.gz",
+            .hash = "1220f85359815083e8b268fcd8236b922dfa0ad793d56468709371558720ef57704c",
+            //.path = "../zigkm-common",
         },
     },
 }
