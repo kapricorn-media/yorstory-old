@@ -197,6 +197,27 @@ pub const PARALLAX_SETS = [_]ParallaxSet {
             ParallaxImage.init("DRIVE/PARALLAX/matahari.psd/5-fg.layer", 1.8),
         },
     },
+    .{
+        .bgColor = .{
+            .Color = colorHexToVec4("#676767") catch unreachable,
+        },
+        .images = &[_]ParallaxImage{
+            ParallaxImage.init("DRIVE/PARALLAX/wand.psd/1-bg.layer", 0.02),
+            ParallaxImage.init("DRIVE/PARALLAX/wand.psd/2-gargoyles.layer", 0.02),
+            ParallaxImage.init("DRIVE/PARALLAX/wand.psd/3-fog1.layer", 0.1),
+            ParallaxImage.init("DRIVE/PARALLAX/wand.psd/4-olivander.layer", 0.3),
+            ParallaxImage.init("DRIVE/PARALLAX/wand.psd/5-effect.layer", 0.31),
+            ParallaxImage.init("DRIVE/PARALLAX/wand.psd/6-light.layer", 0.32),
+            ParallaxImage.init("DRIVE/PARALLAX/wand.psd/7-light.layer", 0.31),
+            ParallaxImage.init("DRIVE/PARALLAX/wand.psd/8-light.layer", 0.32),
+            ParallaxImage.init("DRIVE/PARALLAX/wand.psd/9-light.layer", 0.31),
+            ParallaxImage.init("DRIVE/PARALLAX/wand.psd/10-light.layer", 0.31),
+            ParallaxImage.init("DRIVE/PARALLAX/wand.psd/11-light.layer", 0.31),
+            ParallaxImage.init("DRIVE/PARALLAX/wand.psd/12-light.layer", 0.31),
+            ParallaxImage.init("DRIVE/PARALLAX/wand.psd/13-light.layer", 0.31),
+            ParallaxImage.init("DRIVE/PARALLAX/wand.psd/14-fog2.layer", 0.4),
+        },
+    },
 };
 
 fn tryLoadAndGetParallaxSet(assets: anytype, index: usize, priority: u32, textureWrap: app.asset_data.TextureWrapMode, textureFilter: app.asset_data.TextureFilter) ?*const ParallaxSet

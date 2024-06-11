@@ -191,7 +191,7 @@ pub const App = struct {
     debug: bool = false,
 
     const Self = @This();
-    pub const PARALLAX_SET_SWAP_SECONDS = 6;
+    pub const PARALLAX_SET_SWAP_SECONDS = 600;
     const PARALLAX_SET_INDEX_START = 2;
     comptime {
         if (PARALLAX_SET_INDEX_START >= parallax.PARALLAX_SETS.len) {
@@ -212,20 +212,20 @@ pub const App = struct {
         try self.renderState.load();
         try self.assets.load(permanentAllocator);
 
-        w.glClearColor(0.0, 0.0, 0.0, 0.0);
-        w.glEnable(w.GL_DEPTH_TEST);
-        w.glDepthFunc(w.GL_LEQUAL);
+        // w.glClearColor(0.0, 0.0, 0.0, 0.0);
+        // w.glEnable(w.GL_DEPTH_TEST);
+        // w.glDepthFunc(w.GL_LEQUAL);
 
-        w.glEnable(w.GL_BLEND);
-        w.glBlendFuncSeparate(
-            w.GL_SRC_ALPHA, w.GL_ONE_MINUS_SRC_ALPHA, w.GL_ONE, w.GL_ONE
-        );
+        // w.glEnable(w.GL_BLEND);
+        // w.glBlendFuncSeparate(
+        //     w.GL_SRC_ALPHA, w.GL_ONE_MINUS_SRC_ALPHA, w.GL_ONE, w.GL_ONE
+        // );
 
         w.setCursorZ("auto");
 
-        self.fbTexture = 0;
-        self.fbDepthRenderbuffer = 0;
-        self.fb = 0;
+        // self.fbTexture = 0;
+        // self.fbDepthRenderbuffer = 0;
+        // self.fb = 0;
 
         w.httpRequestZ(.GET, "/portfolio", "", "", ""); // Load portfolio data ASAP
 
@@ -249,7 +249,7 @@ pub const App = struct {
 
     pub fn updateAndRender(self: *Self, screenSize: m.Vec2usize, timestampUs: i64, scrollY: i32) i32
     {
-        const screenSizeI = screenSize.toVec2i();
+        // const screenSizeI = screenSize.toVec2i();
         const screenSizeF = screenSize.toVec2();
         const scrollYF: f32 = @floatFromInt(scrollY);
         defer {
@@ -307,16 +307,16 @@ pub const App = struct {
         const screenResize = !m.eql(self.screenSizePrev, screenSize);
         if (screenResize) {
             std.log.info("resetting screen framebuffer", .{});
-            self.fbTexture = w.createTexture(screenSizeI.x, screenSizeI.y, w.GL_CLAMP_TO_EDGE, w.GL_NEAREST);
+            // self.fbTexture = w.createTexture(screenSizeI.x, screenSizeI.y, w.GL_CLAMP_TO_EDGE, w.GL_NEAREST);
 
-            self.fb = w.glCreateFramebuffer();
-            w.glBindFramebuffer(w.GL_FRAMEBUFFER, self.fb);
-            w.glFramebufferTexture2D(w.GL_FRAMEBUFFER, w.GL_COLOR_ATTACHMENT0, w.GL_TEXTURE_2D, self.fbTexture, 0);
+            // self.fb = w.glCreateFramebuffer();
+            // w.glBindFramebuffer(w.GL_FRAMEBUFFER, self.fb);
+            // w.glFramebufferTexture2D(w.GL_FRAMEBUFFER, w.GL_COLOR_ATTACHMENT0, w.GL_TEXTURE_2D, self.fbTexture, 0);
 
-            self.fbDepthRenderbuffer = w.glCreateRenderbuffer();
-            w.glBindRenderbuffer(w.GL_RENDERBUFFER, self.fbDepthRenderbuffer);
-            w.glRenderbufferStorage(w.GL_RENDERBUFFER, w.GL_DEPTH_COMPONENT16, screenSizeI.x, screenSizeI.y);
-            w.glFramebufferRenderbuffer(w.GL_FRAMEBUFFER, w.GL_DEPTH_ATTACHMENT, w.GL_RENDERBUFFER, self.fbDepthRenderbuffer);
+            // self.fbDepthRenderbuffer = w.glCreateRenderbuffer();
+            // w.glBindRenderbuffer(w.GL_RENDERBUFFER, self.fbDepthRenderbuffer);
+            // w.glRenderbufferStorage(w.GL_RENDERBUFFER, w.GL_DEPTH_COMPONENT16, screenSizeI.x, screenSizeI.y);
+            // w.glFramebufferRenderbuffer(w.GL_FRAMEBUFFER, w.GL_DEPTH_ATTACHMENT, w.GL_RENDERBUFFER, self.fbDepthRenderbuffer);
 
             self.loadRelevantAssets(screenSize, tempAllocator) catch |err| {
                 std.log.err("loadRelevantAssets error {}", .{err});
@@ -339,9 +339,9 @@ pub const App = struct {
         // }
 
         // w.glBindFramebuffer(w.GL_FRAMEBUFFER, self.fb);
-        w.bindNullFramebuffer();
+        // w.bindNullFramebuffer();
 
-        w.glClear(w.GL_COLOR_BUFFER_BIT | w.GL_DEPTH_BUFFER_BIT);
+        // w.glClear(w.GL_COLOR_BUFFER_BIT | w.GL_DEPTH_BUFFER_BIT);
 
         var yMax: i32 = 0;
         defer {
@@ -1302,8 +1302,8 @@ fn drawDesktop(state: *App, deltaS: f64, scrollYF: f32, screenSizeF: m.Vec2, ren
                     );
                     const numStr = std.fmt.allocPrint(allocator, "{}", .{i + 1}) catch unreachable;
                     const numberTextPos = m.Vec2.init(
-                        numberPos.x + numberSize.x * 0.28,
-                        numberPos.y + numberSize.y * 0.75
+                        numberPos.x + numberSize.x * 0.25,
+                        numberPos.y + numberSize.y * 0.77
                     );
                     renderQueue.text(numStr, numberTextPos, DEPTH_UI_GENERIC + 0.01, fontNumber, m.Vec4.black);
 
