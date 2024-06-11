@@ -191,7 +191,7 @@ pub const App = struct {
     debug: bool = false,
 
     const Self = @This();
-    pub const PARALLAX_SET_SWAP_SECONDS = 600;
+    pub const PARALLAX_SET_SWAP_SECONDS = 6;
     const PARALLAX_SET_INDEX_START = 2;
     comptime {
         if (PARALLAX_SET_INDEX_START >= parallax.PARALLAX_SETS.len) {
@@ -279,10 +279,10 @@ pub const App = struct {
                 }
             }
         }
-        // TODO debug disable
-        if (self.inputState.keyboardState.keyDown('G')) {
-            self.debug = !self.debug;
-        }
+        // DEBUG
+        // if (self.inputState.keyboardState.keyDown('G')) {
+        //     self.debug = !self.debug;
+        // }
         if (self.inputState.keyboardState.keyDown('Y')) {
             self.activeParallaxSetIndex = (self.activeParallaxSetIndex + 1) % parallax.PARALLAX_SETS.len;
         }
